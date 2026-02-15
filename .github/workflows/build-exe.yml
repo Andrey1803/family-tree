@@ -32,11 +32,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} dist/Семейное_древо.exe --clobber
+          Copy-Item "dist/Семейное_древо.exe" "dist/Family_tree.exe"
+          gh release upload ${{ github.event.release.tag_name }} dist/Family_tree.exe --clobber
 
       - name: Upload artifact (при ручном запуске)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: Семейное_древо-exe
+          name: Family_tree-exe
           path: dist/Семейное_древо.exe
