@@ -4,8 +4,6 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks.tcl_tk import tcltk_info
-
 _block_cipher = None
 
 # Корень проекта
@@ -14,9 +12,12 @@ tree_dir = root / 'Дерево'
 
 # Данные для приложения + Tcl/Tk (для tkinter на другом ПК)
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
-# tcltk_info.data_files: (dest, src, 'DATA') → для Analysis нужен (src, dest)
-if tcltk_info.data_files:
-    datas_list.extend((src, dest) for dest, src, _ in tcltk_info.data_files)
+try:
+    from PyInstaller.utils.hooks.tcl_tk import tcltk_info
+    if tcltk_info.data_files:
+        datas_list.extend((src, dest) for dest, src, _ in tcltk_info.data_files)
+except Exception:
+    pass  # На GitHub Actions tcltk_info может падать — tkinter всё равно работает
 
 a = Analysis(
     [str(root / 'main.py')],
@@ -50,7 +51,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # upx=True ломает сборку на некоторых CI (GitHub Actions)
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # True — видно ошибки на другом ПК; False — без консоли для релиза
