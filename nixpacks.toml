@@ -1,12 +1,8 @@
-# Railway / Nixpacks: сборка веб-приложения «Семейное древо»
-# https://docs.railway.com/guides/flask
+# Railway / Nixpacks: сборка из корня репозитория
+# Сборка веб-приложения (web/requirements.txt)
 
 [phases.setup]
 nixPkgs = ["python312"]
 
 [phases.install]
-skip = true
-cmds = ["pip install -r web/requirements.txt"]
-
-[start]
-cmd = "gunicorn --bind 0.0.0.0:$PORT web.app:app"
+cmds = ["python -m pip install -r web/requirements.txt"]
