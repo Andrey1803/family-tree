@@ -88,7 +88,8 @@ except Exception:
 def index():
     if "username" not in session:
         return redirect(url_for("login"))
-    return render_template("tree.html", username=session.get("username", "Гость"))
+    github_repo = os.environ.get("GITHUB_REPO", "Andrey1803/family-tree")
+    return render_template("tree.html", username=session.get("username", "Гость"), github_repo=github_repo)
 
 
 @app.route("/login", methods=["GET", "POST"])

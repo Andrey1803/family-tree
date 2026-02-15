@@ -1,0 +1,42 @@
+# Сборка Семейное_древо.exe для Windows
+# Запускается при публикации релиза (или вручную)
+name: Build Windows exe
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Ручной запуск из вкладки Actions
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build exe
+        run: pyinstaller build_exe.spec
+
+      - name: Upload to Release (при релизе)
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} dist/Семейное_древо.exe --clobber
+
+      - name: Upload artifact (при ручном запуске)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Семейное_древо-exe
+          path: dist/Семейное_древо.exe

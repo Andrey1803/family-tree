@@ -1670,6 +1670,7 @@ function openSearchDialog() {
 }
 
 function setupDesktopAppButtons() {
+    const btnExe = document.getElementById("btn-download-exe");
     const btnInstall = document.getElementById("btn-pwa-install");
     const btnOpen = document.getElementById("btn-pwa-open");
     const hint = document.getElementById("desktop-app-hint");
@@ -1682,25 +1683,24 @@ function setupDesktopAppButtons() {
     const isDesktopAppInstalled = () => localStorage.getItem("desktop-app-installed") === "1";
 
     function updateButtons() {
+        const hide = (el) => { if (el) el.style.display = "none"; };
+        const show = (el, d) => { if (el) el.style.display = d || "inline-block"; };
         if (isStandalone()) {
-            btnInstall.style.display = "none";
-            btnOpen.style.display = "none";
-            if (hint) hint.style.display = "none";
+            hide(btnExe); hide(btnInstall); hide(btnOpen); hide(hint);
             return;
         }
         if (!isWindows) {
-            btnInstall.style.display = "none";
-            btnOpen.style.display = "none";
-            if (hint) hint.style.display = "none";
+            hide(btnExe); hide(btnInstall); hide(btnOpen); hide(hint);
             return;
         }
         if (isDesktopAppInstalled()) {
-            btnInstall.style.display = "none";
-            btnOpen.style.display = "inline-block";
-            if (hint) hint.style.display = "none";
+            hide(btnExe); hide(btnInstall);
+            show(btnOpen);
+            hide(hint);
         } else {
-            btnInstall.style.display = "inline-block";
-            btnOpen.style.display = "none";
+            show(btnExe);
+            show(btnInstall);
+            hide(btnOpen);
             if (hint) {
                 hint.style.display = "inline";
                 hint.textContent = "Уже установлено?";
