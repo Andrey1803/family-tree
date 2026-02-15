@@ -89,7 +89,8 @@ def index():
     if "username" not in session:
         return redirect(url_for("login"))
     github_repo = os.environ.get("GITHUB_REPO", "Andrey1803/family-tree")
-    return render_template("tree.html", username=session.get("username", "Гость"), github_repo=github_repo)
+    exe_filename = "Семейное_древо" + ".exe"  # расширение обязательно латиница
+    return render_template("tree.html", username=session.get("username", "Гость"), github_repo=github_repo, exe_filename=exe_filename)
 
 
 @app.route("/login", methods=["GET", "POST"])
