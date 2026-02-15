@@ -201,15 +201,21 @@ def download_desktop():
     buf = BytesIO()
     bat_src = (
         "@echo off\r\nchcp 65001 >nul\r\ncd /d \"%~dp0\"\r\n"
+        "if not exist main.py (\r\n"
+        "  echo Ошибка: main.py не найден. Сначала РАСПАКУЙТЕ архив в папку (не запускайте из WinRAR).\r\n"
+        "  pause\r\n"
+        "  exit /b 1\r\n"
+        ")\r\n"
         "python main.py\r\necho.\r\npause\r\n"
     ).encode("utf-8")
     readme_src = (
         "Семейное древо — Desktop (исходники)\r\n"
         "=====================================\r\n\r\n"
-        "Запуск: дважды нажмите run_debug.bat\r\n"
-        "Требуется: Python 3.8+ (https://python.org)\r\n\r\n"
+        "1. РАСПАКУЙТЕ архив в папку (ПКМ - Извлечь).\r\n"
+        "   Не запускайте файлы прямо из WinRAR/архива!\r\n\r\n"
+        "2. Запуск: дважды нажмите run_debug.bat\r\n"
+        "   Требуется: Python 3.8+ (https://python.org)\r\n\r\n"
         "Чтобы получить .exe: на Windows запустите build_exe.bat из полного проекта с GitHub.\r\n"
-        "Веб-версия не собирает .exe — только исходники.\r\n"
     ).encode("utf-8")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("README.txt", readme_src)
