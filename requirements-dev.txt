@@ -1,0 +1,12 @@
+# Полные зависимости для разработки и сборки
+# Установка: pip install -r requirements-dev.txt
+
+# Desktop
+Pillow>=9.0.0
+
+# Web
+Flask>=3.0.0
+Werkzeug>=3.0.0
+
+# Сборка .exe
+pyinstaller>=6.0.0

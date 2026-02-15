@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1e40af">
+    <title>Семейное древо — {{ username }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+</head>
+<body>
+    <header class="tree-header">
+        <h1>Семейное древо</h1>
+        <nav class="tree-menubar">
+            <div class="menu-item">
+                <span class="menu-label">Файл</span>
+                <div class="menu-dropdown">
+                    <button type="button" data-action="new">Новый</button>
+                    <button type="button" data-action="save">Сохранить</button>
+                    <hr>
+                    <button type="button" data-action="export-csv">Экспорт в CSV</button>
+                    <button type="button" data-action="import-csv">Импорт из CSV</button>
+                    <hr>
+                    <a href="{{ url_for('logout') }}">Выход</a>
+                </div>
+            </div>
+            <div class="menu-item">
+                <span class="menu-label">Вид</span>
+                <div class="menu-dropdown">
+                    <button type="button" data-action="refresh">Обновить</button>
+                    <button type="button" data-action="zoom-reset">Масштаб 1:1</button>
+                    <hr>
+                    <button type="button" data-action="collapse-all">Свернуть все ветви</button>
+                    <button type="button" data-action="expand-all">Развернуть все ветви</button>
+                    <hr>
+                    <button type="button" data-action="focus-mode">Режим фокуса</button>
+                    <button type="button" data-action="filters">Фильтры</button>
+                    <hr>
+                    <button type="button" data-action="color-palette">Цвет интерфейса...</button>
+                </div>
+            </div>
+            <div class="menu-item">
+                <span class="menu-label">Правка</span>
+                <div class="menu-dropdown">
+                    <button type="button" data-action="search">Найти</button>
+                </div>
+            </div>
+        </nav>
+        <div class="tree-header-right">
+            <button type="button" class="btn-pwa-install" id="btn-pwa-install" style="display:none">Установить приложение</button>
+            <button type="button" class="btn-pwa-open" id="btn-pwa-open" style="display:none" title="Запустите приложение и выберите Файл → Зарегистрировать протокол">Открыть в приложении</button>
+            <span class="desktop-app-hint" id="desktop-app-hint" style="display:none">Приложение установлено?</span>
+            <span class="user">{{ username }}</span>
+            <a href="{{ url_for('logout') }}">Выйти</a>
+        </div>
+    </header>
+    <input type="file" id="import-csv-input" accept=".csv" style="display:none">
+    <main class="tree-container">
+        <div id="tree-root"></div>
+        <div class="empty-tree" id="empty-msg" style="display:none;">
+            <p>Дерево пусто.</p>
+            <button type="button" class="btn-add-first" id="btn-add-first">Добавить первую персону</button>
+        </div>
+    </main>
+    <footer class="tree-statusbar">
+        <span id="status-center">Центр: не выбран</span>
+        <span id="status-msg"></span>
+    </footer>
+    <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+</body>
+</html>
