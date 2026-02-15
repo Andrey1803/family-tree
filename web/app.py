@@ -203,7 +203,16 @@ def download_desktop():
         "@echo off\r\nchcp 65001 >nul\r\ncd /d \"%~dp0\"\r\n"
         "python main.py\r\necho.\r\npause\r\n"
     ).encode("utf-8")
+    readme_src = (
+        "Семейное древо — Desktop (исходники)\r\n"
+        "=====================================\r\n\r\n"
+        "Запуск: дважды нажмите run_debug.bat\r\n"
+        "Требуется: Python 3.8+ (https://python.org)\r\n\r\n"
+        "Чтобы получить .exe: на Windows запустите build_exe.bat из полного проекта с GitHub.\r\n"
+        "Веб-версия не собирает .exe — только исходники.\r\n"
+    ).encode("utf-8")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("README.txt", readme_src)
         zf.writestr("run_debug.bat", bat_src)
         if os.path.isfile(main_py):
             zf.write(main_py, "main.py")
