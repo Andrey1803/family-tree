@@ -291,6 +291,8 @@ body {
   inset: 0;
   overflow: hidden;
   user-select: none;
+  /* touch-action: none — нужен для кастомного pan одним пальцем на мобильных */
+  touch-action: none;
 }
 
 #tree-svg {
@@ -625,3 +627,50 @@ body {
   margin-bottom: 4px;
 }
 .tree-pick-modal .pick-item:hover { background: #f1f5f9; }
+
+/* Мобильные устройства */
+@media (max-width: 768px) {
+  .tree-header {
+    padding: 8px 12px;
+    gap: 12px;
+  }
+  .tree-menubar .menu-label {
+    padding: 10px 14px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .tree-menubar .menu-dropdown {
+    min-width: 200px;
+    padding: 8px 0;
+  }
+  .tree-menubar .menu-dropdown button,
+  .tree-menubar .menu-dropdown a {
+    padding: 12px 16px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .tree-header-right {
+    gap: 8px;
+  }
+  .tree-header-right .user {
+    font-size: 0.85rem;
+  }
+  .tree-statusbar {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+  .tree-card {
+    min-width: 100px;
+    min-height: 80px;
+  }
+  .tree-card .name { font-size: 10px; }
+  .tree-card .dates { font-size: 8px; }
+  .tree-context-menu .cm-item {
+    padding: 12px 16px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}

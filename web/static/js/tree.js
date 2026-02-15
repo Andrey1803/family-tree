@@ -309,6 +309,7 @@ function render() {
 
         card.onclick = (e) => {
             if (window._treeDidPan) return;
+            if (card._longPressFired) return;
             setCenterAndSave(pid);
         };
         card.ondblclick = (e) => {
@@ -320,6 +321,20 @@ function render() {
             e.preventDefault();
             showContextMenu(pid, e.clientX, e.clientY, persons);
         });
+        let longPressTimer;
+        card.addEventListener("touchstart", (e) => {
+            if (e.touches.length !== 1) return;
+            card._longPressFired = false;
+            const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+            longPressTimer = setTimeout(() => {
+                if (window._treeDidPan) return; // панорамирование — не показываем меню
+                card._longPressFired = true;
+                e.preventDefault();
+                showContextMenu(pid, tx, ty, persons);
+            }, 500);
+        }, { passive: true });
+        card.addEventListener("touchend", () => clearTimeout(longPressTimer));
+        card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
         wrap.appendChild(card);
     });
 
@@ -368,6 +383,25 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             applyPan();
         }
     }, { passive: false });
+    let pinchDist0, zoom0;
+    panZoomWrapper.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 2) {
+            pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+            zoom0 = treeZoom;
+        }
+    }, { passive: true });
+    panZoomWrapper.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 2 && pinchDist0) {
+            e.preventDefault();
+            const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+            const factor = dist / pinchDist0;
+            applyZoom(zoom0 * factor);
+            applyPan();
+        }
+    }, { passive: false });
+    panZoomWrapper.addEventListener("touchend", (e) => {
+        if (e.touches.length < 2) pinchDist0 = null;
+    });
 }
 
 function setupPan(wrap, panZoomWrapper) {
@@ -393,19 +427,53 @@ function setupPan(wrap, panZoomWrapper) {
         document.removeEventListener("mouseup", onUp);
     };
 
-    viewport.style.cursor = "grab";
-    viewport.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
+    const startPan = (clientX, clientY) => {
         active = true;
         window._treeDidPan = false;
-        startX = e.clientX;
-        startY = e.clientY;
+        startX = clientX;
+        startY = clientY;
         startPanX = treePanX;
         startPanY = treePanY;
         viewport.style.cursor = "grabbing";
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
+    };
+    const onTouchMove = (e) => {
+        if (!active || !e.touches) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        window._treeDidPan = true;
+        treePanX = startPanX + t.clientX - startX;
+        treePanY = startPanY + t.clientY - startY;
+        applyPan();
+    };
+    const stopTouchPan = () => {
+        active = false;
+        viewport.style.cursor = "grab";
+        document.removeEventListener("touchmove", onTouchMove, { passive: false });
+        document.removeEventListener("touchend", onTouchEnd);
+        document.removeEventListener("touchcancel", onTouchEnd);
+    };
+    const onTouchEnd = stopTouchPan;
+    viewport.style.cursor = "grab";
+    viewport.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        startPan(e.clientX, e.clientY);
     });
+    viewport.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) return;
+        e.preventDefault(); // важно для iOS: блокируем браузерный скролл, чтобы pan работал
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        startPanX = treePanX;
+        startPanY = treePanY;
+        active = true;
+        window._treeDidPan = false;
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+        document.addEventListener("touchcancel", onTouchEnd);
+    }, { passive: false });
 }
 
 function setCenterAndSave(pid) {
