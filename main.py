@@ -39,10 +39,10 @@ if __name__ == "__main__":
         if getattr(sys, "frozen", False):
             # .exe: данные рядом с exe, скрипты — во временной папке PyInstaller
             _data_root = os.path.dirname(sys.executable)
-            os.chdir(_data_root)
             _script_root = sys._MEIPASS
         else:
             _data_root = _script_root = os.path.dirname(os.path.abspath(__file__))
+        os.chdir(_data_root)  # данные (users.json, family_tree_*.json) — в папке проекта/exe
         _inner = os.path.join(_script_root, "Дерево")
         if not os.path.isdir(_inner):
             raise FileNotFoundError(f"Папка Дерево не найдена: {_inner}")
