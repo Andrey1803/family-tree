@@ -176,6 +176,7 @@ def api_tree():
 def download_desktop():
     """Скачать Windows-версию: .exe (если собран) или ZIP с исходниками."""
     root_dir = os.path.normpath(os.path.join(_web_dir, ".."))
+    bundle_dir = os.path.join(_web_dir, "desktop_bundle")
     exe_path = os.path.join(root_dir, "dist", "Семейное_древо.exe")
 
     if os.path.isfile(exe_path):
@@ -193,11 +194,17 @@ def download_desktop():
         r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         r.headers["Pragma"] = "no-cache"
         return r
-    # Fallback: ZIP с исходниками (если exe не собран)
-    tree_dir = os.path.join(root_dir, "Дерево")
-    main_py = os.path.join(root_dir, "main.py")
+    # Fallback: ZIP с исходниками (из desktop_bundle или из корня проекта)
+    use_bundle = os.path.isdir(bundle_dir)
+    tree_dir = os.path.join(bundle_dir, "Дерево") if use_bundle else os.path.join(root_dir, "Дерево")
+    main_py = os.path.join(bundle_dir, "main.py") if use_bundle else os.path.join(root_dir, "main.py")
     buf = BytesIO()
+    bat_src = (
+        "@echo off\r\nchcp 65001 >nul\r\ncd /d \"%~dp0\"\r\n"
+        "python main.py\r\necho.\r\npause\r\n"
+    ).encode("utf-8")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("run_debug.bat", bat_src)
         if os.path.isfile(main_py):
             zf.write(main_py, "main.py")
         if os.path.isdir(tree_dir):
