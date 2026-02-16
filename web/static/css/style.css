@@ -264,6 +264,9 @@ body {
   color: var(--card-male);
   text-decoration: none;
 }
+.tree-header a.btn-pwa-install {
+  color: #fff;
+}
 
 .tree-statusbar {
   display: flex;
