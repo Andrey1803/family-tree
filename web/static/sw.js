@@ -1,5 +1,5 @@
 /* Service Worker для PWA «Семейное древо» */
-const CACHE_NAME = "family-tree-v1";
+const CACHE_NAME = "family-tree-v2";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

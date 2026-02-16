@@ -265,15 +265,15 @@ function render() {
     (treeData.marriages || []).forEach(([a, b]) => {
         const idA = String(a), idB = String(b);
         if (!coords[idA] || !coords[idB] || !related.has(idA) || !related.has(idB)) return;
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("x1", coords[idA].x + offsetX);
         line.setAttribute("y1", coords[idA].y + offsetY);
         line.setAttribute("x2", coords[idB].x + offsetX);
         line.setAttribute("y2", coords[idB].y + offsetY);
         line.setAttribute("stroke", "#b45309");
-        line.setAttribute("stroke-width", 2);
+            line.setAttribute("stroke-width", 2);
         line.setAttribute("stroke-dasharray", "4 4");
-        svg.appendChild(line);
+            svg.appendChild(line);
     });
 
     Object.entries(coords).forEach(([pid, pos]) => {
@@ -1420,7 +1420,7 @@ function setupMenubar() {
             } else if (act === "import-csv") {
                 document.getElementById("import-csv-input")?.click();
             } else if (act === "refresh") {
-                loadTree();
+loadTree();
             } else if (act === "zoom-reset") {
                 treeZoom = 1;
                 treePanX = 0;
@@ -1671,10 +1671,9 @@ function openSearchDialog() {
 
 function setupDesktopAppButtons() {
     const btnExe = document.getElementById("btn-download-exe");
-    const btnInstall = document.getElementById("btn-pwa-install");
     const btnOpen = document.getElementById("btn-pwa-open");
     const hint = document.getElementById("desktop-app-hint");
-    if (!btnInstall || !btnOpen) return;
+    if (!btnExe || !btnOpen) return;
 
     const isWindows = /Win|Windows/i.test(navigator.userAgent) || /Windows/i.test(navigator.platform);
     const isStandalone = () =>
@@ -1686,20 +1685,19 @@ function setupDesktopAppButtons() {
         const hide = (el) => { if (el) el.style.display = "none"; };
         const show = (el, d) => { if (el) el.style.display = d || "inline-block"; };
         if (isStandalone()) {
-            hide(btnExe); hide(btnInstall); hide(btnOpen); hide(hint);
+            hide(btnExe); hide(btnOpen); hide(hint);
             return;
         }
         if (!isWindows) {
-            hide(btnExe); hide(btnInstall); hide(btnOpen); hide(hint);
+            hide(btnExe); hide(btnOpen); hide(hint);
             return;
         }
         if (isDesktopAppInstalled()) {
-            hide(btnExe); hide(btnInstall);
+            hide(btnExe);
             show(btnOpen);
             hide(hint);
         } else {
             show(btnExe);
-            show(btnInstall);
             hide(btnOpen);
             if (hint) {
                 hint.style.display = "inline";
@@ -1709,11 +1707,6 @@ function setupDesktopAppButtons() {
     }
 
     updateButtons();
-
-    btnInstall.onclick = () => {
-        // ?v= — обход кэша браузера, всегда скачивать свежий exe
-        window.location.href = window.location.origin + "/download/desktop?v=" + Date.now();
-    };
 
     btnOpen.onclick = () => {
         const url = window.location.origin + "/";
