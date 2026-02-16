@@ -32,9 +32,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          Copy-Item "dist/Семейное_древо.exe" "dist/Family_tree.exe"
-          Copy-Item "scripts/Запуск_release.bat" "dist/Запуск.bat"
-          gh release upload ${{ github.event.release.tag_name }} dist/Family_tree.exe dist/Запуск.bat --clobber
+          Copy-Item "dist/Семейное_древо.exe" "dist/Tree.exe"
+          gh release upload ${{ github.event.release.tag_name }} dist/Tree.exe --clobber
 
       - name: Upload artifact (при ручном запуске)
         if: github.event_name == 'workflow_dispatch'
