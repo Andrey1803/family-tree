@@ -27,17 +27,18 @@ jobs:
       - name: Build exe
         run: pyinstaller build_exe.spec --noconfirm
 
-      - name: Upload to Release (при релизе)
+      - name: Upload to Release (onedir — папка в zip)
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          Copy-Item "dist/Семейное_древо.exe" "dist/Tree.exe"
-          gh release upload ${{ github.event.release.tag_name }} dist/Tree.exe --clobber
+          Copy-Item "scripts/README_release.txt" "dist/Семейное_древо/КАК_ЗАПУСТИТЬ.txt"
+          Compress-Archive -Path "dist/Семейное_древо" -DestinationPath "dist/Tree.zip"
+          gh release upload ${{ github.event.release.tag_name }} dist/Tree.zip --clobber
 
       - name: Upload artifact (при ручном запуске)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: Family_tree-exe
-          path: dist/Семейное_древо.exe
+          name: Tree
+          path: dist/Семейное_древо

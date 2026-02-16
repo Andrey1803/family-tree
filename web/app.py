@@ -94,17 +94,17 @@ def index():
 
 @app.route("/download/exe")
 def download_exe():
-    """Прокси: скачивает Tree.exe с GitHub, отдаёт пользователю. Без перехода на GitHub."""
+    """Прокси: скачивает Tree.zip с GitHub, отдаёт пользователю. Без перехода на GitHub."""
     github_repo = os.environ.get("GITHUB_REPO", "Andrey1803/family-tree")
-    url = f"https://github.com/{github_repo}/releases/latest/download/Tree.exe"
+    url = f"https://github.com/{github_repo}/releases/latest/download/Tree.zip"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             data = resp.read()
-        return Response(data, mimetype="application/octet-stream", headers={
-            "Content-Disposition": "attachment; filename=Tree.exe",
+        return Response(data, mimetype="application/zip", headers={
+            "Content-Disposition": "attachment; filename=Tree.zip",
         })
-    except Exception as e:
+    except Exception:
         return redirect(f"https://github.com/{github_repo}/releases/latest")
 
 

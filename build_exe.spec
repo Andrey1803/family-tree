@@ -10,8 +10,14 @@ _block_cipher = None
 root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
 
-# Данные для приложения (Tcl/Tk — через стандартный hook PyInstaller)
+# Данные для приложения + Tcl/Tk (обязательно для tkinter на другом ПК)
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
+try:
+    from PyInstaller.utils.hooks.tcl_tk import tcltk_info
+    if tcltk_info.data_files:
+        datas_list.extend((src, dest) for dest, src, _ in tcltk_info.data_files)
+except Exception:
+    pass
 
 a = Analysis(
     [str(root / 'main.py')],
@@ -35,23 +41,30 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=_block_cipher)
 
+# onedir — Tcl/Tk стабильно работает на других ПК (onefile даёт init.tcl error)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='Семейное_древо',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,  # без консоли — выглядит как обычное приложение
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='Семейное_древо',
 )
