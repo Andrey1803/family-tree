@@ -47,7 +47,7 @@
             </div>
         </nav>
         <div class="tree-header-right">
-            <a href="{{ releases_url }}" id="btn-download-exe" class="btn-pwa-install" style="display:none" title="Страница релизов — скачайте .exe" target="_blank" rel="noopener">Скачать .exe</a>
+            <a href="{{ url_for('download_exe') }}" id="btn-download-exe" class="btn-pwa-install" style="display:none" title="Скачать Tree.exe" download="Tree.exe">Скачать .exe</a>
             <button type="button" class="btn-pwa-install" id="btn-pwa-install" style="display:none" title="ZIP с исходниками (нужен Python)">Скачать исходники</button>
             <button type="button" class="btn-pwa-open" id="btn-pwa-open" style="display:none" title="Запустите приложение и выберите Файл → Зарегистрировать протокол">Открыть в приложении</button>
             <span class="desktop-app-hint" id="desktop-app-hint" style="display:none">Приложение установлено?</span>

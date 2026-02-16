@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import sys
+import urllib.request
 
 import zipfile
 from io import BytesIO
@@ -88,9 +89,23 @@ except Exception:
 def index():
     if "username" not in session:
         return redirect(url_for("login"))
+    return render_template("tree.html", username=session.get("username", "Гость"))
+
+
+@app.route("/download/exe")
+def download_exe():
+    """Прокси: скачивает Tree.exe с GitHub, отдаёт пользователю. Без перехода на GitHub."""
     github_repo = os.environ.get("GITHUB_REPO", "Andrey1803/family-tree")
-    releases_url = f"https://github.com/{github_repo}/releases/latest"
-    return render_template("tree.html", username=session.get("username", "Гость"), github_repo=github_repo, releases_url=releases_url)
+    url = f"https://github.com/{github_repo}/releases/latest/download/Tree.exe"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+        return Response(data, mimetype="application/octet-stream", headers={
+            "Content-Disposition": "attachment; filename=Tree.exe",
+        })
+    except Exception as e:
+        return redirect(f"https://github.com/{github_repo}/releases/latest")
 
 
 @app.route("/login", methods=["GET", "POST"])
