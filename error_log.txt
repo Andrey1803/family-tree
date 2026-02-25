@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "D:\Мои документы\Рабочий стол\hobby\Projects\Дерево\main.py", line 51, in <module>
+    runpy.run_path(os.path.join(_inner, "main.py"), run_name="__main__")
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "D:\Мои документы\Рабочий стол\hobby\Projects\Дерево\Дерево\main.py", line 36, in <module>
+    main()
+    ~~~~^^
+  File "D:\Мои документы\Рабочий стол\hobby\Projects\Дерево\Дерево\main.py", line 32, in main
+    run_login_window(start_app)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Мои документы\Рабочий стол\hobby\Projects\Дерево\Дерево\auth.py", line 106, in run_login_window
+    from . import constants, update_check
+ImportError: attempted relative import with no known parent package

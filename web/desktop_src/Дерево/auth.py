@@ -4,7 +4,6 @@
 import hashlib
 import json
 import os
-import webbrowser
 from typing import Dict, Optional
 
 import tkinter as tk
@@ -103,17 +102,10 @@ def run_login_window(on_success):
     """
     Показывает окно входа. При успешном входе вызывает on_success(login).
     """
-    import constants
-    import update_check
     login_root = tk.Tk()
-    login_root.configure(bg=constants.AUTH_BG)
     login_root.title("Вход — Семейное древо")
-    login_root.geometry("336x252")
+    login_root.geometry("320x240")
     login_root.resizable(False, False)
-    # Стиль ttk в тон окна
-    _style = ttk.Style()
-    _style.configure('TFrame', background=constants.AUTH_BG)
-    _style.configure('TLabel', background=constants.AUTH_BG, foreground='#2d2a26')
 
     frame = ttk.Frame(login_root, padding=20)
     frame.pack(fill=tk.BOTH, expand=True)
@@ -158,9 +150,8 @@ def run_login_window(on_success):
 
     def do_register():
         reg = tk.Toplevel(login_root)
-        reg.configure(bg=constants.AUTH_BG)
         reg.title("Регистрация")
-        reg.geometry("336x231")
+        reg.geometry("320x220")
         reg.transient(login_root)
         reg.grab_set()
         f = ttk.Frame(reg, padding=20)
@@ -210,23 +201,6 @@ def run_login_window(on_success):
             login_root.destroy()
             login_root.quit()
 
-    def _on_update_available(version, download_url):
-        if messagebox.askyesno(
-            "Обновление",
-            f"Доступна новая версия {version}.\n\nОткрыть страницу скачивания?",
-            parent=login_root,
-        ):
-            try:
-                webbrowser.open(download_url)
-            except Exception:
-                pass
-
     login_root.protocol("WM_DELETE_WINDOW", on_closing)
     password_entry.bind("<Return>", lambda e: do_login())
-
-    update_check.check_for_updates(
-        constants.UPDATE_CHECK_URL,
-        _on_update_available,
-        login_root,
-    )
     login_root.mainloop()

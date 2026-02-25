@@ -10,12 +10,16 @@ _block_cipher = None
 root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
 
-# Данные для приложения + Tcl/Tk (обязательно для tkinter на другом ПК)
+# Данные для приложения + Tcl/Tk (минимальный набор — без tzdata/msgs, чтобы избежать PermissionError)
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
 try:
     from PyInstaller.utils.hooks.tcl_tk import tcltk_info
     if tcltk_info.data_files:
-        datas_list.extend((src, dest) for dest, src, _ in tcltk_info.data_files)
+        for dest, src, kind in tcltk_info.data_files:
+            s, d = str(src), str(dest)
+            skip = any(x in d or x in s for x in ('tzdata', 'msgs', 'macRoman', 'macCyrillic', 'macUkraine', 'macIceland', 'macTurkish', 'macDingbats'))
+            if not skip:
+                datas_list.append((src, dest))
 except Exception:
     pass
 
@@ -28,6 +32,7 @@ a = Analysis(
         'encodings', 'encodings.utf_8', 'encodings.cp1251',
         'PIL', 'PIL._tkinter_finder',
         'app', 'auth', 'models', 'constants', 'ui_helpers', 'protocol_win',
+        'version', 'update_check',
     ],
     hookspath=[],
     hooksconfig={},

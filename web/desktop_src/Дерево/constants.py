@@ -5,27 +5,12 @@ import json
 import os
 import sys
 
-# URL для проверки обновлений (GitHub API — надёжнее, чем Railway)
-GITHUB_REPO = "Andrey1803/family-tree"
-UPDATE_CHECK_URL = "https://family-tree-production-0e7d.up.railway.app"  # запасной вариант
-WEB_VERSION_URL = "https://family-tree-production-0e7d.up.railway.app"  # веб-версия
-
 # --- Пол ---
 GENDER_MALE = "Мужской"
 GENDER_FEMALE = "Женский"
 
-# --- Дизайн: фон окон и интерфейс ---
-WINDOW_BG = "#f7f5f2"           # Тёплый основной фон приложения
-STATUSBAR_BG = "#e8e4de"         # Панель статуса
-CENTER_LABEL_BG = "#e0dbd4"     # Панель «Центр»
-DIALOG_BG = "#faf9f6"           # Фон диалогов и модальных окон
-AUTH_BG = "#f5f3ef"             # Окна входа/регистрации
-MENUBAR_BG = "#e8e4de"           # Фон строки меню (Файл, Вид, Правка)
-MENU_MALE_COLOR = "#1e40af"      # Мужские пункты в меню родственников (синий)
-MENU_FEMALE_COLOR = "#c41e3a"    # Женские пункты в меню родственников (красный)
-
-# --- Холст и карточки ---
-CANVAS_BG = "#f0ebe3"            # Холст дерева (теплее прежнего)
+# --- Дизайн: холст и карточки ---
+CANVAS_BG = "#f5f0e8"
 MARRIAGE_LINE_COLOR = "#b45309"
 PARENT_LINE_COLOR = "#475569"
 CHILD_LINE_COLOR = "#0d9488"
@@ -51,11 +36,7 @@ CARD_TOGGLE_BTN_TEXT = "#1e293b"
 
 # --- Палитра (пользователь может менять через меню) ---
 PALETTE_DEFAULTS = {
-    "WINDOW_BG": "#f7f5f2",
-    "MENUBAR_BG": "#e8e4de",
-    "MENU_MALE_COLOR": "#1e40af",
-    "MENU_FEMALE_COLOR": "#c41e3a",
-    "CANVAS_BG": "#f0ebe3",
+    "CANVAS_BG": "#f5f0e8",
     "MALE_COLOR": "#1e40af",
     "FEMALE_COLOR": "#9d174d",
     "DECEASED_COLOR": "#64748b",
@@ -77,10 +58,6 @@ PALETTE_DEFAULTS = {
     "CARD_TOGGLE_BTN_TEXT": "#1e293b",
 }
 PALETTE_LABELS = {
-    "WINDOW_BG": "Фон окна и рамка",
-    "MENUBAR_BG": "Фон строки меню",
-    "MENU_MALE_COLOR": "Меню: мужчины (синий)",
-    "MENU_FEMALE_COLOR": "Меню: женщины (красный)",
     "CANVAS_BG": "Фон холста",
     "MALE_COLOR": "Карточка: мужчина",
     "FEMALE_COLOR": "Карточка: женщина",

@@ -85,6 +85,22 @@ except Exception:
     pass
 
 
+try:
+    from version import VERSION
+except ImportError:
+    VERSION = "1.0.0"
+
+
+@app.route("/api/version")
+def api_version():
+    """Версия приложения и ссылка на скачивание (для desktop проверки обновлений)."""
+    base = request.url_root.rstrip("/")
+    return jsonify({
+        "version": VERSION,
+        "download_url": f"{base}/download/exe",
+    })
+
+
 @app.route("/")
 def index():
     if "username" not in session:
