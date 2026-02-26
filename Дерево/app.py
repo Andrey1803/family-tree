@@ -4226,10 +4226,17 @@ class FamilyTreeApp:
             return False
         try:
             import csv
+            persons = self.model.get_all_persons()
+            if not persons:
+                messagebox.showwarning("Предупреждение", "Нет персон для экспорта!")
+                return False
+            
             with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=self.CSV_FIELDS, delimiter=';', extrasaction='ignore')
+                writer = csv.DictWriter(csvfile, fieldnames=self.CSV_FIELDS, delimiter=';')
                 writer.writeheader()
-                for pid, person in self.model.get_all_persons().items():
+                
+                count = 0
+                for pid, person in persons.items():
                     links = getattr(person, 'links', None) or []
                     titles = '|'.join((x.get('title') or '') for x in links)
                     urls = '|'.join((x.get('url') or '') for x in links)
@@ -4255,8 +4262,10 @@ class FamilyTreeApp:
                         'links_titles': titles,
                         'links_urls': urls,
                     })
-            self.model.logger.info(f"Экспорт в CSV: {filename}")
-            messagebox.showinfo("Успех", f"Данные экспортированы в {filename}")
+                    count += 1
+            
+            self.model.logger.info(f"Экспорт в CSV: {filename} ({count} персон)")
+            messagebox.showinfo("Успех", f"Экспортировано {count} персон в {filename}")
             return True
         except Exception as e:
             self.model.logger.error(f"Ошибка экспорта в CSV: {e}")
@@ -4325,10 +4334,11 @@ class FamilyTreeApp:
                     for cid in common_ids:
                         new_persons.pop(cid, None)
 
+            imported_count = len(new_persons)
             self.model.persons.update(new_persons)
             self.model.mark_modified()
-            self.model.logger.info(f"Данные импортированы из CSV: {filename}")
-            messagebox.showinfo("Успех", f"Данные импортированы из {filename}\nПерсон: {len(new_persons)}")
+            self.model.logger.info(f"Данные импортированы из CSV: {filename} ({imported_count} персон)")
+            messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}")
             self.refresh_view()
             return True
         except Exception as e:
