@@ -599,13 +599,30 @@ def health_check():
     })
 
 # === ИНИЦИАЛИЗАЦИЯ ===
-if __name__ == '__main__':
-    print("Инициализация базы данных...")
-    init_db()
-    print("База данных готова.")
+def initialize_database():
+    """Инициализация БД при старте"""
+    import sqlite3
+    DB_FILE = os.environ.get('DATA_DIR', '.') + '/family_tree.db'
     
+    # Проверяем есть ли таблица users
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+    if not cursor.fetchone():
+        print("📦 Инициализация базы данных...")
+        conn.close()
+        init_db()
+        print("✅ База данных инициализирована!")
+    else:
+        print("✅ База данных уже инициализирована")
+        conn.close()
+
+if __name__ == '__main__':
+    # Инициализация БД
+    initialize_database()
+    
+    # Запуск сервера
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    
-    print(f"Запуск сервера на порту {port}...")
+    print(f"🚀 Запуск сервера на порту {port}...")
     app.run(host='0.0.0.0', port=port, debug=debug)
