@@ -1299,38 +1299,22 @@ class FamilyTreeApp:
     def on_exit(self):
         """Обработка закрытия приложения."""
         # Проверяем, были ли изменения
-        # ИСПРАВЛЕНО: используем свойство modified вместо метода is_modified()
         if self.model and self.model.modified:
             result = messagebox.askyesnocancel(
                 "Сохранить изменения?",
                 "Данные были изменены. Сохранить перед выходом?"
             )
-            if result is None:  # Нажата Отмена или закрыто окно диалога
-                # Приложение НЕ должно закрываться
-                return False  # Явно возвращаем False, если выход отменён
+            if result is None:  # Нажата Отмена
+                return  # Выходим из функции, НЕ закрываем приложение
             elif result:  # Нажата Да
-                if not self.save_file():
-                    # Если сохранение отменено или не удалось, также не закрываем
-                    return False
+                self.save_file()
 
-        # Если изменения не требуют сохранения или были успешно сохранены
-        # Очистка кэша изображений для освобождения памяти
+        # Очистка кэша изображений
         self.photo_images.clear()
 
-        # Корректное завершение работы Tkinter
-        # ИСПРАВЛЕНО: destroy() вызываем ТОЛЬКО если выход не отменён
-        # Сначала quit() - останавливает mainloop
+        # Завершение работы Tkinter
         self.root.quit()
-        # Затем destroy() - уничтожает окно
-        # Эти вызовы безопасны, если выход не отменён
-        # (ранее destroy() было всегда, что было ошибкой)
-        # На самом деле, quit() достаточно для остановки цикла,
-        # а destroy() уничтожает объект окна. Для простого выхода
-        # обычно достаточно quit(). Tkinter сам вызовет destroy()
-        # при завершении mainloop, если окно больше не используется
-        # другими ссылками. Но часто используют оба.
         self.root.destroy()
-        return True  # Успешный выход
 
 
     def update_adaptive_settings(self):
@@ -4301,19 +4285,11 @@ class FamilyTreeApp:
                     pid = row.get('id', '').strip()
                     if not pid:
                         continue
-                    parents = [p.strip() for p in (row.get('parents') or '').split(',') if p.strip()]
-                    children = [c.strip() for c in (row.get('children') or '').split(',') if c.strip()]
-                    spouse_ids = [s.strip() for s in (row.get('spouse_ids') or '').split(',') if s.strip()]
-                    photo_album = [p.strip() for p in (row.get('photo_album') or '').split('|') if p.strip()]
-                    link_titles = (row.get('link_titles') or '').split('|')
-                    link_urls = (row.get('link_urls') or '').split('|')
-                    links = [{'title': (link_titles[i] if i < len(link_titles) else '').strip(),
-                             'url': (link_urls[i] if i < len(link_urls) else '').strip()}
-                            for i in range(max(len(link_titles), len(link_urls)))]
-                    links = [x for x in links if x.get('url')]
-
-                    is_deceased = (row.get('is_deceased') or '').strip() in ('True', '1', 'true', 'yes')
-                    collapsed = (row.get('collapsed_branches') or '').strip() in ('True', '1', 'true')
+                    
+                    # CSV не содержит parents/children/spouse_ids - только базовые данные
+                    # Поэтому создаём персон без связей
+                    is_deceased = (row.get('is_deceased') or '').strip() in ('True', '1', 'true', 'yes', 'Да', 'да')
+                    
                     p = Person(
                         name=row.get('name', '').strip(),
                         surname=row.get('surname', '').strip(),
@@ -4327,21 +4303,20 @@ class FamilyTreeApp:
                         biography=row.get('biography', '').strip(),
                         burial_place=row.get('burial_place', '').strip(),
                         burial_date=row.get('burial_date', '').strip(),
-                        photo_album=photo_album,
-                        links=links,
                         occupation=row.get('occupation', '').strip(),
                         education=row.get('education', '').strip(),
                         address=row.get('address', '').strip(),
                         notes=row.get('notes', '').strip(),
+                        photo_path=row.get('photo_path', '').strip(),
                     )
                     p.id = pid
-                    p.parents = set(parents)
-                    p.children = set(children)
-                    p.spouse_ids = set(spouse_ids)
-                    p.collapsed_branches = collapsed
-                    p.photo_path = row.get('photo_path', '').strip()
+                    p.parents = set()
+                    p.children = set()
+                    p.spouse_ids = set()
+                    p.collapsed_branches = False
                     new_persons[pid] = p
 
+            # Проверяем совпадения ID
             common_ids = set(new_persons.keys()) & set(self.model.get_all_persons().keys())
             if common_ids:
                 overwrite = messagebox.askyesno("Предупреждение",
@@ -4351,15 +4326,9 @@ class FamilyTreeApp:
                         new_persons.pop(cid, None)
 
             self.model.persons.update(new_persons)
-            # Восстанавливаем множество браков из spouse_ids
-            self.model.marriages = set()
-            for pid, person in self.model.persons.items():
-                for sid in person.spouse_ids or []:
-                    if sid in self.model.persons:
-                        self.model.marriages.add(tuple(sorted([str(pid), str(sid)])))
             self.model.mark_modified()
             self.model.logger.info(f"Данные импортированы из CSV: {filename}")
-            messagebox.showinfo("Успех", f"Данные импортированы из {filename}")
+            messagebox.showinfo("Успех", f"Данные импортированы из {filename}\nПерсон: {len(new_persons)}")
             self.refresh_view()
             return True
         except Exception as e:
