@@ -1061,6 +1061,81 @@ class FamilyTreeApp:
         ttk.Button(dialog, text="Войти", command=do_open).pack(pady=10)
         ttk.Button(dialog, text="Отмена", command=dialog.destroy).pack()
 
+    def auto_sync_on_startup(self):
+        """Авто-синхронизация при запуске (если пользователь вошёл через веб)"""
+        from sync_client import get_sync_client
+        
+        if not self.username:
+            return
+        
+        try:
+            client = get_sync_client()
+            
+            # Пробуем скачать дерево с сервера
+            result = client.download_tree()
+            
+            if result and 'tree' in result:
+                # Дерево скачано - спрашиваем пользователя
+                persons_count = len(result.get('tree', {}).get('persons', {}))
+                
+                response = messagebox.askyesno(
+                    "Синхронизация",
+                    f"Найдено дерево на сервере ({persons_count} персон).\n"
+                    f"Загрузить его вместо локального?",
+                    icon='question'
+                )
+                
+                if response:
+                    # Загрузить дерево с сервера
+                    self._load_tree_from_server(result)
+                    messagebox.showinfo("Успех", f"Дерево загружено! Персон: {persons_count}")
+            else:
+                # Дерева нет на сервере - предлагаем загрузить текущее
+                if len(self.model.get_all_persons()) > 0:
+                    response = messagebox.askyesno(
+                        "Синхронизация",
+                        "Локальное дерево найдено. Загрузить его на сервер?",
+                        icon='question'
+                    )
+                    
+                    if response:
+                        client.sync(self.model, f"Дерево {self.username}")
+                        messagebox.showinfo("Успех", "Дерево загружено на сервер!")
+        
+        except Exception as e:
+            # Тихая ошибка - не прерываем запуск
+            print(f"Авто-синхронизация: {e}")
+    
+    def _load_tree_from_server(self, server_data):
+        """Загрузить дерево из данных сервера"""
+        tree_data = server_data.get('tree', {})
+        persons = tree_data.get('persons', {})
+        
+        # Очищаем текущее дерево
+        self.model.persons.clear()
+        self.model.marriages.clear()
+        
+        # Добавляем персоны из сервера
+        for pid, pdata in persons.items():
+            from models import Person
+            p = Person(
+                name=pdata.get('name', ''),
+                surname=pdata.get('surname', ''),
+                patronymic=pdata.get('patronymic', ''),
+                birth_date=pdata.get('birth_date', ''),
+                gender=pdata.get('gender', ''),
+                is_deceased=pdata.get('is_deceased', False),
+                death_date=pdata.get('death_date', ''),
+            )
+            p.id = pid
+            p.parents = set(pdata.get('parents', []))
+            p.children = set(pdata.get('children', []))
+            p.spouse_ids = set(pdata.get('spouse_ids', []))
+            self.model.persons[pid] = p
+        
+        # Обновляем интерфейс
+        self.refresh_view()
+
     def open_sync_dialog(self):
         """Диалог синхронизации с сервером."""
         from sync_client import get_sync_client
@@ -3614,7 +3689,7 @@ class FamilyTreeApp:
             if is_deceased and death_date and not self.model._validate_date(death_date):
                 messagebox.showerror("Ошибка", constants.VALIDATION_MSG_DEATH_DATE_INVALID)
                 return
-            # УДАЛЯЕМ проверку на обязательность death_date если is_deceased
+            # УДАЛЯ��М проверку на обязательность death_date если is_deceased
             # if is_deceased and not death_date:
             #     messagebox.showerror("Ошибка", constants.VALIDATION_MSG_DEATH_DATE_NEEDED)
             #     return
