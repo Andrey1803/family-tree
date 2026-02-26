@@ -1,7 +1,8 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "NIXPACKS",
+    "prestart": "bash prestart.sh"
   },
   "deploy": {
     "startCommand": "gunicorn app:app -b 0.0.0.0:$PORT",
