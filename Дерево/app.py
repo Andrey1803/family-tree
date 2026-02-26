@@ -273,6 +273,17 @@ class FamilyTreeApp:
         # --- /СВЯЗИ КЛАВИШ ---
         # --- ЗАГРУЗКА ---
         self.model.load_from_file()
+        
+        # Если current_center не установлен, но есть персоны с супругами — установить на первую
+        if not self.model.current_center:
+            for pid, person in self.model.get_all_persons().items():
+                if getattr(person, 'spouse_ids', None):
+                    self.model.current_center = pid
+                    break
+            # Если нет супругов — установить на первую персону
+            if not self.model.current_center and self.model.get_all_persons():
+                self.model.current_center = next(iter(self.model.get_all_persons().keys()))
+        
         self.check_first_run()
         self.hovered_person_id = None  # ID персоны под курсором
         self.selected_person_id = None  # ID выбранной персоны (центр)
@@ -1281,7 +1292,7 @@ class FamilyTreeApp:
             self.model.current_center = old_center
 
     def _quick_add_parent(self, person_id, current_dialog):
-        """Быстрое добавление родителя."""
+        """Быстрое добавление родите��я."""
         current_dialog.destroy()
         old_center = self.model.current_center
         self.model.current_center = str(person_id)
