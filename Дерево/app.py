@@ -4337,6 +4337,12 @@ class FamilyTreeApp:
             imported_count = len(new_persons)
             self.model.persons.update(new_persons)
             self.model.mark_modified()
+            
+            # Устанавливаем current_center на первую персону если не установлен
+            if not self.model.current_center and new_persons:
+                first_pid = list(new_persons.keys())[0]
+                self.model.current_center = first_pid
+            
             self.model.logger.info(f"Данные импортированы из CSV: {filename} ({imported_count} персон)")
             messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}")
             self.refresh_view()
@@ -4913,7 +4919,7 @@ class FamilyTreeApp:
             return f"{years} лет"
 
     def _create_backup(self):
-        """Создать резервную копию."""
+        """Созд��ть резервную копию."""
         if not BACKUP_AVAILABLE:
             return
         try:
