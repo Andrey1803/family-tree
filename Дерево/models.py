@@ -441,10 +441,20 @@ class FamilyTreeModel:
                         if isinstance(persons_list, (list, tuple)) and len(persons_list) >= 2:
                             h_id, w_id = str(persons_list[0]), str(persons_list[1])
                             self.marriages[tuple(sorted((h_id, w_id)))] = {"date": marriage_date}
+                            # Восстанавливаем spouse_ids у персон!
+                            if h_id in self.persons:
+                                self.persons[h_id].spouse_ids.add(w_id)
+                            if w_id in self.persons:
+                                self.persons[w_id].spouse_ids.add(h_id)
                     elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
                         # Старый формат: [id1, id2]
                         h_id, w_id = str(pair[0]), str(pair[1])
                         self.marriages[tuple(sorted((h_id, w_id)))] = {"date": ""}
+                        # Восстанавливаем spouse_ids у персон!
+                        if h_id in self.persons:
+                            self.persons[h_id].spouse_ids.add(w_id)
+                        if w_id in self.persons:
+                            self.persons[w_id].spouse_ids.add(h_id)
                 except Exception as e:
                     print(f"Ошибка загрузки брака {pair}: {e}")
 
