@@ -1988,6 +1988,11 @@ class FamilyTreeApp:
         collect_related(center_pid)
 
         # === ШАГ 4: ОСТАВЛЯЕМ ТОЛЬКО СВЯЗАННЫХ ПЕРСОН ===
+        # Если найдена только 1 персона (нет связей), но в дереве их больше — показываем ВСЕХ
+        if len(related_pids) == 1 and len(persons) > 1:
+            # Нет связей между персонами — показываем всех
+            related_pids = set(persons.keys())
+        
         filtered_persons = {pid: persons[pid] for pid in related_pids}
 
         # Сохраняем позицию центральной персоны: при перерисовке ветви останутся вокруг неё на месте
@@ -2570,7 +2575,7 @@ class FamilyTreeApp:
         if spouse_ids:
             spouse_names = [self.model.get_person(sid).display_name() for sid in spouse_ids if self.model.get_person(sid)]
             info += "\nСупруг(а): " + ", ".join(spouse_names)
-        messagebox.showinfo("Информация о персоне", info)
+        messagebox.showinfo("И��формация о персоне", info)
 
     def edit_person(self):
         """Личная страница персоны: вкладки Основное, Семья, История и захоронение, Фотоальбом, Ссылки, Дополнительно."""
@@ -4344,7 +4349,13 @@ class FamilyTreeApp:
                 self.model.current_center = first_pid
             
             self.model.logger.info(f"Данные импортированы из CSV: {filename} ({imported_count} персон)")
-            messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}")
+            messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}\n\nВНИМАНИЕ: CSV не содержит связей между персонами.\nВсе персоны импортированы без связей (родители, дети, супруги).")
+            
+            # Сбрасываем координаты чтобы пересчитать layout для всех персон
+            self.coords.clear()
+            self.units.clear()
+            self.level_structure.clear()
+            
             self.refresh_view()
             return True
         except Exception as e:
