@@ -617,6 +617,9 @@ def initialize_database():
         print("✅ База данных уже инициализирована")
         conn.close()
 
+# Авто-инициализация при импорте
+initialize_database()
+
 if __name__ == '__main__':
     # Инициализация БД
     initialize_database()
