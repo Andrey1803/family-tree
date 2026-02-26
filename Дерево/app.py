@@ -1292,7 +1292,7 @@ class FamilyTreeApp:
             self.model.current_center = old_center
 
     def _quick_add_parent(self, person_id, current_dialog):
-        """Быстрое добавление родите��я."""
+        """Быстрое добавление родите����я."""
         current_dialog.destroy()
         old_center = self.model.current_center
         self.model.current_center = str(person_id)
@@ -1971,32 +1971,38 @@ class FamilyTreeApp:
             pid_str = str(pid)
             return next((k for k in persons if str(k) == pid_str), None)
 
-        def collect_related(pid):
-            key = _key_in_persons(pid)
+        # ИТЕРАТИВНЫЙ BFS (вместо рекурсии — для больших деревьев)
+        queue = collections.deque([center_pid])
+        
+        while queue:
+            current_pid = queue.popleft()
+            key = _key_in_persons(current_pid)
+            
             if key is None or key in visited:
-                return
+                continue
             if key not in persons:
-                return
+                continue
+            
             visited.add(key)
             related_pids.add(key)
             person = persons[key]
 
-            for parent_id in person.parents:
-                collect_related(parent_id)
-            for child_id in person.children:
-                collect_related(child_id)
-            for parent_id in person.parents:
-                parent = persons.get(_key_in_persons(parent_id))
-                if not parent:
-                    continue
-                for sibling_id in parent.children:
-                    sk = _key_in_persons(sibling_id)
-                    if sk and sk != key:
-                        collect_related(sk)
+            # Добавляем всех связанных в очередь
+            for parent_id in (person.parents or []):
+                queue.append(parent_id)
+            for child_id in (person.children or []):
+                queue.append(child_id)
             for spouse_id in (person.spouse_ids or []):
-                collect_related(spouse_id)
-
-        collect_related(center_pid)
+                queue.append(spouse_id)
+            
+            # Добавляем siblings (через родителей)
+            for parent_id in (person.parents or []):
+                parent = persons.get(_key_in_persons(parent_id))
+                if parent:
+                    for sibling_id in (parent.children or []):
+                        sk = _key_in_persons(sibling_id)
+                        if sk and sk != key and sk not in visited:
+                            queue.append(sibling_id)
 
         # === ШАГ 4: ОСТАВЛЯЕМ ТОЛЬКО СВЯЗАННЫХ ПЕРСОН ===
         # Если найдена только 1 персона (нет связей), но в дереве их больше — показываем ВСЕХ
