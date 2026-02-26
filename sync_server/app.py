@@ -49,8 +49,9 @@ def close_db(exception):
 
 def init_db():
     """Инициализировать базу данных."""
+    DB_FILE = os.environ.get('DATA_DIR', '.') + '/family_tree.db'
     db = sqlite3.connect(DB_FILE)
-    
+
     # Таблица пользователей
     db.execute('''
         CREATE TABLE IF NOT EXISTS users (
