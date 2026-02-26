@@ -28,7 +28,8 @@ class Person:
     def __init__(self, name="", surname="", patronymic="", birth_date="", gender="",
                  photo=None, photo_path="", is_deceased=False, death_date="", maiden_name="",
                  birth_place="", biography="", burial_place="", burial_date="",
-                 photo_album=None, links=None, occupation="", education="", address="", notes=""):
+                 photo_album=None, links=None, occupation="", education="", address="", notes="",
+                 significant_events=None, phone="", email="", social_media=None, blood_type="", medical_info=None):
         self.id = None
         self.name = name
         self.surname = surname
@@ -54,6 +55,12 @@ class Person:
         self.education = education if education is not None else ""
         self.address = address if address is not None else ""
         self.notes = notes if notes is not None else ""
+        self.significant_events = list(significant_events) if significant_events is not None else []
+        self.phone = phone if phone is not None else ""
+        self.email = email if email is not None else ""
+        self.social_media = list(social_media) if social_media is not None else []
+        self.blood_type = blood_type if blood_type is not None else ""
+        self.medical_info = list(medical_info) if medical_info is not None else []
 
     def full_name(self):
         return f"{self.name} {self.surname}"
@@ -83,7 +90,8 @@ class FamilyTreeModel:
 
     def __init__(self, data_file="family_tree.json"):
         self.persons = {}
-        self.marriages = set()
+        # marriages: dict {(pid1, pid2): {"date": "dd.mm.yyyy"}}
+        self.marriages = {}
         self.data_file = data_file
         self.current_center = None
         self.logger = logging.getLogger(__name__)
@@ -151,26 +159,59 @@ class FamilyTreeModel:
         self.mark_modified()
         return True, f"Родитель {parent_id} успешно добавлен к ребёнку {child_id}"
 
-    def add_person(self, name, surname="", patronymic="", birth_date="", gender=GENDER_MALE,
-                   is_deceased=False, death_date="", maiden_name="", photo=None, photo_path=""):
-        is_valid, validation_errors = self.validate_person_data(
-            name, surname, patronymic, birth_date, gender,
-            is_deceased, death_date, maiden_name
-        )
-        if not is_valid:
-            return None, "\n".join(validation_errors)
-        new_id = str(self.next_id)
-        self.next_id += 1
-        new_person = Person(
-            name=name, surname=surname, patronymic=patronymic,
-            birth_date=birth_date, gender=gender, photo=photo, photo_path=photo_path,
-            is_deceased=is_deceased, death_date=death_date, maiden_name=maiden_name
-        )
-        new_person.id = new_id
-        new_person.parents = set()
-        new_person.children = set()
-        new_person.spouse_ids = set()
-        new_person.collapsed_branches = False
+    def add_person(self, name=None, surname="", patronymic="", birth_date="", gender=GENDER_MALE,
+                   is_deceased=False, death_date="", maiden_name="", photo=None, photo_path="",
+                   birth_place="", biography="", burial_place="", burial_date="",
+                   photo_album=None, links=None, occupation="", education="", address="", notes="",
+                   significant_events=None, phone="", email="", social_media=None,
+                   blood_type="", medical_info=None):
+        # Поддержка двух вариантов вызова: с объектом Person или с отдельными параметрами
+        if isinstance(name, Person):
+            person = name
+            # Проверяем данные персоны
+            is_valid, validation_errors = self.validate_person_data(
+                person.name, person.surname, person.patronymic, person.birth_date, person.gender,
+                person.is_deceased, person.death_date, person.maiden_name
+            )
+            if not is_valid:
+                return None, "\n".join(validation_errors)
+            new_id = str(self.next_id)
+            self.next_id += 1
+            new_person = person
+            new_person.id = new_id
+            # Инициализируем множества, если их нет
+            if not hasattr(new_person, 'parents') or new_person.parents is None:
+                new_person.parents = set()
+            if not hasattr(new_person, 'children') or new_person.children is None:
+                new_person.children = set()
+            if not hasattr(new_person, 'spouse_ids') or new_person.spouse_ids is None:
+                new_person.spouse_ids = set()
+            if not hasattr(new_person, 'collapsed_branches'):
+                new_person.collapsed_branches = False
+        else:
+            is_valid, validation_errors = self.validate_person_data(
+                name, surname, patronymic, birth_date, gender,
+                is_deceased, death_date, maiden_name
+            )
+            if not is_valid:
+                return None, "\n".join(validation_errors)
+            new_id = str(self.next_id)
+            self.next_id += 1
+            new_person = Person(
+                name=name, surname=surname, patronymic=patronymic,
+                birth_date=birth_date, gender=gender, photo=photo, photo_path=photo_path,
+                is_deceased=is_deceased, death_date=death_date, maiden_name=maiden_name,
+                birth_place=birth_place, biography=biography, burial_place=burial_place,
+                burial_date=burial_date, photo_album=photo_album, links=links,
+                occupation=occupation, education=education, address=address, notes=notes,
+                significant_events=significant_events, phone=phone, email=email,
+                social_media=social_media, blood_type=blood_type, medical_info=medical_info
+            )
+            new_person.id = new_id
+            new_person.parents = set()
+            new_person.children = set()
+            new_person.spouse_ids = set()
+            new_person.collapsed_branches = False
         self.persons[new_id] = new_person
         self.mark_modified()
         self.logger.info(f"Добавлена персона: {new_person.display_name()} (ID: {new_id})")
@@ -191,7 +232,7 @@ class FamilyTreeModel:
             errors.append(VALIDATION_MSG_DEATH_DATE_INVALID)
         return len(errors) == 0, errors
 
-    def add_marriage(self, person1_id, person2_id):
+    def add_marriage(self, person1_id, person2_id, marriage_date=None):
         if person1_id == person2_id:
             return False, MSG_ERROR_CANNOT_ADD_TO_SELF
         marriage_key = tuple(sorted((person1_id, person2_id)))
@@ -204,7 +245,7 @@ class FamilyTreeModel:
         if p1 and p2:
             p1.spouse_ids.add(person2_id)
             p2.spouse_ids.add(person1_id)
-        self.marriages.add(marriage_key)
+        self.marriages[marriage_key] = {"date": marriage_date or ""}
         self.mark_modified()
         return True, MSG_SUCCESS_MARRIAGE_ADDED
 
@@ -243,7 +284,7 @@ class FamilyTreeModel:
         p2 = self.persons[person2_id]
         p1.spouse_ids.discard(person2_id)
         p2.spouse_ids.discard(person1_id)
-        self.marriages.discard(marriage_key)
+        del self.marriages[marriage_key]
         self.mark_modified()
         return True, MSG_SUCCESS_MARRIAGE_REMOVED
 
@@ -261,6 +302,22 @@ class FamilyTreeModel:
 
     def get_marriages(self):
         return self.marriages
+
+    def get_marriage_date(self, person1_id, person2_id):
+        """Возвращает дату брака между двумя персонами."""
+        marriage_key = tuple(sorted((person1_id, person2_id)))
+        if marriage_key in self.marriages:
+            return self.marriages[marriage_key].get("date", "")
+        return ""
+
+    def set_marriage_date(self, person1_id, person2_id, marriage_date):
+        """Устанавливает дату брака между двумя персонами."""
+        marriage_key = tuple(sorted((person1_id, person2_id)))
+        if marriage_key in self.marriages:
+            self.marriages[marriage_key]["date"] = marriage_date
+            self.mark_modified()
+            return True
+        return False
 
     def get_all_persons(self):
         return self.persons
@@ -316,7 +373,10 @@ class FamilyTreeModel:
                         "notes": getattr(p, "notes", "") or "",
                     } for pid, p in self.persons.items()
                 },
-                "marriages": list(self.marriages),
+                "marriages": [
+                    {"persons": list(key), "date": val.get("date", "")}
+                    for key, val in self.marriages.items()
+                ],
                 "current_center": self.current_center
             }
             with open(filename, 'w', encoding='utf-8') as f:
@@ -371,11 +431,22 @@ class FamilyTreeModel:
                 self.persons[pid] = p
 
             marriages_raw = data.get("marriages", [])
-            self.marriages = set()
+            self.marriages = {}
             for pair in marriages_raw:
-                if len(pair) == 2:
-                    h_id, w_id = str(pair[0]), str(pair[1])
-                    self.marriages.add(tuple(sorted((h_id, w_id))))
+                try:
+                    if isinstance(pair, dict):
+                        # Новый формат: {"persons": [id1, id2], "date": "dd.mm.yyyy"}
+                        persons_list = pair.get("persons", [])
+                        marriage_date = pair.get("date", "")
+                        if isinstance(persons_list, (list, tuple)) and len(persons_list) >= 2:
+                            h_id, w_id = str(persons_list[0]), str(persons_list[1])
+                            self.marriages[tuple(sorted((h_id, w_id)))] = {"date": marriage_date}
+                    elif isinstance(pair, (list, tuple)) and len(pair) >= 2:
+                        # Старый формат: [id1, id2]
+                        h_id, w_id = str(pair[0]), str(pair[1])
+                        self.marriages[tuple(sorted((h_id, w_id)))] = {"date": ""}
+                except Exception as e:
+                    print(f"Ошибка загрузки брака {pair}: {e}")
 
             center_val = data.get("current_center")
             self.current_center = str(center_val) if center_val and center_val != "None" else None

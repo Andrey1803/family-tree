@@ -103,6 +103,7 @@ def run_login_window(on_success):
     """
     Показывает окно входа. При успешном входе вызывает on_success(login).
     """
+    # Исправлено: абсолютный импорт вместо relative import
     import constants
     import update_check
     login_root = tk.Tk()

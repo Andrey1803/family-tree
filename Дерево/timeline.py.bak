@@ -1,0 +1,335 @@
+# -*- coding: utf-8 -*-
+"""
+Timeline (Временная шкала) для приложения «Семейное древо».
+
+Отображает жизни всех персон в виде горизонтальных полос.
+"""
+
+import tkinter as tk
+from tkinter import ttk
+import constants
+
+
+class TimelineWindow:
+    """Окно временной шкалы жизней персон."""
+
+    def __init__(self, parent, model):
+        self.parent = parent
+        self.model = model
+        
+        # Создание окна
+        self.window = tk.Toplevel(parent)
+        self.window.title("Временная шкала")
+        self.window.geometry("1200x700")
+        
+        # Настройка окна
+        self.window.configure(bg="#f8f9fa")
+        
+        # Заголовок
+        title_frame = tk.Frame(self.window, bg="#ffffff", height=60)
+        title_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        tk.Label(
+            title_frame,
+            text="📅 Временная шкала жизней",
+            font=("Segoe UI", 18, "bold"),
+            bg="#ffffff",
+            fg="#1e293b"
+        ).pack(pady=15)
+        
+        # Панель инструментов
+        toolbar = tk.Frame(self.window, bg="#e9ecef")
+        toolbar.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Масштаб
+        tk.Label(toolbar, text="Масштаб:", bg="#e9ecef", fg="#1e293b").pack(side=tk.LEFT, padx=10)
+        
+        self.scale_var = tk.IntVar(value=5)
+        scale_combo = ttk.Combobox(
+            toolbar,
+            textvariable=self.scale_var,
+            values=[1, 2, 5, 10, 20],
+            width=5,
+            state="readonly"
+        )
+        scale_combo.pack(side=tk.LEFT, padx=5)
+        scale_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_timeline())
+        tk.Label(toolbar, text="лет/см", bg="#e9ecef", fg="#64748b").pack(side=tk.LEFT, padx=5)
+        
+        # Фильтры
+        tk.Label(toolbar, text="|", bg="#e9ecef", fg="#adb5bd").pack(side=tk.LEFT, padx=10)
+        
+        self.filter_var = tk.StringVar(value="all")
+        filter_combo = ttk.Combobox(
+            toolbar,
+            textvariable=self.filter_var,
+            values=[
+                ("Все персоны", "all"),
+                ("Только предки", "ancestors"),
+                ("Только с фото", "with_photos"),
+                ("Мужчины", "male"),
+                ("Женщины", "female")
+            ],
+            width=20,
+            state="readonly"
+        )
+        filter_combo.pack(side=tk.LEFT, padx=5)
+        filter_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_timeline())
+        
+        # Кнопка закрытия
+        tk.Button(
+            toolbar,
+            text="Закрыть",
+            command=self.window.destroy,
+            bg="#dc2626",
+            fg="#ffffff",
+            padx=20,
+            pady=5
+        ).pack(side=tk.RIGHT, padx=10)
+        
+        # Холст с прокруткой
+        canvas_frame = tk.Frame(self.window, bg="#ffffff", bd=2, relief=tk.SUNKEN)
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Создаём Canvas и Scrollbar
+        self.canvas = tk.Canvas(canvas_frame, bg="#ffffff", highlightthickness=0)
+        self.scrollbar_y = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.scrollbar_x = ttk.Scrollbar(canvas_frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        
+        self.canvas.configure(yscrollcommand=self.scrollbar_y.set, xscrollcommand=self.scrollbar_x.set)
+        
+        self.scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        self.scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Фрейм для содержимого
+        self.timeline_frame = tk.Frame(self.canvas, bg="#ffffff")
+        self.canvas_window = self.canvas.create_window(
+            (0, 0),
+            window=self.timeline_frame,
+            anchor="nw"
+        )
+        
+        # Привязка событий
+        self.canvas.bind("<Configure>", self.on_canvas_configure)
+        self.timeline_frame.bind("<Configure>", self.on_frame_configure)
+        
+        # Колесо мыши
+        self.canvas.bind("<MouseWheel>", self.on_mousewheel)
+        
+        # Отрисовка
+        self.refresh_timeline()
+        
+        # Центррирование окна
+        self.window.update_idletasks()
+        x = (self.window.winfo_screenwidth() - 1200) // 2
+        y = (self.window.winfo_screenheight() - 700) // 2
+        self.window.geometry(f"+{x}+{y}")
+
+    def on_canvas_configure(self, event):
+        """Обновляет область прокрутки при изменении размера canvas."""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def on_frame_configure(self, event):
+        """Обновляет область прокрутки при изменении размера фрейма."""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def on_mousewheel(self, event):
+        """Прокрутка колесом мыши."""
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def get_filtered_persons(self):
+        """Возвращает отфильтрованный список персон."""
+        persons = list(self.model.get_all_persons().values())
+        
+        if self.filter_var.get() == "all":
+            return persons
+        elif self.filter_var.get() == "ancestors":
+            # Только персоны с родителями
+            return [p for p in persons if p.parents]
+        elif self.filter_var.get() == "with_photos":
+            # Только с фото
+            return [p for p in persons if p.has_photo()]
+        elif self.filter_var.get() == "male":
+            return [p for p in persons if p.gender == "Мужской"]
+        elif self.filter_var.get() == "female":
+            return [p for p in persons if p.gender == "Женский"]
+        
+        return persons
+
+    def parse_date(self, date_str):
+        """Парсит дату в формате DD.MM.YYYY и возвращает год."""
+        if not date_str:
+            return None
+        try:
+            parts = date_str.split(".")
+            if len(parts) == 3:
+                return int(parts[2])
+        except:
+            pass
+        return None
+
+    def refresh_timeline(self):
+        """Обновляет временную шкалу."""
+        # Очистка
+        for widget in self.timeline_frame.winfo_children():
+            widget.destroy()
+        
+        persons = self.get_filtered_persons()
+        if not persons:
+            tk.Label(
+                self.timeline_frame,
+                text="Нет персон для отображения",
+                font=("Segoe UI", 14),
+                fg="#64748b",
+                bg="#ffffff"
+            ).pack(pady=50)
+            return
+        
+        # Определяем диапазон лет
+        years = []
+        for p in persons:
+            birth_year = self.parse_date(p.birth_date)
+            death_year = self.parse_date(p.death_date) if p.is_deceased else None
+            
+            if birth_year:
+                years.append(birth_year)
+            if death_year:
+                years.append(death_year)
+        
+        if not years:
+            tk.Label(
+                self.timeline_frame,
+                text="Нет дат для отображения",
+                font=("Segoe UI", 14),
+                fg="#64748b",
+                bg="#ffffff"
+            ).pack(pady=50)
+            return
+        
+        min_year = min(years) - 5
+        max_year = max(years) + 5
+        
+        # Настройки отображения
+        scale = self.scale_var.get()  # лет на см
+        pixels_per_year = 10 / scale  # см на пиксель (примерно)
+        
+        # Ширина шкалы
+        timeline_width = (max_year - min_year) * pixels_per_year * 10
+        
+        # Заголовок шкалы лет
+        header_frame = tk.Frame(self.timeline_frame, bg="#f1f5f9", height=40)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Рисуем годы
+        for year in range(min_year, max_year + 1, 5):
+            x = (year - min_year) * pixels_per_year * 10
+            tk.Label(
+                header_frame,
+                text=str(year),
+                font=("Segoe UI", 9),
+                fg="#64748b",
+                bg="#f1f5f9"
+            ).place(x=x, y=10, anchor="n")
+            
+            # Вертикальная линия
+            canvas = tk.Canvas(header_frame, width=1, height=10, bg="#e2e8f0", highlightthickness=0)
+            canvas.place(x=x, y=30, anchor="n")
+        
+        # Контейнер для полос жизней
+        lives_frame = tk.Frame(self.timeline_frame, bg="#ffffff")
+        lives_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Сортировка персон по году рождения
+        persons.sort(key=lambda p: self.parse_date(p.birth_date) or 9999)
+        
+        # Отрисовка полос
+        row_height = 35
+        for i, person in enumerate(persons):
+            birth_year = self.parse_date(person.birth_date)
+            death_year = self.parse_date(person.death_date) if person.is_deceased else None
+            
+            if not birth_year:
+                continue
+            
+            # Если нет года смерти, используем текущий
+            if not death_year:
+                death_year = 2026
+            
+            # Позиции
+            x_start = (birth_year - min_year) * pixels_per_year * 10
+            x_end = (death_year - min_year) * pixels_per_year * 10
+            y = i * row_height
+            
+            # Цвет
+            if person.gender == "Мужской":
+                color = "#60a5fa"
+            else:
+                color = "#f472b6"
+            
+            # Создаём полосу
+            life_canvas = tk.Canvas(
+                lives_frame,
+                height=row_height - 4,
+                bg="#ffffff",
+                highlightthickness=0
+            )
+            life_canvas.place(x=x_start, y=y, width=x_end - x_start, height=row_height - 4)
+            
+            # Рисуем полосу
+            life_canvas.create_rectangle(
+                0, 0, x_end - x_start, row_height - 4,
+                fill=color,
+                outline="#1e293b",
+                width=1
+            )
+            
+            # Текст
+            text = f"{person.surname} {person.name}"
+            if len(text) > 30:
+                text = text[:27] + "..."
+            
+            life_canvas.create_text(
+                5, (row_height - 4) // 2,
+                text=text,
+                font=("Segoe UI", 9, "bold"),
+                fill="#ffffff",
+                anchor="w"
+            )
+            
+            # Даты
+            dates = f"{birth_year}-{death_year}"
+            life_canvas.create_text(
+                x_end - x_start - 5, (row_height - 4) // 2,
+                text=dates,
+                font=("Segoe UI", 8),
+                fill="#ffffff",
+                anchor="e"
+            )
+            
+            # Клик → переход к персоне
+            life_canvas.bind("<Button-1>", lambda e, p=person: self.on_person_click(p))
+            life_canvas.bind("<Enter>", lambda e, c=life_canvas: c.configure(bg="#f1f5f9"))
+            life_canvas.bind("<Leave>", lambda e, c=life_canvas: c.configure(bg="#ffffff"))
+        
+        # Обновляем область прокрутки
+        self.timeline_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def on_person_click(self, person):
+        """Обработка клика на персону."""
+        # Закрываем Timeline
+        self.window.destroy()
+        
+        # Устанавливаем центр на выбранную персону
+        self.model.current_center = person.id
+        
+        # Обновляем главное окно
+        if hasattr(self, 'parent') and hasattr(self.parent, 'refresh_view'):
+            self.parent.refresh_view()
+
+
+def open_timeline(parent, model):
+    """Открывает окно временной шкалы."""
+    timeline = TimelineWindow(parent, model)
+    timeline.window.wait_window()

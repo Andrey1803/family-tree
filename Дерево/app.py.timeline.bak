@@ -12,7 +12,6 @@ import collections
 import io
 import time
 import math
-from datetime import datetime
 
 from PIL import Image, ImageTk
 
@@ -89,11 +88,6 @@ class FamilyTreeApp:
             self.base_title += f" — {username}"
         self.root.title(self.base_title)
         self.modified_indicator = " *"  # Индикатор несохранённых изменений
-        
-        # Авто-синхронизация при запуске (если есть username)
-        if username:
-            self.root.after(2000, self.auto_sync_on_startup)  # Через 2 секунды после запуска
-        
         # Создание стиля для акцентных кнопок
         style = ttk.Style()
         style.configure('Accent.TButton', foreground='black', background='#e74c3c')
@@ -112,7 +106,7 @@ class FamilyTreeApp:
             y = 100
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         # --- ПЕРЕМЕННЫЕ (файл дерева — свой у каждого пользователя) ---
-        self.model = FamilyTreeModel(data_file=data_file or "family_tree.json")
+        self.model = FamilyTreeModel(data_file=data_file or "family_tree.json", on_modified_callback=self.update_title)
         self.canvas = tk.Canvas(root, bg=constants.CANVAS_BG, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.photo_images = {}  # Хранит ссылки на PhotoImage
@@ -134,6 +128,7 @@ class FamilyTreeApp:
         self.focus_mode_active = False  # ← ИНИЦИАЛИЗИРУЕМ ОДИН РАЗ (было дублирование!)
         self.precomputed_hidden_nodes = set()
         self.active_filters = {"gender": constants.FILTER_ALL, "status": constants.FILTER_ALL, "photos_only": False, "childless": False}
+        self.kinship_labels = {}  # {person_id: "Брат", "Дядя" и т.д.}
         # --- /ПЕРЕМЕННЫЕ ---
         # --- НАСТРОЙКИ РАЗМЕРОВ ---
         self.BASE_CARD_WIDTH = 120
@@ -151,59 +146,41 @@ class FamilyTreeApp:
         self.menu_bar = tk.Menu(root)
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Новый", command=self.new_file)
-        self.file_menu.add_command(label="Сохранить", command=self.save_file)
+        self.file_menu.add_command(label="Сохранить", command=self.save_file, accelerator="Ctrl+S")
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Резервные копии", command=self.open_backup_dialog)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Экспорт в CSV", command=self.export_to_csv)
         self.file_menu.add_command(label="Импорт из CSV", command=self.import_from_csv)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="🌐 Открыть веб-версию", command=self.open_web_version)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="☁️ Синхронизация...", command=self.open_sync_dialog)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="👑 Админ-панель", command=self.open_admin_panel)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Зарегистрировать протокол (веб → приложение)", command=self._register_protocol)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Выход", command=self.on_exit)
         self.menu_bar.add_cascade(label="Файл", menu=self.file_menu)
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.view_menu.add_command(label="Обновить", command=self.refresh_view)
+        self.view_menu.add_command(label="Масштаб 1:1", command=self.reset_scale)
+        self.view_menu.add_command(label="Свернуть все ветви", command=self.collapse_all_branches)
+        self.view_menu.add_command(label="Развернуть все ветви", command=self.expand_all_branches)
+        self.view_menu.add_separator()
+        # === ИСПРАВЛЕНО: ДОБАВЛЕН ПУНКТ МЕНЮ РЕЖИМА ФОКУСА ===
+        self.view_menu.add_command(
+            label="Режим фокуса (скрыть предков)",
+            command=self.toggle_focus_mode,
+            accelerator="Ctrl+F"
+        )
+        # === КОНЕЦ ИСПРАВЛЕНИЯ ===
         self.view_menu.add_command(label="Фильтры", command=self.open_filter_dialog)
         self.view_menu.add_command(label="Цвет интерфейса...", command=self.open_color_palette_dialog)
         self.view_menu.add_separator()
-        self.view_menu.add_command(label="📅 Временная шкала", command=self.open_timeline)
+        self.view_menu.add_command(label="Тёмная тема", command=self.toggle_theme)
         self.menu_bar.add_cascade(label="Вид", menu=self.view_menu)
         self.edit_menu = tk.Menu(self.menu_bar, tearoff=0)
-        # Пункты меню Отмена/Повтор (если доступен модуль undo)
-        self.undo_menu_item = None
-        self.redo_menu_item = None
-        if UNDO_AVAILABLE:
-            self.undo_menu_item = self.edit_menu.add_command(
-                label="Отмена", 
-                command=self.undo,
-                accelerator="Ctrl+Z"
-            )
-            self.redo_menu_item = self.edit_menu.add_command(
-                label="Повтор", 
-                command=self.redo,
-                accelerator="Ctrl+Y"
-            )
-            self.edit_menu.add_separator()
-            # Инициализация менеджера отмены (передаём model, а не self)
-            self.undo_manager = UndoManager(self.model)
-        else:
-            self.undo_manager = None
+        self.edit_menu.add_command(label="Отменить", command=self.undo, accelerator="Ctrl+Z")
+        self.edit_menu.add_command(label="Повторить", command=self.redo, accelerator="Ctrl+Y")
+        self.edit_menu.add_separator()
         self.edit_menu.add_command(label="Найти", command=self.open_search_dialog)
         self.menu_bar.add_cascade(label="Правка", menu=self.edit_menu)
-        
-        # Меню "Сервис" (если доступны модули backup/theme)
-        if BACKUP_AVAILABLE or THEME_AVAILABLE:
-            self.service_menu = tk.Menu(self.menu_bar, tearoff=0)
-            if BACKUP_AVAILABLE:
-                self.service_menu.add_command(label="Резервные копии...", command=self.open_backup_dialog)
-                self.service_menu.add_separator()
-            if THEME_AVAILABLE:
-                self.service_menu.add_command(label="Сменить тему", command=self.toggle_theme_menu)
-            self.menu_bar.add_cascade(label="Сервис", menu=self.service_menu)
         
         # --- МЕНЮ СПРАВКА ---
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -214,15 +191,12 @@ class FamilyTreeApp:
         
         root.config(menu=self.menu_bar)
         # --- /МЕНЮ ---
-        # --- СТАТУСБАР И ПАНЕЛЬ ЦЕНТРА (в тон холста) ---
+        # --- ПАНЕЛЬ ЦЕНТРА И СЧЁТЧИК ПЕРСОН ---
         # Счётчик персон
         self.counter_label = tk.Label(root, text="Персон: 0", bd=1, relief=tk.SUNKEN, anchor=tk.CENTER,
                                      bg="#e2e8f0", fg="#1e293b", font=("Segoe UI", 9, "bold"))
         self.counter_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.statusbar = tk.Label(root, text=constants.MSG_STATUS_IDLE, bd=1, relief=tk.SUNKEN, anchor=tk.W,
-                                 bg="#f1f5f9", fg="#334155", font=("Segoe UI", 9))
-        self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
         self.center_label = tk.Label(root, text="Центр: Не выбран", bd=1, relief=tk.SUNKEN, anchor=tk.W,
                                      bg="#e2e8f0", fg="#1e293b", font=("Segoe UI", 9, "bold"))
         self.center_label.pack(side=tk.BOTTOM, fill=tk.X)
@@ -233,28 +207,90 @@ class FamilyTreeApp:
         self.context_menu.add_command(label="Редактировать", command=self.edit_person)
         self.context_menu.add_command(label="Удалить", command=self.delete_person)
         self.context_menu.add_separator()
-        self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0, font=("Segoe UI", 12, "bold"))
-        self.add_relative_menu.add_command(label="Отец...",
-                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id,
-                                                                                  "Мужской"))
-        self.add_relative_menu.add_command(label="Мать...",
-                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id,
-                                                                                  "Женский"))
-        self.add_relative_menu.add_command(label="Сын...",
-                                           command=lambda: self.add_child_dialog(self.last_selected_person_id,
-                                                                                 "Мужской"))
-        self.add_relative_menu.add_command(label="Дочь...",
-                                           command=lambda: self.add_child_dialog(self.last_selected_person_id,
-                                                                                 "Женский"))
-        self.add_relative_menu.add_command(label="Брат...",
-                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
-                                                                                   "Мужской"))
-        self.add_relative_menu.add_command(label="Сестра...",
-                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
-                                                                                   "Женский"))
-        self.add_relative_menu.add_command(label="Супруг(а)...",
-                                           command=lambda: self.add_spouse_dialog(self.last_selected_person_id))
-        self.context_menu.add_cascade(label="Родственник", menu=self.add_relative_menu)
+
+        # === МЕНЮ ДОБАВЛЕНИЯ РОДСТВЕННИКА (С ЦВЕТОВЫМ ОФОРМЛЕНИЕМ) ===
+        self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0)
+
+        # Цветовые схемы
+        MALE_FG = "#1e40af"
+        FEMALE_FG = "#c41e3a"
+
+        # --- РОДИТЕЛИ ---
+        self.add_relative_menu.add_command(
+            label="Отец",
+            font=("Segoe UI", 9),
+            foreground=MALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#1e40af",
+            command=lambda: self.add_parent_dialog(self.last_selected_person_id, "Мужской")
+        )
+        self.add_relative_menu.add_command(
+            label="Мать",
+            font=("Segoe UI", 9),
+            foreground=FEMALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#c41e3a",
+            command=lambda: self.add_parent_dialog(self.last_selected_person_id, "Женский")
+        )
+        self.add_relative_menu.add_separator()
+
+        # --- ДЕТИ ---
+        self.add_relative_menu.add_command(
+            label="Сын",
+            font=("Segoe UI", 9),
+            foreground=MALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#1e40af",
+            command=lambda: self.add_child_dialog(self.last_selected_person_id, "Мужской")
+        )
+        self.add_relative_menu.add_command(
+            label="Дочь",
+            font=("Segoe UI", 9),
+            foreground=FEMALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#c41e3a",
+            command=lambda: self.add_child_dialog(self.last_selected_person_id, "Женский")
+        )
+        self.add_relative_menu.add_separator()
+
+        # --- БРАТЬЯ / СЁСТРЫ ---
+        self.add_relative_menu.add_command(
+            label="Брат",
+            font=("Segoe UI", 9),
+            foreground=MALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#1e40af",
+            command=lambda: self.add_sibling_dialog(self.last_selected_person_id, "Мужской")
+        )
+        self.add_relative_menu.add_command(
+            label="Сестра",
+            font=("Segoe UI", 9),
+            foreground=FEMALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#c41e3a",
+            command=lambda: self.add_sibling_dialog(self.last_selected_person_id, "Женский")
+        )
+        self.add_relative_menu.add_separator()
+
+        # --- СУПРУГИ ---
+        self.add_relative_menu.add_command(
+            label="Супруг",
+            font=("Segoe UI", 9),
+            foreground=MALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#1e40af",
+            command=lambda: self.add_spouse_dialog(self.last_selected_person_id, "Мужской")
+        )
+        self.add_relative_menu.add_command(
+            label="Супруга",
+            font=("Segoe UI", 9),
+            foreground=FEMALE_FG,
+            activeforeground="#ffffff",
+            activebackground="#c41e3a",
+            command=lambda: self.add_spouse_dialog(self.last_selected_person_id, "Женский")
+        )
+
+        self.context_menu.add_cascade(label="➕ Добавить родственника", menu=self.add_relative_menu)
         # --- /КОНТЕКСТНОЕ МЕНЮ ---
         # --- СВЯЗИ КЛАВИШ ---
         self.canvas.bind("<Button-3>", self.show_context_menu)
@@ -265,21 +301,126 @@ class FamilyTreeApp:
         self.canvas.bind("<MouseWheel>", self.zoom)
         # === ИСПРАВЛЕНО: ДОБАВЛЕНА ПРИВЯЗКА ГОРЯЧЕЙ КЛАВИШИ Ctrl+F ===
         self.root.bind("<Control-f>", lambda e: self.toggle_focus_mode())
+        # Добавляем горячие клавиши
+        self.root.bind("<Control-s>", lambda e: self.save_file())  # Сохранение
+        self.root.bind("<Control-z>", lambda e: self.undo())  # Отмена
+        self.root.bind("<Control-y>", lambda e: self.redo())  # Повтор
         # === КОНЕЦ ИСПРАВЛЕНИЯ ===
-        # Привязки для отмены/повтора (если доступен модуль undo)
-        if UNDO_AVAILABLE:
-            self.root.bind("<Control-z>", lambda e: self.undo())
-            self.root.bind("<Control-y>", lambda e: self.redo())
         # --- /СВЯЗИ КЛАВИШ ---
         # --- ЗАГРУЗКА ---
         self.model.load_from_file()
-        self.check_first_run()
+
+        # Инициализация системы резервного копирования
+        if BACKUP_AVAILABLE:
+            self.backup_manager, self.auto_save_manager = init_backup_system(self.model, self.root)
+            backup_info = self.backup_manager.get_backup_info()
+            print(f"Бэкапы: {backup_info['count']} шт., автосохранение каждые {backup_info['interval_minutes']} мин.")
+        else:
+            self.backup_manager = None
+            self.auto_save_manager = None
+
+        # Инициализация менеджера отмены/повтора действий
+        if UNDO_AVAILABLE:
+            self.undo_manager = UndoManager(self.model)
+        else:
+            self.undo_manager = None
+
+        # Инициализация переменных (до темы!)
         self.hovered_person_id = None  # ID персоны под курсором
         self.selected_person_id = None  # ID выбранной персоны (центр)
-        # УБРАНО: повторная инициализация self.focus_mode_active (была дублирована!)
+        self.focus_mode_active = False
+
+        # Инициализация темы оформления
+        self.current_theme = load_theme()
+        self.theme_colors = get_theme_colors(self.current_theme)
+        self.style = ttk.Style()
+        if THEME_AVAILABLE:
+            apply_theme(self.current_theme, self)
+
+        self.check_first_run()
         self.refresh_view()
         self.root.protocol("WM_DELETE_WINDOW", self.on_exit)
         # --- /ЗАГРУЗКА ---
+
+    def update_title(self):
+        """Обновляет заголовок окна с индикатором несохранённых изменений."""
+        title = self.base_title
+        if self.model and self.model.modified:
+            title += self.modified_indicator
+        self.root.title(title)
+
+    def undo(self):
+        """Отмена последнего действия."""
+        if not UNDO_AVAILABLE or not self.undo_manager:
+            messagebox.showinfo("Отмена", "Функция отмены действий недоступна.")
+            return
+
+        if self.undo_manager.undo():
+            self.refresh_view()
+            self.update_title()
+            action_name = self.undo_manager.get_last_action_name()
+            self.statusbar.config(text=f"Отменено: {action_name}" if hasattr(self, 'statusbar') else "")
+        else:
+            messagebox.showinfo("Отмена", "Нечего отменять.")
+
+    def redo(self):
+        """Повтор отменённого действия."""
+        if not UNDO_AVAILABLE or not self.undo_manager:
+            messagebox.showinfo("Повтор", "Функция повтора действий недоступна.")
+            return
+
+        if self.undo_manager.redo():
+            self.refresh_view()
+            self.update_title()
+            action_name = self.undo_manager.get_last_action_name()
+            self.statusbar.config(text=f"Повторено: {action_name}" if hasattr(self, 'statusbar') else "")
+        else:
+            messagebox.showinfo("Повтор", "Нечего повторять.")
+
+    def toggle_theme(self):
+        """Переключает тему оформления (светлая/тёмная)."""
+        if not THEME_AVAILABLE:
+            messagebox.showinfo("Темы", "Модуль управления темами недоступен.")
+            return
+
+        new_theme = toggle_theme(self)
+        theme_name = get_theme_name(new_theme)
+        
+        # Обновляем пункт меню
+        self._update_theme_menu_item(theme_name)
+        
+        # Сохраняем настройки окна
+        self._save_window_settings()
+        
+        messagebox.showinfo("Тема", f"Применена {theme_name.lower()} тема")
+
+    def _update_theme_menu_item(self, theme_name):
+        """Обновляет название пункта меню темы."""
+        # Находим индекс пункта меню и обновляем
+        for i in range(self.view_menu.index('end')):
+            try:
+                label = self.view_menu.entrycget(i, 'label')
+                if 'тема' in label.lower() or 'theme' in label.lower():
+                    self.view_menu.entryconfig(i, label=f"Тёмная тема ({'✓' if theme_name == 'Тёмная' else '○'})")
+                    break
+            except Exception:
+                pass
+
+    def _save_window_settings(self):
+        """Сохраняет настройки окна и темы."""
+        import json
+        settings = {
+            "width": self.root.winfo_width(),
+            "height": self.root.winfo_height(),
+            "x": self.root.winfo_x(),
+            "y": self.root.winfo_y(),
+            "theme": self.current_theme
+        }
+        try:
+            with open("window_settings.json", 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Ошибка сохранения настроек: {e}")
 
 
 
@@ -439,9 +580,9 @@ class FamilyTreeApp:
             if messagebox.askyesno("Подтверждение", msg):
                 welcome.destroy()
                 if self.username:
-                    self.statusbar.config(text="Добавьте персону через ПКМ по холсту → «Добавить».")
+                    pass  # statusbar удалён
                 else:
-                    self.statusbar.config(text="Режим гостя: создайте персону вручную через меню «Файл → Новая персона».")
+                    pass  # statusbar удалён
 
         def on_submit():
             # Валидация
@@ -957,51 +1098,110 @@ class FamilyTreeApp:
                         has_mother = True
             # --- /ПРОВЕРКА НАЛИЧИЯ РОДИТЕЛЕЙ ---
 
-            # Добавляем пункты в зависимости от пола персоны
-            if person.gender == "Мужской":
-                self.add_relative_menu.add_command(label="Жена...",
-                                                   command=lambda
-                                                       p=self.last_selected_person_id: self.add_spouse_dialog(p))
-                self.add_relative_menu.add_command(label="Сын...",
-                                                   command=lambda p=self.last_selected_person_id: self.add_child_dialog(
-                                                       p, "Мужской"))
-                self.add_relative_menu.add_command(label="Дочь...",
-                                                   command=lambda p=self.last_selected_person_id: self.add_child_dialog(
-                                                       p, "Женский"))
-            else:
-                self.add_relative_menu.add_command(label="Муж...",
-                                                   command=lambda
-                                                       p=self.last_selected_person_id: self.add_spouse_dialog(p))
-                self.add_relative_menu.add_command(label="Сын...",
-                                                   command=lambda p=self.last_selected_person_id: self.add_child_dialog(
-                                                       p, "Мужской"))
-                self.add_relative_menu.add_command(label="Дочь...",
-                                                   command=lambda p=self.last_selected_person_id: self.add_child_dialog(
-                                                       p, "Женский"))
+            # Цветовые схемы
+            MALE_FG = "#1e40af"
+            FEMALE_FG = "#c41e3a"
 
-            # Общие пункты для обоих полов — с проверкой наличия родителей
+            # --- РОДИТЕЛИ ---
             if not has_father:
-                self.add_relative_menu.add_command(label="Отец...",
-                                                   command=lambda
-                                                       p=self.last_selected_person_id: self.add_parent_dialog(p,
-                                                                                                              "Мужской"))
+                self.add_relative_menu.add_command(
+                    label="Отец",
+                    font=("Segoe UI", 9),
+                    foreground=MALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#1e40af",
+                    command=lambda p=self.last_selected_person_id: self.add_parent_dialog(p, "Мужской")
+                )
             if not has_mother:
-                self.add_relative_menu.add_command(label="Мать...",
-                                                   command=lambda
-                                                       p=self.last_selected_person_id: self.add_parent_dialog(p,
-                                                                                                              "Женский"))
+                self.add_relative_menu.add_command(
+                    label="Мать",
+                    font=("Segoe UI", 9),
+                    foreground=FEMALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#c41e3a",
+                    command=lambda p=self.last_selected_person_id: self.add_parent_dialog(p, "Женский")
+                )
+            self.add_relative_menu.add_separator()
 
-            self.add_relative_menu.add_command(label="Брат...",
-                                               command=lambda p=self.last_selected_person_id: self.add_sibling_dialog(p,
-                                                                                                                      "Мужской"))
-            self.add_relative_menu.add_command(label="Сестра...",
-                                               command=lambda p=self.last_selected_person_id: self.add_sibling_dialog(p,
-                                                                                                                      "Женский"))
+            # --- ДЕТИ ---
+            if person.gender == "Мужской":
+                self.add_relative_menu.add_command(
+                    label="Сын",
+                    font=("Segoe UI", 9),
+                    foreground=MALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#1e40af",
+                    command=lambda p=self.last_selected_person_id: self.add_child_dialog(p, "Мужской")
+                )
+                self.add_relative_menu.add_command(
+                    label="Дочь",
+                    font=("Segoe UI", 9),
+                    foreground=FEMALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#c41e3a",
+                    command=lambda p=self.last_selected_person_id: self.add_child_dialog(p, "Женский")
+                )
+            else:
+                self.add_relative_menu.add_command(
+                    label="Сын",
+                    font=("Segoe UI", 9),
+                    foreground=MALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#1e40af",
+                    command=lambda p=self.last_selected_person_id: self.add_child_dialog(p, "Мужской")
+                )
+                self.add_relative_menu.add_command(
+                    label="Дочь",
+                    font=("Segoe UI", 9),
+                    foreground=FEMALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#c41e3a",
+                    command=lambda p=self.last_selected_person_id: self.add_child_dialog(p, "Женский")
+                )
+            self.add_relative_menu.add_separator()
+
+            # --- БРАТЬЯ / СЁСТРЫ ---
+            self.add_relative_menu.add_command(
+                label="Брат",
+                font=("Segoe UI", 9),
+                foreground=MALE_FG,
+                activeforeground="#ffffff",
+                activebackground="#1e40af",
+                command=lambda p=self.last_selected_person_id: self.add_sibling_dialog(p, "Мужской")
+            )
+            self.add_relative_menu.add_command(
+                label="Сестра",
+                font=("Segoe UI", 9),
+                foreground=FEMALE_FG,
+                activeforeground="#ffffff",
+                activebackground="#c41e3a",
+                command=lambda p=self.last_selected_person_id: self.add_sibling_dialog(p, "Женский")
+            )
+            self.add_relative_menu.add_separator()
+
+            # --- СУПРУГИ ---
+            if person.gender == "Мужской":
+                self.add_relative_menu.add_command(
+                    label="Супруга",
+                    font=("Segoe UI", 9),
+                    foreground=FEMALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#c41e3a",
+                    command=lambda p=self.last_selected_person_id: self.add_spouse_dialog(p)
+                )
+            else:
+                self.add_relative_menu.add_command(
+                    label="Супруг",
+                    font=("Segoe UI", 9),
+                    foreground=MALE_FG,
+                    activeforeground="#ffffff",
+                    activebackground="#1e40af",
+                    command=lambda p=self.last_selected_person_id: self.add_spouse_dialog(p)
+                )
 
         # Отображаем контекстное меню
         try:
             self.context_menu.tk_popup(event.x_root, event.y_root)
-            self.statusbar.config(text=constants.MSG_STATUS_CONTEXT_MENU_OPENED)
         finally:
             self.context_menu.grab_release()
 
@@ -1016,246 +1216,37 @@ class FamilyTreeApp:
         except Exception as e:
             messagebox.showerror("Ошибка", str(e))
 
-    def open_web_version(self):
-        """Открывает веб-версию приложения в браузере."""
-        import webbrowser
-        url = constants.WEB_VERSION_URL
-        webbrowser.open(url)
-
-    def open_admin_panel(self):
-        """Открыть админ-панель"""
-        from admin_dashboard import open_admin_dashboard
-        
-        # Диалог ввода пароля администратора
-        dialog = tk.Toplevel(self.root)
-        dialog.title("👑 Вход администратора")
-        dialog.geometry("400x200")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        ttk.Label(dialog, text="Введите данные администратора", 
-                 font=("Segoe UI", 12, "bold")).pack(pady=10)
-        
-        frame = ttk.Frame(dialog, padding=20)
-        frame.pack()
-        
-        # Логин
-        ttk.Label(frame, text="Логин:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        login_var = tk.StringVar(value="admin")
-        ttk.Entry(frame, textvariable=login_var, width=30).grid(row=0, column=1, padx=10, pady=5)
-        
-        # Пароль
-        ttk.Label(frame, text="Пароль:").grid(row=1, column=0, padx=10, pady=5, sticky='e')
-        password_var = tk.StringVar()
-        ttk.Entry(frame, textvariable=password_var, show="*", width=30).grid(row=1, column=1, padx=10, pady=5)
-        
-        # URL сервера
-        ttk.Label(frame, text="URL:").grid(row=2, column=0, padx=10, pady=5, sticky='e')
-        url_var = tk.StringVar(value="https://ravishing-caring-production-3656.up.railway.app")
-        ttk.Entry(frame, textvariable=url_var, width=30).grid(row=2, column=1, padx=10, pady=5)
-        
-        def do_open():
-            open_admin_dashboard(url_var.get(), login_var.get(), password_var.get())
-            dialog.destroy()
-        
-        ttk.Button(dialog, text="Войти", command=do_open).pack(pady=10)
-        ttk.Button(dialog, text="Отмена", command=dialog.destroy).pack()
-
-    def open_sync_dialog(self):
-        """Диалог синхронизации с сервером."""
-        from sync_client import get_sync_client
-        
-        dialog = tk.Toplevel(self.root)
-        dialog.title("☁️ Синхронизация с сервером")
-        dialog.geometry("450x350")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Заголовок
-        ttk.Label(dialog, text="☁️ Синхронизация с сервером", 
-                 font=("Segoe UI", 14, "bold")).pack(pady=10)
-        
-        # Поля ввода
-        frame = ttk.Frame(dialog, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        # URL сервера
-        ttk.Label(frame, text="URL сервера:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        url_var = tk.StringVar(value="https://ravishing-caring-production-3656.up.railway.app")
-        url_entry = ttk.Entry(frame, textvariable=url_var, width=50)
-        url_entry.grid(row=0, column=1, padx=10, pady=5, sticky='w')
-        
-        # Логин
-        ttk.Label(frame, text="Логин:").grid(row=1, column=0, padx=10, pady=5, sticky='e')
-        login_var = tk.StringVar()
-        login_entry = ttk.Entry(frame, textvariable=login_var, width=30)
-        login_entry.grid(row=1, column=1, padx=10, pady=5, sticky='w')
-        
-        # Пароль
-        ttk.Label(frame, text="Пароль:").grid(row=2, column=0, padx=10, pady=5, sticky='e')
-        password_var = tk.StringVar()
-        password_entry = ttk.Entry(frame, textvariable=password_var, show="*", width=30)
-        password_entry.grid(row=2, column=1, padx=10, pady=5, sticky='w')
-        
-        # Статус
-        status_var = tk.StringVar(value="")
-        status_label = ttk.Label(frame, textvariable=status_var, foreground="blue")
-        status_label.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
-        
-        def do_login():
-            """Выполнить вход."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                client.login(login_var.get(), password_var.get())
-                status_var.set("✅ Вход успешен!")
-                status_var.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
-        
-        def do_upload():
-            """Загрузить на сервер."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                if not client.is_logged_in():
-                    client.login(login_var.get(), password_var.get())
-                result = client.sync(self.model, "Моё дерево")
-                status_var.set(f"✅ Загрузка успешна! {result}")
-                status_var.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
-        
-        def do_download():
-            """Скачать с сервера."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                if not client.is_logged_in():
-                    client.login(login_var.get(), password_var.get())
-                result = client.download_tree()
-                status_var.set(f"✅ Скачивание успешно! Персон: {len(result.get('tree', {}).get('persons', {}))}")
-                status_var.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
-        
-        # Кнопки
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(pady=10)
-        
-        ttk.Button(btn_frame, text="Войти", command=do_login).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="⬆️ Загрузить", command=do_upload).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="⬇️ Скачать", command=do_download).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
-
-    def _view_person_by_id(self, person_id):
-        """Просмотр персоны по ID."""
-        old_center = self.model.current_center
-        old_selected = self.last_selected_person_id
-        self.model.current_center = str(person_id)
-        self.last_selected_person_id = str(person_id)
-        try:
-            self.view_person()
-        finally:
-            self.model.current_center = old_center
-            self.last_selected_person_id = old_selected
-
-    def _edit_person_by_id(self, person_id, current_dialog):
-        """Редактирование персоны по ID (закрывает текущий диалог)."""
-        current_dialog.destroy()
-        old_center = self.model.current_center
-        old_selected = self.last_selected_person_id
-        self.model.current_center = str(person_id)
-        self.last_selected_person_id = str(person_id)
-        try:
-            self.edit_person()
-        finally:
-            self.model.current_center = old_center
-            self.last_selected_person_id = old_selected
-
-    def _quick_add_spouse(self, person_id, current_dialog):
-        """Быстрое добавление супруга."""
-        current_dialog.destroy()
-        old_center = self.model.current_center
-        self.model.current_center = str(person_id)
-        try:
-            self.add_spouse_dialog(person_id)
-        finally:
-            self.model.current_center = old_center
-
-    def _quick_add_child(self, person_id, current_dialog):
-        """Быстрое добавление ребёнка."""
-        current_dialog.destroy()
-        old_center = self.model.current_center
-        self.model.current_center = str(person_id)
-        try:
-            # Спрашиваем пол ребёнка
-            gender = simpledialog.askstring("Пол ребёнка", "Введите пол ребёнка (Мужской/Женский):", 
-                                           initialvalue="Мужской")
-            if gender:
-                if gender.lower() in ["м", "мужской", "male"]:
-                    self.add_child_dialog(person_id, "Мужской")
-                elif gender.lower() in ["ж", "женский", "female"]:
-                    self.add_child_dialog(person_id, "Женский")
-                else:
-                    messagebox.showerror("Ошибка", "Неверно указан пол")
-        finally:
-            self.model.current_center = old_center
-
-    def _quick_add_parent(self, person_id, current_dialog):
-        """Быстрое добавление родителя."""
-        current_dialog.destroy()
-        old_center = self.model.current_center
-        self.model.current_center = str(person_id)
-        try:
-            # Спрашиваем, кого добавить
-            parent_type = messagebox.askquestion("Тип родителя", "Кого хотите добавить?\n\nДа - Мать\nНет - Отец",
-                                                icon=messagebox.QUESTION)
-            if parent_type == 'yes':
-                self.add_parent_dialog(person_id, "Женский")
-            else:
-                self.add_parent_dialog(person_id, "Мужской")
-        finally:
-            self.model.current_center = old_center
-
     def on_exit(self):
-        """Обработка закрытия приложения."""
+        """Обработка закрытия приложения с синхронизацией."""
+        # Останавливаем автосохранение
+        if self.auto_save_manager:
+            self.auto_save_manager.stop()
+
         # Проверяем, были ли изменения
-        # ИСПРАВЛЕНО: используем свойство modified вместо метода is_modified()
         if self.model and self.model.modified:
             result = messagebox.askyesnocancel(
                 "Сохранить изменения?",
                 "Данные были изменены. Сохранить перед выходом?"
             )
-            if result is None:  # Нажата Отмена или закрыто окно диалога
-                # Приложение НЕ должно закрываться
-                return False  # Явно возвращаем False, если выход отменён
+            if result is None:  # Нажата Отмена или закрыто окна диалога
+                return False
             elif result:  # Нажата Да
                 if not self.save_file():
-                    # Если сохранение отменено или не удалось, также не закрываем
                     return False
+                # Автосинхронизация при сохранении (без дополнительного вопроса)
+                if SYNC_AVAILABLE and self.username:
+                    try:
+                        self._sync_with_server()
+                    except Exception:
+                        pass
 
-        # Если изменения не требуют сохранения или были успешно сохранены
-        # Очистка кэша изображений для освобождения памяти
+        # Очистка кэша изображений
         self.photo_images.clear()
 
-        # Корректное завершение работы Tkinter
-        # ИСПРАВЛЕНО: destroy() вызываем ТОЛЬКО если выход не отменён
-        # Сначала quit() - останавливает mainloop
+        # Завершение работы
         self.root.quit()
-        # Затем destroy() - уничтожает окно
-        # Эти вызовы безопасны, если выход не отменён
-        # (ранее destroy() было всегда, что было ошибкой)
-        # На самом деле, quit() достаточно для остановки цикла,
-        # а destroy() уничтожает объект окна. Для простого выхода
-        # обычно достаточно quit(). Tkinter сам вызовет destroy()
-        # при завершении mainloop, если окно больше не используется
-        # другими ссылками. Но часто используют оба.
         self.root.destroy()
-        return True  # Успешный выход
+        return True
 
 
     def update_adaptive_settings(self):
@@ -1277,11 +1268,9 @@ class FamilyTreeApp:
         old_scale = self.current_scale
         if event.delta > 0:
             self.current_scale *= 1.1
-            self.statusbar.config(text=constants.MSG_STATUS_ZOOM_IN)
         elif event.delta < 0:
             self.current_scale /= 1.1
             self.current_scale = max(0.1, self.current_scale)
-            self.statusbar.config(text=constants.MSG_STATUS_ZOOM_OUT)
         self.offset_x = canvas_x - (canvas_x - self.offset_x) * (self.current_scale / old_scale)
         self.offset_y = canvas_y - (canvas_y - self.offset_y) * (self.current_scale / old_scale)
         self.refresh_view()
@@ -1290,37 +1279,27 @@ class FamilyTreeApp:
         """Начало перетаскивания холста"""
         self.drag_start_x = event.x
         self.drag_start_y = event.y
-        self.is_dragging = False  # Флаг устанавливается только при реальном движении
+        self.is_dragging = False
 
     def pan(self, event):
         """Перемещение холста при удержании ЛКМ с синхронным движением карточек и курсора"""
         dx = event.x - self.drag_start_x
         dy = event.y - self.drag_start_y
 
-        # Определяем начало перетаскивания (только при реальном движении)
         if not self.is_dragging and (dx * dx + dy * dy > self.DRAG_THRESHOLD * self.DRAG_THRESHOLD):
             self.is_dragging = True
-            self.statusbar.config(text=constants.MSG_STATUS_PAN_ACTIVE)
-            self.root.focus_set()  # Снимаем фокус с элементов
+            self.root.focus_set()
 
         if self.is_dragging:
-            # ИСПРАВЛЕНО: карточки двигаются СИНХРОННО с курсором (без минуса!)
-
             self.offset_x += dx
             self.offset_y += dy
-
-            # Обновляем стартовую точку для плавного продолжения
             self.drag_start_x = event.x
             self.drag_start_y = event.y
-
-            # Мгновенное обновление без задержек
             self.refresh_view()
 
     def stop_pan(self, event):
         """Завершение перетаскивания"""
-        if self.is_dragging:
-            self.is_dragging = False
-            self.statusbar.config(text=constants.MSG_STATUS_PAN_INACTIVE)
+        self.is_dragging = False
 
     def on_canvas_click(self, event):
         if self.is_dragging:
@@ -1486,6 +1465,19 @@ class FamilyTreeApp:
                 anchor="n",
                 tags=card_tags
             )
+            y_offset += 12 * self.current_scale
+
+        # === ОТОБРАЖЕНИЕ РОДСТВА ===
+        if pid in self.kinship_labels and pid != self.model.current_center:
+            kinship = self.kinship_labels[pid]
+            self.canvas.create_text(
+                scaled_x, text_y_start + y_offset,
+                text=f"({kinship})",
+                font=("Arial", int(7 * self.current_scale), "italic"),
+                fill="#fbbf24",  # Янтарный цвет
+                anchor="n",
+                tags=card_tags
+            )
 
         # === ПРИВЯЗКА СОБЫТИЙ ===
         self.canvas.tag_bind(card_tags, "<Enter>", lambda e, p_id=pid: self.on_person_enter(p_id))
@@ -1494,7 +1486,7 @@ class FamilyTreeApp:
         self.canvas.tag_bind(card_tags, "<Double-Button-1>", lambda e, p_id=pid: self.on_person_double_click(p_id))
 
     def clear_photo_cache(self):
-        """Очищает кэш изображений для освобо��дения памяти."""
+        """Очищает кэш изображений для освобождения памяти."""
         self.photo_images.clear()
         print("Кэш изображений очищен.")
 
@@ -1504,10 +1496,10 @@ class FamilyTreeApp:
         Возвращает PhotoImage или None при ошибке.
         Гарантирует сохранение ссылки в кэше для предотвращения удаления сборщиком мусора.
         """
-        # === СТРОГАЯ ПРОВЕ����КА НАЛИЧИЯ ФОТО ===
+        # === СТРОГАЯ ПРОВЕРКА НАЛИЧИЯ ФОТО ===
         # 1. Сначала проверяем путь к файлу (приоритетнее)
         if person.photo_path and os.path.exists(person.photo_path):
-            pass  # Файл существует — продолжаем загрузку
+            pass  # Файл существует — продолж����ем загрузку
         # 2. Проверяем base64: должно быть непустой строкой без пробелов
         elif person.photo and isinstance(person.photo, str) and person.photo.strip():
             pass  # Base64 валиден — продолжаем загрузку
@@ -1609,6 +1601,11 @@ class FamilyTreeApp:
         self._skip_centering_once = False
         if not skip_layout or not self.coords:
             self.calculate_layout(skip_centering=skip_centering)
+
+        # === ВЫЧИСЛЯЕМ РОДСТВО ДЛЯ ВСЕХ ПЕРСОН ===
+        self.kinship_labels = {}
+        if self.model.current_center and KINSHIP_AVAILABLE:
+            self.kinship_labels = calculate_kinship(self.model, self.model.current_center)
 
         # === ФИЛЬТРАЦИЯ ПЕРСОН (предки, потомки, братья/сёстры, супруги) ===
         visible_after_center = {}
@@ -1721,6 +1718,14 @@ class FamilyTreeApp:
             filtered_visible[pid] = coords
 
         self.visible_persons_in_coords = filtered_visible
+        
+        # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
+        total_persons = len(self.model.persons)
+        visible_persons = len(self.visible_persons_in_coords)
+        if total_persons == visible_persons:
+            self.counter_label.config(text=f"Персон: {total_persons}")
+        else:
+            self.counter_label.config(text=f"Персон: {total_persons} (видимо: {visible_persons})")
 
         # === ОТРИСОВКА СВЯЗЕЙ РОДИТЕЛИ → ДЕТИ (середина линии родителей → общая линия детей → верх карточки ребёнка, скругления) ===
         def _key_in_vis(pid):
@@ -1834,15 +1839,6 @@ class FamilyTreeApp:
             if not person: continue
             self.draw_person_card(pid, person, sx, sy)  # ← Без параметра photo_cache!
         # === /КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
-
-        # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
-        total_persons = len(self.model.persons)
-        visible_persons = len(self.visible_persons_in_coords)
-        if hasattr(self, 'counter_label'):
-            if visible_persons == total_persons:
-                self.counter_label.config(text=f"Персон: {total_persons}")
-            else:
-                self.counter_label.config(text=f"Персон: {total_persons} (видимо: {visible_persons})")
 
     def calculate_layout(self, skip_centering=False):
         """
@@ -2556,7 +2552,7 @@ class FamilyTreeApp:
 
         # --- Вкладка 1: Основное ---
         tab_main = ttk.Frame(notebook)
-        notebook.add(tab_main, text="👤 Основное")
+        notebook.add(tab_main, text="Основное")
         f_main = make_scrollable_tab(tab_main)
         row = 0
 
@@ -2614,10 +2610,10 @@ class FamilyTreeApp:
 
         death_date_frame = ttk.Frame(f_main)
         death_date_frame.grid(row=row, column=0, columnspan=2, padx=10, pady=0, sticky='w')
-        ttk.Label(death_date_frame, text="Дата смерти", width=18).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(death_date_frame, text="Дата смерти").pack(side=tk.LEFT, padx=(0, 10))
         death_date_var = tk.StringVar(value=person.death_date or "")
-        death_entry = ttk.Entry(death_date_frame, textvariable=death_date_var, width=32)
-        death_entry.pack(side=tk.LEFT, padx=(0, 10))
+        death_entry = ttk.Entry(death_date_frame, textvariable=death_date_var, width=28)
+        death_entry.pack(side=tk.LEFT)
         death_entry.bind("<KeyPress>", self._date_entry_keypress)
         death_entry.bind("<<Paste>>", lambda e, ent=death_entry: self._date_entry_on_paste(ent))
         death_entry.bind("<FocusOut>", self.normalize_date_on_focusout)
@@ -2635,35 +2631,6 @@ class FamilyTreeApp:
             death_date_frame.grid_remove()
         row += 1
 
-        # Расчёт возраста и знака зодиака (отдельная строка)
-        age_info_frame = ttk.Frame(f_main)
-        age_info_frame.grid(row=row, column=1, padx=10, pady=2, sticky='w')
-
-        def update_age_info(*args):
-            """Обновляет информацию о возрасте и знаке зодиака."""
-            for widget in age_info_frame.winfo_children():
-                widget.destroy()
-
-            birth_date_str = birth_date_var.get().strip()
-            death_date_str = death_date_var.get().strip() if deceased_var.get() else ""
-
-            if birth_date_str:
-                age, zodiac = self._calculate_age_and_zodiac(birth_date_str, death_date_str)
-                info_text = f"({age} лет"
-                if zodiac:
-                    info_text += f", {zodiac}"
-                info_text += ")"
-                ttk.Label(age_info_frame, text=info_text,
-                         font=("Segoe UI", 9), foreground="#64748b").pack(side=tk.LEFT)
-
-        # Привязка обновления к изменению дат
-        birth_date_var.trace_add("write", update_age_info)
-        death_date_var.trace_add("write", update_age_info)
-        # Первоначальное обновление
-        age_info_frame.after(100, lambda: update_age_info())
-
-        row += 1
-
         maiden_name_frame = ttk.Frame(f_main)
         maiden_name_frame.grid(row=row, column=0, columnspan=2, padx=10, pady=0, sticky='w')
         ttk.Label(maiden_name_frame, text="Девичья фамилия").pack(side=tk.LEFT, padx=(0, 10))
@@ -2677,7 +2644,7 @@ class FamilyTreeApp:
         row += 1
 
         # Основное фото (на основной вкладке — одно поле)
-        ttk.Label(f_main, text="Главное фото").grid(row=row, column=0, padx=10, pady=6, sticky='e')
+        ttk.Label(f_main, text="��лавное фото").grid(row=row, column=0, padx=10, pady=6, sticky='e')
         photo_path_var = tk.StringVar(value=person.photo_path or "")
         photo_f = ttk.Frame(f_main)
         photo_f.grid(row=row, column=1, padx=10, pady=6, sticky='w')
@@ -2703,7 +2670,7 @@ class FamilyTreeApp:
 
         # --- Вкладка 2: Семья (родители, супруги, дети + быстрые действия) ---
         tab_family = ttk.Frame(notebook)
-        notebook.add(tab_family, text="👨‍👩‍👧‍👦 Семья")
+        notebook.add(tab_family, text="Семья")
         f_fam = make_scrollable_tab(tab_family)
         row_f = 0
 
@@ -2723,109 +2690,22 @@ class FamilyTreeApp:
             ttk.Label(f_fam, text=label).grid(row=row_f, column=0, padx=10, pady=4, sticky='e')
             if p_id:
                 p_obj = self.model.get_person(p_id)
-                # Фрейм для родителя с кнопками действий
-                parent_frame = ttk.Frame(f_fam)
-                parent_frame.grid(row=row_f, column=1, padx=10, pady=4, sticky='w')
-
-                # Расчёт возраста родителя
-                age_text = ""
-                if p_obj and p_obj.birth_date:
-                    age, _ = self._calculate_age_and_zodiac(p_obj.birth_date, p_obj.death_date if p_obj.is_deceased else "")
-                    if age and age != "?":
-                        age_text = f" ({age} л.)"
-
-                ttk.Label(parent_frame, text=f"{p_obj.display_name() if p_obj else str(p_id)}{age_text}",
-                         font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 5))
-
-                # Кнопки действий (используем p_id как default argument для замыкания)
-                ttk.Button(parent_frame, text="👁", width=3,
-                          command=lambda pid=p_id: self._view_person_by_id(pid)).pack(side=tk.LEFT, padx=2)
-                ttk.Button(parent_frame, text="✏", width=3,
-                          command=lambda pid=p_id: self._edit_person_by_id(pid, dialog)).pack(side=tk.LEFT, padx=2)
+                ttk.Label(f_fam, text=p_obj.display_name() if p_obj else str(p_id)).grid(row=row_f, column=1, padx=10, pady=4, sticky='w')
             else:
                 ttk.Button(f_fam, text="Добавить из существующих",
                            command=lambda pid=pid, is_mother=(label == "Мать:"): self._add_parent_from_list_and_close(dialog, pid, is_mother)).grid(row=row_f, column=1, padx=10, pady=4, sticky='w')
             row_f += 1
-        
-        # Кнопка добавления родителя
-        add_parent_btn = ttk.Button(f_fam, text="➕ Добавить родителя", 
-                                   command=lambda: self._quick_add_parent(pid, dialog))
-        add_parent_btn.grid(row=row_f, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-        row_f += 1
 
         ttk.Label(f_fam, text="Супруг(и) / Партнёры", font=("Arial", 10, "bold")).grid(row=row_f, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
         row_f += 1
-        marriage_date_vars = {}  # Сохраняем переменные для дат брака
         for s_id in (person.spouse_ids or []):
             s = self.model.get_person(s_id)
             if s:
-                # Получаем дату брака
-                marriage_date = self.model.get_marriage_date(pid, s_id)
-                # Имя супруга (с кнопками действий)
-                spouse_frame = ttk.Frame(f_fam)
-                spouse_frame.grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
-                
-                ttk.Label(spouse_frame, text=s.display_name(), font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
-
-                # Расчёт возраста супруга
-                age_text = ""
-                if s.birth_date:
-                    age, _ = self._calculate_age_and_zodiac(s.birth_date, s.death_date if s.is_deceased else "")
-                    if age and age != "?":
-                        age_text = f" ({age} л.)"
-                
-                # Добавляем возраст к имени, если есть
-                if age_text:
-                    for widget in spouse_frame.winfo_children():
-                        if isinstance(widget, ttk.Label) and widget.cget('text') == s.display_name():
-                            widget.config(text=f"{s.display_name()}{age_text}")
-                            break
-
-                # Кнопка просмотра (используем s_id=s_id для замыкания)
-                ttk.Button(spouse_frame, text="👁", width=3,
-                          command=lambda s_id=s_id: self._view_person_by_id(s_id)).pack(side=tk.LEFT, padx=2)
-
-                # Кнопка редактирования
-                ttk.Button(spouse_frame, text="✏", width=3,
-                          command=lambda s_id=s_id: self._edit_person_by_id(s_id, dialog)).pack(side=tk.LEFT, padx=2)
-
-                # Поле для даты брака с расчётом лет вместе
-                date_var = tk.StringVar(value=marriage_date or "")
-                date_entry = ttk.Entry(spouse_frame, textvariable=date_var, width=12)
-                date_entry.pack(side=tk.RIGHT, padx=5)
-                ttk.Label(spouse_frame, text="Дата брака:").pack(side=tk.RIGHT, padx=(0, 5))
-                
-                # Метка для отображения лет вместе
-                years_together_label = ttk.Label(spouse_frame, text="", font=("Segoe UI", 9), foreground="#64748b")
-                years_together_label.pack(side=tk.RIGHT, padx=(5, 0))
-                
-                # Функция для обновления расчёта лет вместе
-                def update_years_together(*args):
-                    marriage_date_str = date_var.get().strip()
-                    if marriage_date_str:
-                        years = self._calculate_years_together(marriage_date_str)
-                        if years:
-                            years_together_label.config(text=f"({years} лет вместе)")
-                    else:
-                        years_together_label.config(text="")
-                
-                # Привязка обновления к изменению даты брака
-                date_var.trace_add("write", update_years_together)
-                # Первоначальное обновление
-                years_together_label.after(100, lambda: update_years_together())
-
-                # Сохраняем ссылку на переменную
-                marriage_date_vars[(pid, s_id)] = date_var
+                ttk.Label(f_fam, text=s.display_name()).grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
                 row_f += 1
         if not person.spouse_ids:
             ttk.Label(f_fam, text="— Нет", foreground="gray").grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
             row_f += 1
-        
-        # Кнопка добавления супруга
-        add_spouse_btn = ttk.Button(f_fam, text="➕ Добавить супруга", 
-                                   command=lambda: self._quick_add_spouse(pid, dialog))
-        add_spouse_btn.grid(row=row_f, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-        row_f += 1
 
         ttk.Label(f_fam, text="Дети", font=("Arial", 10, "bold")).grid(row=row_f, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
         row_f += 1
@@ -2835,44 +2715,19 @@ class FamilyTreeApp:
         for c_id in sorted(person.children or [], key=_child_sort_key):
             c = self.model.get_person(c_id)
             if c:
-                # Фрейм для ребёнка с кнопками действий
-                child_frame = ttk.Frame(f_fam)
-                child_frame.grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
-                
-                # Расчёт возраста ребёнка
-                age_text = ""
-                if c.birth_date:
-                    age, _ = self._calculate_age_and_zodiac(c.birth_date, c.death_date if c.is_deceased else "")
-                    if age and age != "?":
-                        age_text = f" ({age} л.)"
-                
-                ttk.Label(child_frame, text=f"{c.display_name()}{age_text}", 
-                         font=("Arial", 10)).pack(side=tk.LEFT)
-                
-                # Кнопки действий (используем c_id=c_id для замыкания)
-                ttk.Button(child_frame, text="👁", width=3,
-                          command=lambda c_id=c_id: self._view_person_by_id(c_id)).pack(side=tk.LEFT, padx=5)
-                ttk.Button(child_frame, text="✏", width=3,
-                          command=lambda c_id=c_id: self._edit_person_by_id(c_id, dialog)).pack(side=tk.LEFT, padx=2)
-                
+                ttk.Label(f_fam, text=c.display_name()).grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
                 row_f += 1
         if not person.children:
             ttk.Label(f_fam, text="— Нет", foreground="gray").grid(row=row_f, column=0, columnspan=2, padx=10, pady=2, sticky='w')
             row_f += 1
-        
-        # Кнопка добавления ребёнка
-        add_child_btn = ttk.Button(f_fam, text="➕ Добавить ребёнка", 
-                                  command=lambda: self._quick_add_child(pid, dialog))
-        add_child_btn.grid(row=row_f, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-        row_f += 1
 
-        # --- Вкладка 3: История ---
+        # --- Вкладка 3: История и захоронение ---
         tab_history = ttk.Frame(notebook)
-        notebook.add(tab_history, text="📜 История")
+        notebook.add(tab_history, text="История / Захоронение")
         f_hist = make_scrollable_tab(tab_history)
         row_h = 0
 
-        ttk.Label(f_hist, text="Биография, история жизни", font=("Arial", 10, "bold")).grid(row=row_h, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
+        ttk.Label(f_hist, text="Биография, ис��ория жизни", font=("Arial", 10, "bold")).grid(row=row_h, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
         row_h += 1
         biography_var = tk.StringVar(value=getattr(person, "biography", "") or "")
         bio_text = tk.Text(f_hist, width=48, height=8, wrap=tk.WORD, font=("Arial", 10))
@@ -2899,9 +2754,9 @@ class FamilyTreeApp:
         form_vars['burial_date'] = burial_date_var
         row_h += 1
 
-        # --- Вкладка 4: Фотоальбом (доп. фото) — показываем превью фотографий ---
+        # --- Вкладка 4: Фотоальбом (доп. фото) — показываем превью фотографи�� ---
         tab_photos = ttk.Frame(notebook)
-        notebook.add(tab_photos, text="📷 Фотоальбом")
+        notebook.add(tab_photos, text="Фотоальбом")
         f_ph = make_scrollable_tab(tab_photos)
         row_p = 0
         ttk.Label(f_ph, text="Дополнительные фото", font=("Arial", 10, "bold")).grid(row=row_p, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
@@ -2983,124 +2838,17 @@ class FamilyTreeApp:
         ttk.Button(list_frame, text="+ Добавить фото", command=add_album_row).grid(row=len(album_vars), column=0, columnspan=3, pady=8, sticky='w')
         form_vars['photo_album_vars'] = album_vars
 
-        # --- Вкладка 5: Контакты (объединено со ссылками) ---
-        tab_contacts = ttk.Frame(notebook)
-        notebook.add(tab_contacts, text="📞 Контакты")
-        f_cont = make_scrollable_tab(tab_contacts)
-        row_c = 0
-
-        # Телефон
-        ttk.Label(f_cont, text="📞 Телефон").grid(row=row_c, column=0, padx=10, pady=6, sticky='e')
-        phone_var = tk.StringVar(value=getattr(person, "phone", "") or "")
-        phone_entry = ttk.Entry(f_cont, textvariable=phone_var, width=36)
-        phone_entry.grid(row=row_c, column=1, padx=10, pady=6, sticky='w')
-        self._enable_copy_paste(phone_entry)
-        form_vars['phone'] = phone_var
-        row_c += 1
-
-        # Email
-        ttk.Label(f_cont, text="✉ Email").grid(row=row_c, column=0, padx=10, pady=6, sticky='e')
-        email_var = tk.StringVar(value=getattr(person, "email", "") or "")
-        email_entry = ttk.Entry(f_cont, textvariable=email_var, width=36)
-        email_entry.grid(row=row_c, column=1, padx=10, pady=6, sticky='w')
-        self._enable_copy_paste(email_entry)
-        form_vars['email'] = email_var
-        row_c += 1
-
-        # Адрес
-        ttk.Label(f_cont, text="🏠 Адрес").grid(row=row_c, column=0, padx=10, pady=6, sticky='e')
-        address_var = tk.StringVar(value=getattr(person, "address", "") or "")
-        address_entry = ttk.Entry(f_cont, textvariable=address_var, width=36)
-        address_entry.grid(row=row_c, column=1, padx=10, pady=6, sticky='w')
-        self._enable_copy_paste(address_entry)
-        form_vars['address'] = address_var
-        row_c += 1
-
-        # Разделитель
-        ttk.Separator(f_cont, orient='horizontal').grid(row=row_c, column=0, columnspan=2, padx=10, pady=15, sticky='ew')
-        row_c += 1
-
-        # Социальные сети
-        ttk.Label(f_cont, text="Социальные сети", font=("Arial", 10, "bold")).grid(row=row_c, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-        row_c += 1
-
-        # VK
-        ttk.Label(f_cont, text="🔵 VK").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        vk_var = tk.StringVar(value="")
-        vk_entry = ttk.Entry(f_cont, textvariable=vk_var, width=36)
-        vk_entry.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['vk'] = vk_var
-        row_c += 1
-
-        # Telegram
-        ttk.Label(f_cont, text="✈ Telegram").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        telegram_var = tk.StringVar(value="")
-        telegram_entry = ttk.Entry(f_cont, textvariable=telegram_var, width=36)
-        telegram_entry.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['telegram'] = telegram_var
-        row_c += 1
-
-        # WhatsApp
-        ttk.Label(f_cont, text="💬 WhatsApp").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        whatsapp_var = tk.StringVar(value="")
-        whatsapp_entry = ttk.Entry(f_cont, textvariable=whatsapp_var, width=36)
-        whatsapp_entry.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['whatsapp'] = whatsapp_var
-        row_c += 1
-
-        # Разделитель
-        ttk.Separator(f_cont, orient='horizontal').grid(row=row_c, column=0, columnspan=2, padx=10, pady=15, sticky='ew')
-        row_c += 1
-
-        # Медицинская информация
-        ttk.Label(f_cont, text="🏥 Медицинская информация", font=("Arial", 10, "bold")).grid(row=row_c, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-        row_c += 1
-
-        # Группа крови
-        ttk.Label(f_cont, text="Группа крови").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        blood_type_var = tk.StringVar(value="")
-        blood_type_combo = ttk.Combobox(f_cont, textvariable=blood_type_var, width=33, state="readonly")
-        blood_type_combo['values'] = ("I (0)", "II (A)", "III (B)", "IV (AB)", "Неизвестно")
-        blood_type_combo.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['blood_type'] = blood_type_var
-        row_c += 1
-
-        # Резус-фактор
-        ttk.Label(f_cont, text="Резус-фактор").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        rh_var = tk.StringVar(value="")
-        rh_combo = ttk.Combobox(f_cont, textvariable=rh_var, width=33, state="readonly")
-        rh_combo['values'] = ("Rh+", "Rh-", "Неизвестно")
-        rh_combo.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['rh_factor'] = rh_var
-        row_c += 1
-
-        # Аллергии
-        ttk.Label(f_cont, text="Аллергии").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        allergies_var = tk.StringVar(value="")
-        allergies_entry = ttk.Entry(f_cont, textvariable=allergies_var, width=36)
-        allergies_entry.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['allergies'] = allergies_var
-        row_c += 1
-
-        # Хронические заболевания
-        ttk.Label(f_cont, text="Хронические заболевания").grid(row=row_c, column=0, padx=10, pady=4, sticky='e')
-        chronic_var = tk.StringVar(value="")
-        chronic_entry = ttk.Entry(f_cont, textvariable=chronic_var, width=36)
-        chronic_entry.grid(row=row_c, column=1, padx=10, pady=4, sticky='w')
-        form_vars['chronic_conditions'] = chronic_var
-        row_c += 1
-
-        # Разделитель
-        ttk.Separator(f_cont, orient='horizontal').grid(row=row_c, column=0, columnspan=2, padx=10, pady=15, sticky='ew')
-        row_c += 1
-
-        # --- Вкладка: Ссылки (объединено с Контактами) ---
-        ttk.Label(f_cont, text="🔗 Ссылки на информацию в интернете", font=("Arial", 10, "bold")).grid(row=row_c, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
-        row_c += 1
+        # --- Вкладка 5: Ссылки ---
+        tab_links = ttk.Frame(notebook)
+        notebook.add(tab_links, text="Ссылки")
+        f_lnk = make_scrollable_tab(tab_links)
+        row_l = 0
+        ttk.Label(f_lnk, text="Ссылки на информацию в интернете", font=("Arial", 10, "bold")).grid(row=row_l, column=0, columnspan=2, padx=10, pady=(10, 4), sticky='w')
+        row_l += 1
         links_data = getattr(person, "links", None) or []
         links_vars = []  # list of (title_var, url_var)
-        links_frame = ttk.Frame(f_cont)
-        links_frame.grid(row=row_c, column=0, columnspan=2, padx=10, pady=6, sticky='nw')
+        links_frame = ttk.Frame(f_lnk)
+        links_frame.grid(row=row_l, column=0, columnspan=2, padx=10, pady=6, sticky='nw')
 
         def add_link_row(title="", url=""):
             tv = tk.StringVar(value=title)
@@ -3135,7 +2883,7 @@ class FamilyTreeApp:
 
         # --- Вкладка 6: Дополнительно ---
         tab_extra = ttk.Frame(notebook)
-        notebook.add(tab_extra, text="⚙️ Дополнительно")
+        notebook.add(tab_extra, text="Дополнительно")
         f_extra = make_scrollable_tab(tab_extra)
         row_e = 0
 
@@ -3213,10 +2961,6 @@ class FamilyTreeApp:
             person.education = education_var.get().strip()
             person.address = address_var.get().strip()
             person.notes = notes_text.get("1.0", tk.END).strip()
-
-            # Сохраняем даты браков
-            for (p1_id, p2_id), date_var in marriage_date_vars.items():
-                self.model.set_marriage_date(p1_id, p2_id, date_var.get().strip())
 
             self.model.mark_modified()
             dialog.destroy()
@@ -3366,22 +3110,6 @@ class FamilyTreeApp:
         person.is_deceased = form_data.get("is_deceased", False)
         person.photo_path = form_data.get("photo_path", "")
         person.maiden_name = form_data.get("maiden_name", "")
-
-        # Контакты
-        person.phone = form_data.get("phone", "").strip()
-        person.email = form_data.get("email", "").strip()
-        person.address = form_data.get("address", "").strip()
-
-        # Социальные сети
-        person.vk = form_data.get("vk", "").strip()
-        person.telegram = form_data.get("telegram", "").strip()
-        person.whatsapp = form_data.get("whatsapp", "").strip()
-
-        # Медицинская информация
-        person.blood_type = form_data.get("blood_type", "").strip()
-        person.rh_factor = form_data.get("rh_factor", "").strip()
-        person.allergies = form_data.get("allergies", "").strip()
-        person.chronic_conditions = form_data.get("chronic_conditions", "").strip()
 
         # Устанавливаем флаг изменений
         self.mark_modified()
@@ -3663,7 +3391,7 @@ class FamilyTreeApp:
 
     def add_sibling_dialog(self, person_id, sibling_gender):
         """Диалог добавления брата/сестры с автозаполнением отчества от имени отца.
-        После добавления **не меняет** центр, а обновл��ет отображение."""
+        После добавления **не меняет** центр, а обновляет отображение."""
         person = self.model.get_person(person_id)
         if not person:
             messagebox.showerror("Ошибка", "Персона не найдена")
@@ -3711,7 +3439,7 @@ class FamilyTreeApp:
                 if clean_name.endswith(('а', 'я')) and clean_name.lower() not in ['лев', 'павел']:
                     auto_patronymic = clean_name + "ична"
                 elif clean_name.endswith('ь'):
-                    auto_patronymic = clean_name[:-1] + "евич" if sibling_gender == "Муж��кой" else clean_name[
+                    auto_patronymic = clean_name[:-1] + "евич" if sibling_gender == "Мужской" else clean_name[
                                                                                                        :-1] + "евна"
                 elif clean_name.endswith('й'):
                     auto_patronymic = clean_name[:-1] + "евич" if sibling_gender == "Мужской" else clean_name[
@@ -3764,7 +3492,7 @@ class FamilyTreeApp:
                                        command=lambda: entries["Дата смерти (ДД.ММ.ГГГГ):"].config(
                                            state='normal' if deceased_var.get() else 'disabled'))
         chk_deceased.grid(row=len(fields) + 1, column=0, columnspan=2, sticky=tk.W, padx=(0, 5), pady=2)
-        entries["Дата с����������������ерти (ДД.ММ.ГГГГ):"].config(state='disabled')
+        entries["Дата смерти (ДД.ММ.ГГГГ):"].config(state='disabled')
 
         # Кнопка выбора фото
         ttk.Button(frame, text="Выбрать фото", command=lambda: self.browse_photo(photo_path_var)).grid(
@@ -3984,7 +3712,7 @@ class FamilyTreeApp:
             surname = new_entries["Фамилия:"].get().strip()
             patronymic = new_entries["Отчество:"].get().strip()
             birth_date = new_entries["Дата рождения (ДД.ММ.ГГГГ):"].get().strip()
-            death_date = new_entries["Дата смерти (ДД.ММ.��ГГГ):"].get().strip()
+            death_date = new_entries["Дата смерти (ДД.ММ.ГГГГ):"].get().strip()
             gender = new_gender_var.get()
             is_deceased = new_is_deceased_var.get()
             if not name or not surname:
@@ -4023,7 +3751,7 @@ class FamilyTreeApp:
             dialog.destroy()
             self.refresh_view()
 
-        # ИСПРАВЛЕНО: используем grid() вместо pack() для кнопки (устранение конфликта геометрии)
+        # ИСПРАВЛЕНО: используем grid() вместо pack() для кнопки (устранение конфл��кта геометрии)
         ttk.Button(new_frame, text="Создать и добавить в брак", command=create_new_spouse_and_marriage).grid(
             row=new_row, column=0, columnspan=2, pady=10)
 
@@ -4135,20 +3863,184 @@ class FamilyTreeApp:
 
     # --- МЕТОДЫ ФАЙЛОВОЙ СИСТЕМЫ ---
     def new_file(self):
-        if messagebox.askyesno("Подтверждение",
+        if messagebox.askyesno("Подтверждени��",
                                "Создать новое семейное древо? Все несохранённые изменения будут потеряны."):
-            self.model = FamilyTreeModel()
+            self.model = FamilyTreeModel(on_modified_callback=self.update_title)
             self.model.current_center = None
             self.center_label.config(text="Центр: Не выбран")
             self.last_selected_person_id = None
             self.refresh_view()
 
     def save_file(self):
+        """Сохраняет данные локально и синхронизирует с сервером."""
+        # Создаём резервную копию перед сохранением
+        if self.backup_manager and self.model.data_file and os.path.exists(self.model.data_file):
+            try:
+                self.backup_manager.create_backup(self.model.data_file, backup_name_prefix="backup")
+            except Exception as e:
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Не удалось создать бэкап: {e}")
+
         success = self.model.save_to_file()
         if success:
-            self.statusbar.config(text=constants.MSG_STATUS_DATA_SAVED)
+            # Синхронизация с сервером
+            if SYNC_AVAILABLE and self.username:
+                self._sync_with_server()
+            try:
+                self.statusbar.config(text="Данные сохранены" + (" • Синхронизировано" if SYNC_AVAILABLE else ""))
+            except AttributeError:
+                pass  # statusbar может отсутствовать
+            self.update_title()  # Убираем индикатор *
         else:
-            self.statusbar.config(text=constants.MSG_STATUS_ERROR_GENERIC)
+            try:
+                self.statusbar.config(text="Ошибка при сохранении")
+            except AttributeError:
+                pass
+        return success
+    
+    def _sync_with_server(self):
+        """Выполняет синхронизацию с сервером."""
+        if not SYNC_AVAILABLE or not self.username:
+            return False
+        
+        try:
+            if sync_to_server(self.model.data_file, self.username):
+                self.statusbar.config(text="✓ Синхронизировано с сервером")
+                return True
+            else:
+                self.statusbar.config(text="⚠ Синхронизация не удалась")
+                return False
+        except Exception as e:
+            print(f"Sync error: {e}")
+            self.statusbar.config(text="⚠ Ошибка синхронизации")
+            return False
+
+    def open_backup_dialog(self):
+        """Диалог управления резервными копиями."""
+        if not BACKUP_AVAILABLE or not self.backup_manager:
+            messagebox.showinfo("Резервные копии", "Модуль резервного копирования недоступен.")
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Резервные копии")
+        dialog.geometry("500x400")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Центрируем
+        dialog.update_idletasks()
+        x = (self.root.winfo_screenwidth() - 500) // 2
+        y = (self.root.winfo_screenheight() - 400) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Заголовок
+        tk.Label(dialog, text="🗄️ Управление резервными копиями", 
+                font=("Segoe UI", 14, "bold")).pack(pady=10)
+        
+        # Информация о бэкапах
+        backup_info = self.backup_manager.get_backup_info()
+        info_text = (
+            f"Всего бэкапов: {backup_info['count']} из {backup_info['max_allowed']}\n"
+            f"Последний бэкап: {backup_info['latest'] or 'нет'}\n"
+            f"Автосохранение: каждые {backup_info['interval_minutes']} мин."
+        )
+        tk.Label(dialog, text=info_text, font=("Segoe UI", 10), 
+                justify="left").pack(pady=10, padx=20, anchor="w")
+        
+        # Список бэкапов
+        tk.Label(dialog, text="Доступные резервные копии:", 
+                font=("Segoe UI", 10, "bold")).pack(pady=(10, 5), padx=20, anchor="w")
+        
+        listbox_frame = tk.Frame(dialog)
+        listbox_frame.pack(pady=5, padx=20, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(listbox_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        backup_listbox = tk.Listbox(listbox_frame, height=10, font=("Segoe UI", 9),
+                                   yscrollcommand=scrollbar.set)
+        backup_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=backup_listbox.yview)
+        
+        # Заполняем список
+        backups = self.backup_manager.list_backups()
+        for backup_path, backup_time in backups:
+            display_name = f"{backup_time.strftime('%d.%m.%Y %H:%M')} - {backup_path.name}"
+            backup_listbox.insert(tk.END, display_name)
+        
+        if not backups:
+            backup_listbox.insert(tk.END, "Нет доступных резервных копий")
+            backup_listbox.itemconfig(0, {'fg': 'gray'})
+        
+        # Кнопки
+        btn_frame = tk.Frame(dialog)
+        btn_frame.pack(pady=15)
+        
+        def restore_backup():
+            selection = backup_listbox.curselection()
+            if not selection:
+                messagebox.showwarning("Предупреждение", "Выберите резервную копию для восстановления.")
+                return
+            
+            if backup_listbox.size() == 1 and "нет доступных" in backup_listbox.get(0).lower():
+                messagebox.showwarning("Предупреждение", "Нет доступных резервных копий.")
+                return
+            
+            idx = selection[0]
+            if idx < len(backups):
+                backup_path, _ = backups[idx]
+                
+                if messagebox.askyesno("Подтверждение", 
+                                      f"Восстановить из резервной копии?\n{backup_path.name}\n\n"
+                                      "Все текущие изменения будут сохранены в новую резервную копию."):
+                    # Создаём бэкап текущего состояния перед восстановлением
+                    if self.model.data_file and self.model.modified:
+                        self.backup_manager.create_backup(self.model.data_file, "pre_restore")
+                    
+                    # Восстанавливаем
+                    if self.backup_manager.restore_from_backup(self.model.data_file, backup_path):
+                        messagebox.showinfo("Успех", "Данные восстановлены из резервной копии!")
+                        self.model.load_from_file()
+                        self.refresh_view()
+                        dialog.destroy()
+                    else:
+                        messagebox.showerror("Ошибка", "Не удалось восстановить данные.")
+        
+        def delete_backup():
+            selection = backup_listbox.curselection()
+            if not selection:
+                messagebox.showwarning("Предупреждение", "Выберите резервную копию для удаления.")
+                return
+            
+            if backup_listbox.size() == 1 and "нет доступных" in backup_listbox.get(0).lower():
+                return
+            
+            idx = selection[0]
+            if idx < len(backups):
+                backup_path, _ = backups[idx]
+                if messagebox.askyesno("Подтверждение", 
+                                      f"Удалить резервную копию?\n{backup_path.name}"):
+                    try:
+                        backup_path.unlink()
+                        backup_listbox.delete(idx)
+                        messagebox.showinfo("Успех", "Резервная копия удалена.")
+                    except Exception as e:
+                        messagebox.showerror("Ошибка", f"Не удалось удалить бэкап: {e}")
+        
+        def open_backup_folder():
+            """Открывает папку с бэкапами в проводнике."""
+            import subprocess
+            try:
+                subprocess.run(['explorer', str(self.backup_manager.backup_dir)], check=True)
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось открыть папку: {e}")
+        
+        tk.Button(btn_frame, text="Восстановить", command=restore_backup, 
+                 bg="#4CAF50", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Удалить", command=delete_backup, width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Открыть папку", command=open_backup_folder, width=15).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Закрыть", command=dialog.destroy, width=15).pack(side=tk.LEFT, padx=5)
 
     # --- Экспорт/Импорт CSV: таблица колонок соответствует модели Person и связям ---
     CSV_FIELDS = [
@@ -4183,34 +4075,31 @@ class FamilyTreeApp:
                         'birth_place': getattr(person, 'birth_place', '') or '',
                         'gender': person.gender,
                         'is_deceased': person.is_deceased,
-                        'death_date': person.death_date,
-                        'maiden_name': person.maiden_name,
-                        'photo_path': person.photo_path,
-                        'biography': getattr(person, 'biography', '') or '',
+                        'death_date': person.death_date or '',
+                        'maiden_name': getattr(person, 'maiden_name', '') or '',
+                        'photo_path': getattr(person, 'photo_path', '') or '',
+                        'parents': ','.join(str(x) for x in (person.parents or [])),
+                        'children': ','.join(str(x) for x in (person.children or [])),
+                        'spouse_ids': ','.join(str(x) for x in (person.spouse_ids or [])),
+                        'biography': (getattr(person, 'biography', '') or '').replace('\n', ' '),
                         'burial_place': getattr(person, 'burial_place', '') or '',
                         'burial_date': getattr(person, 'burial_date', '') or '',
+                        'photo_album': '|'.join(getattr(person, 'photo_album', None) or []),
+                        'link_titles': titles,
+                        'link_urls': urls,
                         'occupation': getattr(person, 'occupation', '') or '',
                         'education': getattr(person, 'education', '') or '',
-                        'address': getattr(person, 'address', '') or '',
-                        'notes': getattr(person, 'notes', '') or '',
-                        'links_titles': titles,
-                        'links_urls': urls,
+                        'address': (getattr(person, 'address', '') or '').replace('\n', ' '),
+                        'notes': (getattr(person, 'notes', '') or '').replace('\n', ' '),
+                        'collapsed_branches': getattr(person, 'collapsed_branches', False),
                     })
-            self.model.logger.info(f"Экспорт в CSV: {filename}")
+            self.model.logger.info(f"Данные экспортированы в CSV: {filename}")
             messagebox.showinfo("Успех", f"Данные экспортированы в {filename}")
             return True
         except Exception as e:
-            self.model.logger.error(f"Ошибка экспорта в CSV: {e}")
+            self.model.logger.error(f"Ошибка экспорта в CSV {filename}: {e}")
             messagebox.showerror("Ошибка", f"Ошибка экспорта: {e}")
             return False
-
-    # Продолжение метода export_to_csv
-    CSV_FIELDS = [
-        'id', 'name', 'surname', 'patronymic', 'birth_date', 'birth_place',
-        'gender', 'is_deceased', 'death_date', 'maiden_name', 'photo_path',
-        'biography', 'burial_place', 'burial_date', 'occupation', 'education',
-        'address', 'notes', 'links_titles', 'links_urls'
-    ]
 
     def import_from_csv(self, filename=None):
         if not filename:
@@ -4291,92 +4180,6 @@ class FamilyTreeApp:
             self.model.logger.error(f"Ошибка импорта из CSV {filename}: {e}")
             messagebox.showerror("Ошибка", f"Ошибка импорта: {e}")
             return False
-
-    # --- МЕТОДЫ ОТМЕНЫ/ПОВТОРА И ТЕМ ---
-    def undo(self):
-        """Отмена последней операции."""
-        if not UNDO_AVAILABLE or not self.undo_manager:
-            messagebox.showinfo("Отмена", "Функция отмены действий недоступна.")
-            return
-
-        if self.undo_manager.undo():
-            self.refresh_view()
-            self.update_title()
-            action_name = self.undo_manager.get_last_action_name()
-            if hasattr(self, 'statusbar'):
-                self.statusbar.config(text=f"Отменено: {action_name}")
-        else:
-            messagebox.showinfo("Отмена", "Нечего отменять.")
-
-    def redo(self):
-        """Повтор отменённой операции."""
-        if not UNDO_AVAILABLE or not self.undo_manager:
-            messagebox.showinfo("Повтор", "Функция повтора действий недоступна.")
-            return
-
-        if self.undo_manager.redo():
-            self.refresh_view()
-            self.update_title()
-            action_name = self.undo_manager.get_last_action_name()
-            if hasattr(self, 'statusbar'):
-                self.statusbar.config(text=f"Повторено: {action_name}")
-        else:
-            messagebox.showinfo("Повтор", "Нечего повторять.")
-
-    def toggle_theme_menu(self):
-        """Переключает тему оформления."""
-        if not THEME_AVAILABLE:
-            messagebox.showinfo("Темы", "Модуль управления темами недоступен.")
-            return
-
-        new_theme = toggle_theme(self)
-        theme_name = get_theme_name(new_theme)
-        self._save_window_settings()
-        messagebox.showinfo("Тема", f"Применена {theme_name.lower()} тема")
-        self.refresh_view()
-
-    def open_timeline(self):
-        """Открывает окно временной шкалы жизней персон."""
-        try:
-            from timeline import open_timeline as open_timeline_window
-            open_timeline_window(self, self.model)
-        except ImportError as e:
-            messagebox.showerror("Ошибка", f"Не удалось загрузить модуль временной шкалы: {e}")
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка при открытии временной шкалы: {e}")
-
-    def open_backup_dialog(self):
-        """Диалог управления резервными копиями."""
-        if not BACKUP_AVAILABLE:
-            messagebox.showinfo("Резервные копии", "Модуль резервного копирования недоступен.")
-            return
-        
-        try:
-            from backup import BackupDialog
-            BackupDialog(self.root, self)
-        except ImportError:
-            messagebox.showerror("Ошибка", "Диалог резервного копирования недоступен")
-
-    def _save_window_settings(self):
-        """Сохраняет настройки окна."""
-        settings = {
-            "width": self.root.winfo_width(),
-            "height": self.root.winfo_height(),
-            "x": self.root.winfo_x(),
-            "y": self.root.winfo_y()
-        }
-        try:
-            with open("window_settings.json", "w") as f:
-                json.dump(settings, f)
-        except Exception as e:
-            print(f"Ошибка сохранения настроек окна: {e}")
-
-    def update_title(self):
-        """Обновляет заголовок окна с индикатором изменений."""
-        title = self.base_title
-        if self.model and self.model.modified:
-            title += self.modified_indicator
-        self.root.title(title)
 
     # --- МЕТОДЫ ПОИСКА И ФИЛЬТРАЦИИ ---
     def open_search_dialog(self):
@@ -4486,22 +4289,6 @@ class FamilyTreeApp:
 
         ttk.Button(dialog, text="Применить", command=apply_filters).pack(pady=20)
 
-    def apply_ui_colors_from_palette(self):
-        """Применяет цвета из сохранённой палитры к элементам интерфейса."""
-        style = ttk.Style()
-        self.root.configure(bg=constants.WINDOW_BG)
-        try:
-            self.menu_bar.configure(bg=constants.MENUBAR_BG)
-            self.file_menu.configure(bg=constants.MENUBAR_BG)
-            self.view_menu.configure(bg=constants.MENUBAR_BG)
-            self.edit_menu.configure(bg=constants.MENUBAR_BG)
-            self.help_menu.configure(bg=constants.MENUBAR_BG)
-        except Exception:
-            pass
-        self.canvas.config(bg=constants.CANVAS_BG)
-        style.configure('TButton', background=constants.WINDOW_BG)
-        style.configure('Accent.TButton', background='#e74c3c', foreground='black')
-
     def open_color_palette_dialog(self):
         """Диалог выбора цветов интерфейса: иконки персон, линии, фон холста и т.д."""
         dialog = tk.Toplevel(self.root)
@@ -4527,7 +4314,7 @@ class FamilyTreeApp:
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         def pick_color(key):
-            result = colorchooser.askcolor(initialcolor=current.get(key, "#000000"), title=constants.PALETTE_LABELS.get(key, key))
+            result = colorchooser.askcolor(initialcolor=current.get(key, "#000000"), title=PALETTE_LABELS.get(key, key))
             if result and result[1]:
                 current[key] = result[1]
                 if key in swatches:
@@ -4536,7 +4323,7 @@ class FamilyTreeApp:
         for key in constants.PALETTE_DEFAULTS:
             row = ttk.Frame(inner)
             row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=constants.PALETTE_LABELS.get(key, key), width=32).pack(side=tk.LEFT, padx=(0, 8))
+            ttk.Label(row, text=PALETTE_LABELS.get(key, key), width=32).pack(side=tk.LEFT, padx=(0, 8))
             swatch = tk.Frame(row, width=44, height=24, bg=current[key], relief=tk.SOLID, bd=1)
             swatch.pack(side=tk.LEFT, padx=2)
             swatch.pack_propagate(False)
@@ -4561,7 +4348,6 @@ class FamilyTreeApp:
         ttk.Button(btn_f, text="По умолчанию", command=reset_defaults).pack(side=tk.LEFT, padx=4)
         ttk.Button(btn_f, text="Применить", command=apply_palette).pack(side=tk.RIGHT, padx=4)
 
-    # --- ДИАЛОГИ О ПРОГРАММЕ И ОБНОВЛЕНИЯХ ---
     def _show_about_dialog(self):
         """Показать диалог 'О программе' с проверкой обновлений."""
         dialog = tk.Toplevel(self.root)
@@ -4570,16 +4356,16 @@ class FamilyTreeApp:
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
-
+        
         # Центрируем
         dialog.update_idletasks()
         x = (self.root.winfo_screenwidth() - 450) // 2
         y = (self.root.winfo_screenheight() - 420) // 2
         dialog.geometry(f"+{x}+{y}")
-
+        
         # Иконка
         tk.Label(dialog, text="🌳", font=("Segoe UI", 48)).pack(pady=10)
-
+        
         # Текст
         about_text = (
             f"Семейное древо\n\n"
@@ -4588,28 +4374,28 @@ class FamilyTreeApp:
             "семейного генеалогического дерева.\n\n"
             "© 2024-2026 Все права защищены."
         )
-        tk.Label(dialog, text=about_text, font=("Segoe UI", 10),
+        tk.Label(dialog, text=about_text, font=("Segoe UI", 10), 
                 justify="center").pack(pady=5)
-
+        
         # Статус обновления
-        self.update_status_label = tk.Label(dialog, text="", font=("Segoe UI", 9),
+        self.update_status_label = tk.Label(dialog, text="", font=("Segoe UI", 9), 
                                            fg="#666666", wraplength=400)
         self.update_status_label.pack(pady=5)
-
+        
         # Кнопки
         btn_frame = tk.Frame(dialog)
         btn_frame.pack(pady=15)
-
+        
         def check_updates():
             self._check_for_updates(dialog)
-
-        tk.Button(btn_frame, text="🔄 Проверить обновления",
+        
+        tk.Button(btn_frame, text="🔄 Проверить обновления", 
                  command=check_updates,
                  bg="#4CAF50", fg="white",
                  font=("Segoe UI", 10, "bold"),
                  padx=15, pady=8).pack(side=tk.LEFT, padx=5)
-
-        tk.Button(btn_frame, text="Закрыть",
+        
+        tk.Button(btn_frame, text="Закрыть", 
                  command=dialog.destroy,
                  font=("Segoe UI", 10),
                  padx=20, pady=8).pack(side=tk.LEFT, padx=5)
@@ -4621,28 +4407,28 @@ class FamilyTreeApp:
             return version.__version__
         except:
             return "1.0.0"
-
+    
     def _check_for_updates(self, dialog=None):
         """Проверяет наличие обновлений."""
         if dialog:
             self.update_status_label.config(text="⏳ Проверка обновлений...", fg="#FF9800")
             dialog.update()
-
+        
         try:
             import urllib.request
             import json
-
+            
             # GitHub Releases API
             api_url = "https://api.github.com/repos/Andrey1803/family-tree/releases/latest"
-
+            
             req = urllib.request.Request(api_url, headers={'User-Agent': 'FamilyTree'})
             with urllib.request.urlopen(req, timeout=10) as response:
                 data = json.loads(response.read().decode())
                 latest_version = data.get('tag_name', 'v0.0.0').lstrip('v')
                 release_notes = data.get('body', '')
-
+            
             current_version = self._get_app_version()
-
+            
             if self._compare_versions(latest_version, current_version) > 0:
                 # Есть новая версия
                 self._show_update_dialog(dialog, latest_version, release_notes)
@@ -4651,220 +4437,152 @@ class FamilyTreeApp:
                     self.update_status_label.config(text="✅ Установлена актуальная версия", fg="#4CAF50")
                 else:
                     messagebox.showinfo("Обновления", "Установлена актуальная версия!")
-
+                    
         except Exception as e:
             if dialog:
                 self.update_status_label.config(text="❌ Ошибка проверки обновлений", fg="#F44336")
             print(f"Update check error: {e}")
-
+    
     def _compare_versions(self, v1, v2):
-        """Сравнивает версии: возвращает -1, 0, 1."""
+        """Сравнивает версии. Возвращает: -1 (v1 < v2), 0 (равны), 1 (v1 > v2)."""
         def normalize(v):
-            return [int(x) for x in v.split('.')]
-        try:
-            parts1 = normalize(v1)
-            parts2 = normalize(v2)
-            for i in range(max(len(parts1), len(parts2))):
-                p1 = parts1[i] if i < len(parts1) else 0
-                p2 = parts2[i] if i < len(parts2) else 0
-                if p1 < p2:
-                    return -1
-                if p1 > p2:
-                    return 1
-            return 0
-        except:
-            return 0
-
+            return [int(x) for x in v.split('.') if x.isdigit()]
+        
+        parts1 = normalize(v1)
+        parts2 = normalize(v2)
+        
+        for i in range(max(len(parts1), len(parts2))):
+            p1 = parts1[i] if i < len(parts1) else 0
+            p2 = parts2[i] if i < len(parts2) else 0
+            if p1 < p2:
+                return -1
+            elif p1 > p2:
+                return 1
+        return 0
+    
     def _show_update_dialog(self, parent_dialog, new_version, release_notes):
         """Показывает диалог обновления."""
-        msg = (f"Доступна новая версия: {new_version}\n\n"
-               f"Текущая версия: {self._get_app_version()}\n\n"
-               f"Изменения:\n{release_notes[:500]}...\n\n"
-               "Перейти на страницу загрузок?")
-        if messagebox.askyesno("Доступно обновление", msg):
+        msg = (
+            f"🎉 Доступна новая версия: {new_version}\n\n"
+            f"Текущая версия: {self._get_app_version()}\n\n"
+            "Хотите скачать и установить обновление?\n\n"
+            "⚠️ Перед обновлением будет создана резервная копия всех данных."
+        )
+        
+        if messagebox.askyesno("Доступно обновление", msg, parent=self.root):
+            # Сначала создаём резервную копию
+            backup_path = self._create_backup()
+            
+            if backup_path:
+                confirm = messagebox.askyesno(
+                    "Резервная копия создана",
+                    f"✅ База данных сохранена:\n{backup_path}\n\n"
+                    f"Продолжить установку версии {new_version}?",
+                    parent=self.root
+                )
+                if confirm:
+                    self._download_and_install_update(new_version, parent_dialog)
+            else:
+                messagebox.showwarning(
+                    "Предупреждение",
+                    "Не удалось создать резервную копию.\n"
+                    "Продолжайте с осторожностью.",
+                    parent=self.root
+                )
+                self._download_and_install_update(new_version, parent_dialog)
+    
+    def _create_backup(self):
+        """Создаёт резервную копию базы данных."""
+        import shutil
+        import time
+        
+        try:
+            backup_dir = os.path.join(os.path.dirname(self.model.data_file), "backups")
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            backup_name = f"family_tree_backup_{timestamp}.json"
+            backup_path = os.path.join(backup_dir, backup_name)
+            
+            # Копируем основной файл
+            if os.path.exists(self.model.data_file):
+                shutil.copy2(self.model.data_file, backup_path)
+                
+                # Копируем файлы пользователей
+                user_settings = f"user_settings_{self.username}.json" if self.username else "user_settings.json"
+                if os.path.exists(user_settings):
+                    shutil.copy2(user_settings, os.path.join(backup_dir, f"user_settings_backup_{timestamp}.json"))
+                
+                return backup_path
+        except Exception as e:
+            print(f"Backup error: {e}")
+        return None
+    
+    def _download_and_install_update(self, new_version, parent_dialog=None):
+        """Скачивает и устанавливает обновление."""
+        try:
             import webbrowser
-            webbrowser.open("https://github.com/Andrey1803/family-tree/releases")
+            import os
+            
+            # Показываем сообщение
+            msg = (
+                f"📥 Скачивание версии {new_version}...\n\n"
+                "Открываю страницу релиза в браузере.\n"
+                "Скачайте установочный файл и запустите его.\n\n"
+                "✅ Ваши данные сохранены в резервной копии."
+            )
+            messagebox.showinfo("Загрузка обновления", msg, parent=self.root)
+            
+            # Открываем страницу релиза в браузере
+            release_url = f"https://github.com/Andrey1803/family-tree/releases/tag/v{new_version}"
+            webbrowser.open(release_url)
+            
+            if parent_dialog:
+                self.update_status_label.config(text=f"📥 Версия {new_version} доступна для загрузки", fg="#2196F3")
+                
+        except Exception as e:
+            messagebox.showerror("Ошибка обновления", f"Не удалось загрузить обновление:\n{e}", parent=self.root)
 
     def _show_developer_dialog(self):
         """Показать диалог 'О разработчике'."""
         dialog = tk.Toplevel(self.root)
         dialog.title("О разработчике")
-        dialog.geometry("500x450")
+        dialog.geometry("450x400")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
-
+        
         # Центрируем
         dialog.update_idletasks()
-        x = (self.root.winfo_screenwidth() - 500) // 2
-        y = (self.root.winfo_screenheight() - 450) // 2
+        x = (self.root.winfo_screenwidth() - 450) // 2
+        y = (self.root.winfo_screenheight() - 400) // 2
         dialog.geometry(f"+{x}+{y}")
-
-        # Заголовок с иконкой
-        header_frame = tk.Frame(dialog, bg="#2563eb")
-        header_frame.pack(fill=tk.X)
-        tk.Label(header_frame, text="👨‍💻", font=("Segoe UI Emoji", 56),
-                bg="#2563eb").pack(pady=15)
-
-        # Основной контент
-        content_frame = tk.Frame(dialog, bg="#ffffff")
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-        # ФИО
-        tk.Label(content_frame, text="Емельянов Андрей Николаевич",
-                font=("Segoe UI", 14, "bold"),
-                bg="#ffffff", fg="#1e293b").pack(pady=8)
-
-        # Разделитель
-        ttk.Separator(content_frame, orient='horizontal').pack(fill=tk.X, pady=10)
-
-        # Описание
-        tk.Label(content_frame,
-                text="Приложение создано для ведения\nсемейного генеалогического древа,\nсохранения истории семьи\nи пер��дачи знаний будущим поколениям.",
+        
+        # Заголовок
+        tk.Label(dialog, text="👨‍💻 Разработчик", 
+                font=("Segoe UI", 16, "bold")).pack(pady=15)
+        
+        # Информация
+        info_frame = tk.Frame(dialog)
+        info_frame.pack(fill="both", expand=True, padx=40)
+        
+        info_text = (
+            "Емельянов Андрей\n\n"
+            "📧 Email:\n"
+            "1472108@mail.ru\n\n"
+            "📱 Телефон:\n"
+            "+375 29 147-21-08\n\n"
+            "📍 Беларусь\n\n"
+            "© 2024-2026 Все права защищены."
+        )
+        
+        tk.Label(info_frame, text=info_text, 
                 font=("Segoe UI", 11),
-                bg="#ffffff", fg="#475569",
-                justify="center").pack(pady=10)
-
-        # Разделитель
-        ttk.Separator(content_frame, orient='horizontal').pack(fill=tk.X, pady=10)
-
-        # Контакты
-        contacts_frame = tk.Frame(content_frame, bg="#f8fafc", relief=tk.SOLID, bd=1)
-        contacts_frame.pack(fill=tk.X, pady=10, ipady=10)
-
-        tk.Label(contacts_frame, text="���� К��нтакты ��ля связи:",
-                font=("Segoe UI", 11, "bold"),
-                bg="#f8fafc", fg="#1e293b").pack(pady=5)
-
-        tk.Label(contacts_frame, text="+375 (29) 147-21-08",
-                font=("Segoe UI", 12),
-                bg="#f8fafc", fg="#dc2626").pack(pady=3)
-
-        tk.Label(contacts_frame, text="📍 Республика Беларусь",
-                font=("Segoe UI", 10),
-                bg="#f8fafc", fg="#64748b").pack(pady=3)
-
+                justify="left",
+                anchor="w").pack(fill="both", expand=True)
+        
         # Кнопка
-        tk.Button(dialog, text="Закрыть", command=dialog.destroy,
-                 font=("Segoe UI", 11, "bold"),
-                 bg="#2563eb", fg="#ffffff",
-                 activebackground="#1d4ed8", activeforeground="#ffffff",
-                 padx=30, pady=8, relief=tk.FLAT,
-                 cursor="hand2").pack(pady=15)
-
-    def _sync_with_server(self):
-        """Синхронизация с сервером (если доступна)."""
-        if not SYNC_AVAILABLE:
-            return
-        try:
-            if self.username:
-                sync_to_server(f"family_tree_{self.username}.json", self.username)
-        except Exception as e:
-            print(f"Sync error: {e}")
-
-    def _calculate_age_and_zodiac(self, birth_date_str, death_date_str=""):
-        """
-        Рассчитывает возраст и знак зодиака по дате рождения.
-        Возвращает кортеж (возраст, знак_зодиака).
-        """
-        def parse_date(date_str):
-            """Парсит дату в формате dd.mm.yyyy."""
-            if not date_str:
-                return None
-            try:
-                return datetime.strptime(date_str.strip(), "%d.%m.%Y")
-            except ValueError:
-                try:
-                    return datetime.strptime(date_str.strip(), "%d.%m.%y")
-                except ValueError:
-                    return None
-        
-        def get_zodiac_sign(date):
-            """Определяет знак зодиака по дате."""
-            if not date:
-                return None
-            
-            month, day = date.month, date.day
-            zodiac_signs = [
-                (120, "♑ Козерог"), (219, "♒ Водолей"), (320, "♓ Рыбы"),
-                (420, "♈ Овен"), (521, "♉ Телец"), (621, "♊ Близнецы"),
-                (723, "♋ Рак"), (823, "♌ Лев"), (923, "♍ Дева"),
-                (1023, "♎ Весы"), (1122, "♏ Скорпион"), (1222, "♐ Стрелец"),
-                (1231, "♑ Козерог")
-            ]
-            
-            day_of_year = date.timetuple().tm_yday
-            for max_day, sign in zodiac_signs:
-                if day_of_year <= max_day:
-                    return sign
-            return "♑ Козерог"
-        
-        birth_date = parse_date(birth_date_str)
-        if not birth_date:
-            return ("?", None)
-        
-        # Определяем дату для расчёта возраста
-        if death_date_str:
-            end_date = parse_date(death_date_str)
-            if not end_date:
-                end_date = datetime.now()
-        else:
-            end_date = datetime.now()
-        
-        # Расчёт возраста
-        age = end_date.year - birth_date.year
-        if (end_date.month, end_date.day) < (birth_date.month, birth_date.day):
-            age -= 1
-        
-        # Знак зодиака
-        zodiac = get_zodiac_sign(birth_date)
-        
-        age_str = str(age) if age >= 0 else "?"
-        return (age_str, zodiac)
-
-    def _calculate_years_together(self, marriage_date_str):
-        """
-        Рассчитывает количество лет, прожитых вместе в браке.
-        Возвращает строку с количеством лет.
-        """
-        def parse_date(date_str):
-            """Парсит дату в формате dd.mm.yyyy."""
-            if not date_str:
-                return None
-            try:
-                return datetime.strptime(date_str.strip(), "%d.%m.%Y")
-            except ValueError:
-                try:
-                    return datetime.strptime(date_str.strip(), "%d.%m.%y")
-                except ValueError:
-                    return None
-        
-        marriage_date = parse_date(marriage_date_str)
-        if not marriage_date:
-            return ""
-        
-        # Расчёт времени с даты брака до сегодня
-        today = datetime.now()
-        years = today.year - marriage_date.year
-        if (today.month, today.day) < (marriage_date.month, marriage_date.day):
-            years -= 1
-        
-        if years < 0:
-            return ""
-        elif years == 1:
-            return "1 год"
-        elif 2 <= years <= 4:
-            return f"{years} года"
-        else:
-            return f"{years} лет"
-
-    def _create_backup(self):
-        """Создать резервную копию."""
-        if not BACKUP_AVAILABLE:
-            return
-        try:
-            from backup import BackupManager
-            bm = BackupManager()
-            bm.create_backup(self.model.data_file)
-        except Exception as e:
-            print(f"Backup error: {e}")
+        tk.Button(dialog, text="Закрыть", 
+                 command=dialog.destroy,
+                 font=("Segoe UI", 10),
+                 padx=30, pady=8).pack(pady=20)
