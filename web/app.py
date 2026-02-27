@@ -144,6 +144,7 @@ def auth_check(login: str, password: str) -> bool:
 
 
 def auth_register(login: str, password: str):
+    """Зарегистрировать пользователя через сервер синхронизации"""
     login = (login or "").strip()
     if not login:
         return "Введите логин."
@@ -151,6 +152,36 @@ def auth_register(login: str, password: str):
         return "Введите пароль."
     if len(password) < 4:
         return "Пароль должен быть не короче 4 символов."
+    
+    # Пробуем зарегистрировать на сервере синхронизации
+    try:
+        req = urllib.request.Request(
+            f"{SYNC_SERVER_URL}/api/auth/register",
+            data=json.dumps({
+                "login": login,
+                "password": password,
+                "email": f"{login}@local.com"
+            }).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            if data.get('success') or data.get('token'):
+                # Успешно зарегистрирован на сервере
+                return None
+            else:
+                # Сервер вернул ошибку
+                return data.get('message', 'Ошибка регистрации')
+    except urllib.error.HTTPError as e:
+        # Пользователь уже существует на сервере — это OK
+        if e.code == 400:
+            return None  # Продолжаем с локальной регистрацией
+        pass
+    except Exception:
+        pass
+    
+    # Fallback на локальную регистрацию
     users = _load_users()
     if login in users:
         return "Такой логин уже занят."
