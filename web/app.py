@@ -43,7 +43,7 @@ if _project_root not in sys.path:
 SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring-production-3656.up.railway.app"
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.secret_key = os.environ.get("SECRET_KEY") or "FamilyTreeApp_Fixed_Secret_Key_2026"
 app.config["JSON_AS_ASCII"] = False
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
