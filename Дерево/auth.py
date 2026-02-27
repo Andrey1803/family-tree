@@ -43,6 +43,25 @@ def _save_users(users: Dict[str, str]) -> bool:
 def auth_check(login: str, password: str) -> bool:
     if not login.strip() or not password:
         return False
+    
+    # Пробуем проверить на сервере синхронизации
+    try:
+        import urllib.request
+        sync_url = "https://ravishing-caring-production-3656.up.railway.app"
+        req = urllib.request.Request(
+            f"{sync_url}/api/auth/login",
+            data=json.dumps({"login": login.strip(), "password": password}).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            if data.get('token'):
+                return True  # Успешный вход на сервере
+    except Exception:
+        pass  # Ошибка сервера — пробуем локально
+    
+    # Локальная проверка
     users = _load_users()
     stored = users.get(login.strip())
     if not stored:
@@ -90,6 +109,29 @@ def auth_register(login: str, password: str) -> Optional[str]:
         return "Введите пароль."
     if len(password) < 4:
         return "Пароль должен быть не короче 4 символов."
+    
+    # Пробуем зарегистрировать на сервере синхронизации
+    try:
+        import urllib.request
+        sync_url = "https://ravishing-caring-production-3656.up.railway.app"
+        req = urllib.request.Request(
+            f"{sync_url}/api/auth/register",
+            data=json.dumps({
+                "login": login,
+                "password": password,
+                "email": f"{login}@local.com"
+            }).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            if data.get('success') or data.get('token'):
+                return None  # Успешно зарегистрирован на сервере
+    except Exception:
+        pass  # Ошибка сервера — пробуем локально
+    
+    # Локальная регистрация
     users = _load_users()
     if login in users:
         return "Такой логин уже занят."
