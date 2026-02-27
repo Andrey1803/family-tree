@@ -295,6 +295,21 @@ def api_register():
     return jsonify({"message": "Пользователь успешно зарегистрирован"}), 200
 
 
+@app.route("/api/auth/session", methods=["POST"])
+def api_session():
+    """Сохранить токен сессии после входа через сервер синхронизации"""
+    data = request.get_json() or {}
+    token = data.get('token')
+    user_id = data.get('user_id')
+    
+    if token:
+        session['server_token'] = token
+        session['server_user_id'] = user_id
+        return jsonify({"ok": True}), 200
+    
+    return jsonify({"error": "No token"}), 400
+
+
 @app.route("/sw.js")
 def service_worker():
     return app.send_static_file("sw.js"), 200, {"Service-Worker-Allowed": "/"}

@@ -25,6 +25,9 @@
     </div>
     
     <script>
+    // URL сервера синхронизации
+    const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
+    
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -41,14 +44,15 @@
         errorDiv.textContent = 'Регистрация...';
         
         try {
-            const response = await fetch('/api/auth/register', {
+            const response = await fetch(SYNC_SERVER_URL + '/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     login: login,
-                    password: password
+                    password: password,
+                    email: login + '@local.com'
                 })
             });
             
