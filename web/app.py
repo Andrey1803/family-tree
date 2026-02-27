@@ -115,11 +115,11 @@ def _verify_password(login: str, password: str, stored_hash: str) -> bool:
 
 
 def auth_check(login: str, password: str) -> bool:
-    """Проверить логин/пароль через сервер синхронизации"""
+    """Проверить логин/пароль ТОЛЬКО через сервер синхронизации"""
     if not (login or "").strip() or not password:
         return False
     
-    # Пробуем через сервер синхронизации
+    # Проверяем ТОЛЬКО на сервере синхронизации
     try:
         req = urllib.request.Request(
             f"{SYNC_SERVER_URL}/api/auth/login",
@@ -127,24 +127,22 @@ def auth_check(login: str, password: str) -> bool:
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
             if data.get('token'):
                 # Сохраняем токен в сессии
                 session['server_token'] = data['token']
                 session['server_user_id'] = data.get('user_id')
                 return True
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH] Server login failed: {e}")
         pass
     
-    # Fallback на локальную проверку
-    users = _load_users()
-    stored = users.get(login.strip())
-    return bool(stored and _verify_password(login.strip(), password, stored))
+    return False
 
 
 def auth_register(login: str, password: str):
-    """Зарегистрировать пользователя через сервер синхронизации"""
+    """Зарегистрировать пользователя ТОЛЬКО через сервер синхронизации"""
     login = (login or "").strip()
     if not login:
         return "Введите логин."
@@ -153,7 +151,7 @@ def auth_register(login: str, password: str):
     if len(password) < 4:
         return "Пароль должен быть не короче 4 символов."
     
-    # Пробуем зарегистрировать на сервере синхронизации
+    # Регистрируем ТОЛЬКО на сервере синхронизации
     try:
         req = urllib.request.Request(
             f"{SYNC_SERVER_URL}/api/auth/register",
@@ -165,27 +163,20 @@ def auth_register(login: str, password: str):
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
-            if data.get('success') or data.get('token'):
+            if data.get('success') or data.get('token') or data.get('message'):
                 # Успешно зарегистрирован на сервере
                 return None
             else:
-                # Сервер вернул ошибку
                 return data.get('message', 'Ошибка регистрации')
     except urllib.error.HTTPError as e:
-        # Пользователь уже существует на сервере — это OK
-        if e.code == 400:
-            return None  # Продолжаем с локальной регистрацией
-        pass
-    except Exception:
-        pass
-    
-    # Fallback на локальную регистрацию
-    users = _load_users()
-    if login in users:
-        return "Такой логин уже занят."
-    users[login] = _password_hash(login, password)
+        error_body = e.read().decode() if e.fp else ""
+        if 'уже занят' in error_body or 'already' in error_body.lower():
+            return "Такой логин уже занят."
+        return f"Ошибка сервера: {e.code}"
+    except Exception as e:
+        return f"Ошибка подключения к серверу: {str(e)}"
     if not _save_users(users):
         return "Ошибка сохранения."
     return None
