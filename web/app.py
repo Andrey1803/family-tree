@@ -275,6 +275,26 @@ def register():
     return redirect(url_for("login"))
 
 
+@app.route("/api/auth/register", methods=["POST"])
+def api_register():
+    """API регистрация (принимает JSON)"""
+    data = request.get_json() or {}
+    login_val = (data.get("login") or "").strip()
+    p1 = data.get("password") or ""
+    p2 = data.get("password2") or p1
+    
+    if not login_val:
+        return jsonify({"error": "Введите логин."}), 400
+    if p1 != p2:
+        return jsonify({"error": "Пароли не совпадают."}), 400
+    
+    err = auth_register(login_val, p1)
+    if err:
+        return jsonify({"error": err}), 400
+    
+    return jsonify({"message": "Пользователь успешно зарегистрирован"}), 200
+
+
 @app.route("/sw.js")
 def service_worker():
     return app.send_static_file("sw.js"), 200, {"Service-Worker-Allowed": "/"}
