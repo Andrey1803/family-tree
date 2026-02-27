@@ -275,6 +275,12 @@ def register():
     err = auth_register(login_val, p1)
     if err:
         return render_template("register.html", error=err, login=login_val)
+    
+    # После успешной регистрации — автоматически входим
+    if auth_check(login_val, p1):
+        session["username"] = login_val
+        return redirect(url_for("index"))
+    
     return redirect(url_for("login"))
 
 
