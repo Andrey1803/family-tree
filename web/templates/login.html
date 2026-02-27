@@ -43,6 +43,7 @@
         try {
             const response = await fetch(SYNC_SERVER_URL + '/api/auth/login', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -58,6 +59,7 @@
                 // Успех — отправляем токен на сервер для сохранения в сессии
                 const sessionResp = await fetch('/api/auth/session', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({token: data.token, user_id: data.user_id})
                 });
