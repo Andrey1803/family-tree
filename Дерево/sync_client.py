@@ -10,18 +10,43 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-# Настройки сервера по умолчанию
-DEFAULT_SERVER_URL = "https://family-tree-server.herokuapp.com"
+# Настройки сервера
+DEFAULT_SERVER_URL = "https://ravishing-caring-production-3656.up.railway.app"
 CONFIG_FILE = "sync_config.json"
+REMEMBER_FILE = "login_remember.json"
+
+# Учётные данные пользователей
+USER_CREDENTIALS = {
+    "Гость": {"login": "guest", "password": "guest123"},
+    "Емельянов Андрей": {"login": "andrey", "password": "andrey123"}
+}
 
 
 class SyncClient:
     """Клиент для синхронизации с сервером."""
-    
+
     def __init__(self, server_url=None):
         self.server_url = server_url or self._load_server_url()
         self.token = self._load_token()
         self.user_id = None
+        self.username = self._load_username()
+
+    def _load_username(self):
+        """Загрузить сохранённое имя пользователя"""
+        if os.path.exists(REMEMBER_FILE):
+            try:
+                with open(REMEMBER_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get('username')
+            except:
+                pass
+        return None
+
+    def _save_username(self, username):
+        """Сохранить имя пользователя"""
+        data = {'username': username}
+        with open(REMEMBER_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
     
     def _load_server_url(self):
         """Загрузить URL сервера из конфига."""
@@ -127,16 +152,18 @@ class SyncClient:
         })
         return result
     
-    def login(self, login, password):
+    def login(self, login, password, remember=False):
         """Войти в систему."""
         result = self._request('/api/auth/login', method='POST', data={
             'login': login,
             'password': password
         })
-        
+
         if 'token' in result:
             self._save_token(result['token'], result.get('user_id'))
-        
+            if remember:
+                self._save_username(login)
+
         return result
     
     def logout(self):
@@ -166,8 +193,114 @@ class SyncClient:
         return self.token is not None
     
     # === СИНХРОНИЗАЦИЯ ===
-    def upload_tree(self, tree_data, tree_name='Моё дерево'):
-        """Загрузить дерево на сервер."""
+    def sync_trees(self, local_model, tree_name='Моё дерево'):
+        """Умная синхронизация: сливает локальное и серверное деревья"""
+        # 1. Скачиваем дерево с сервера
+        server_data = self.download_tree()
+        
+        if not server_data or 'tree' not in server_data:
+            # Сервер пустое - загружаем локальное
+            return self.upload_tree(local_model, tree_name)
+        
+        server_tree = server_data.get('tree', {})
+        server_persons = server_tree.get('persons', {})
+        server_marriages = server_tree.get('marriages', [])
+        
+        # 2. Получаем локальное дерево
+        local_persons = local_model.get_all_persons()
+        local_marriages = local_model.get_marriages()
+        
+        # 3. Сливаем персоны (только новые с новыми ID)
+        merged_persons = dict(server_persons)
+        next_id = max([int(pid) for pid in server_persons.keys() if pid.isdigit()], default=0) + 1
+        
+        id_mapping = {}  # Старый ID -> Новый ID
+        
+        for pid, person in local_persons.items():
+            if pid not in merged_persons:
+                # Проверяем, есть ли такая же персона на сервере (по имени)
+                person_key = (person.surname.lower(), person.name.lower(), person.patronymic.lower())
+                found = False
+                for spid, sperson in server_persons.items():
+                    sperson_key = (sperson.get('surname', '').lower(), sperson.get('name', '').lower(), sperson.get('patronymic', '').lower())
+                    if person_key == sperson_key and person_key != ('', '', ''):
+                        found = True
+                        id_mapping[pid] = spid
+                        break
+                
+                if not found:
+                    # Добавляем новую персону с новым ID
+                    new_id = str(next_id)
+                    id_mapping[pid] = new_id
+                    merged_persons[new_id] = {
+                        'id': new_id,
+                        'name': person.name,
+                        'surname': person.surname,
+                        'patronymic': person.patronymic,
+                        'birth_date': person.birth_date,
+                        'gender': person.gender,
+                        'is_deceased': person.is_deceased,
+                        'death_date': person.death_date,
+                        'parents': [],  # Родителей пока не связываем
+                        'children': [],
+                        'spouse_ids': [],
+                    }
+                    next_id += 1
+        
+        # 4. Сливаем браки (с учётом маппинга ID)
+        merged_marriages = list(server_marriages)
+        existing_marriages_set = set()
+        for m in server_marriages:
+            if isinstance(m, list) and len(m) >= 2:
+                existing_marriages_set.add(tuple(sorted([str(m[0]), str(m[1])])))
+        
+        for m in local_marriages:
+            # Маппим ID
+            id1 = id_mapping.get(str(m[0]), str(m[0]))
+            id2 = id_mapping.get(str(m[1]), str(m[1]))
+            marriage_key = tuple(sorted([id1, id2]))
+            
+            if marriage_key not in existing_marriages_set:
+                merged_marriages.append(list(marriage_key))
+                existing_marriages_set.add(marriage_key)
+        
+        # 5. Загружаем слитое дерево на сервер
+        merged_tree = {
+            'persons': merged_persons,
+            'marriages': merged_marriages
+        }
+        
+        return self.upload_tree_data(merged_tree, tree_name)
+
+    def upload_tree(self, model, tree_name='Моё дерево'):
+        """Загрузить дерево на сервер из модели"""
+        tree_data = {
+            'persons': {},
+            'marriages': []
+        }
+        
+        for pid, person in model.get_all_persons().items():
+            tree_data['persons'][pid] = {
+                'id': pid,
+                'name': person.name,
+                'surname': person.surname,
+                'patronymic': person.patronymic,
+                'birth_date': person.birth_date,
+                'gender': person.gender,
+                'is_deceased': person.is_deceased,
+                'death_date': person.death_date,
+                'parents': list(person.parents),
+                'children': list(person.children),
+                'spouse_ids': list(person.spouse_ids),
+            }
+        
+        for marriage in model.get_marriages():
+            tree_data['marriages'].append(list(marriage))
+        
+        return self.upload_tree_data(tree_data, tree_name)
+
+    def upload_tree_data(self, tree_data, tree_name='Моё дерево'):
+        """Загрузить дерево на сервер"""
         if not self.token:
             raise Exception("Требуется авторизация")
         

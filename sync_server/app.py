@@ -586,8 +586,72 @@ def admin_toggle_user(user_id):
     db = get_db()
     db.execute('UPDATE users SET is_active = NOT is_active WHERE id = ?', (user_id,))
     db.commit()
-    
+
     return jsonify({'message': 'Статус пользователя изменён'})
+
+@app.route('/api/admin/user/<int:user_id>/trees', methods=['GET'])
+@require_admin
+def admin_get_user_trees(user_id):
+    """Получить деревья пользователя."""
+    db = get_db()
+    
+    # Проверяем существование пользователя
+    user = db.execute('SELECT id, login FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    # Получаем деревья пользователя
+    trees = db.execute('''
+        SELECT id, name, created_at, updated_at
+        FROM family_trees
+        WHERE user_id = ?
+        ORDER BY updated_at DESC
+    ''', (user_id,)).fetchall()
+    
+    trees_data = []
+    for tree in trees:
+        # Получаем персон для этого дерева
+        persons = db.execute('''
+            SELECT id, name, surname, patronymic, gender, birth_date,
+                   is_deceased, death_date, parents, children, spouse_ids
+            FROM persons
+            WHERE tree_id = ?
+        ''', (tree['id'],)).fetchall()
+        
+        # Получаем браки
+        marriages = db.execute('''
+            SELECT person1_id, person2_id, marriage_date
+            FROM marriages
+            WHERE tree_id = ?
+        ''', (tree['id'],)).fetchall()
+        
+        tree_data = {
+            'id': tree['id'],
+            'name': tree['name'],
+            'created_at': tree['created_at'],
+            'updated_at': tree['updated_at'],
+            'persons': {p['id']: {
+                'id': p['id'],
+                'name': p['name'],
+                'surname': p['surname'],
+                'patronymic': p['patronymic'],
+                'gender': p['gender'],
+                'birth_date': p['birth_date'],
+                'is_deceased': bool(p['is_deceased']),
+                'death_date': p['death_date'],
+                'parents': json.loads(p['parents']) if p['parents'] else [],
+                'children': json.loads(p['children']) if p['children'] else [],
+                'spouse_ids': json.loads(p['spouse_ids']) if p['spouse_ids'] else [],
+            } for p in persons},
+            'marriages': [{
+                'persons': [m['person1_id'], m['person2_id']],
+                'date': m['marriage_date']
+            } for m in marriages]
+        }
+        
+        trees_data.append(tree_data)
+    
+    return jsonify({'trees': trees_data})
 
 # === ЗДОРОВЬЕ ПРИЛОЖЕНИЯ ===
 @app.route('/api/health', methods=['GET'])

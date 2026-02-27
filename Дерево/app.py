@@ -91,8 +91,9 @@ class FamilyTreeApp:
         self.modified_indicator = " *"  # Индикатор несохранённых изменений
         
         # Авто-синхронизация при запуске (если есть username)
-        if username:
-            self.root.after(2000, self.auto_sync_on_startup)  # Через 2 секунды после запуска
+        # ОТКЛЮЧЕНО - сервер на Railway требует обновления
+        # if username:
+        #     self.root.after(1000, self.auto_sync_on_startup)
         
         # Создание стиля для акцентных кнопок
         style = ttk.Style()
@@ -112,7 +113,10 @@ class FamilyTreeApp:
             y = 100
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         # --- ПЕРЕМЕННЫЕ (файл дерева — свой у каждого пользователя) ---
-        self.model = FamilyTreeModel(data_file=data_file or "family_tree.json")
+        actual_data_file = data_file or "family_tree.json"
+        print(f"[DEBUG] __init__: data_file={data_file}, actual={actual_data_file}")
+        self.model = FamilyTreeModel(data_file=actual_data_file)
+        print(f"[DEBUG] __init__: model.data_file={self.model.data_file}")
         self.canvas = tk.Canvas(root, bg=constants.CANVAS_BG, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.photo_images = {}  # Хранит ссылки на PhotoImage
@@ -159,8 +163,12 @@ class FamilyTreeApp:
         self.file_menu.add_command(label="🌐 Открыть веб-версию", command=self.open_web_version)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="☁️ Синхронизация...", command=self.open_sync_dialog)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="👑 Админ-панель", command=self.open_admin_panel)
+        
+        # Админ-панель только для Андрея Емельянова
+        if self.username == "Емельянов Андрей":
+            self.file_menu.add_separator()
+            self.file_menu.add_command(label="👑 Админ-панель", command=self.open_admin_panel)
+        
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Зарегистрировать протокол (веб → приложение)", command=self._register_protocol)
         self.file_menu.add_separator()
@@ -1034,88 +1042,177 @@ class FamilyTreeApp:
         webbrowser.open(url)
 
     def open_admin_panel(self):
-        """Открыть админ-панель"""
-        from admin_dashboard import open_admin_dashboard
-        
-        # Диалог ввода пароля администратора
-        dialog = tk.Toplevel(self.root)
-        dialog.title("👑 Вход администратора")
-        dialog.geometry("400x200")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        ttk.Label(dialog, text="Введите данные администратора", 
-                 font=("Segoe UI", 12, "bold")).pack(pady=10)
-        
-        frame = ttk.Frame(dialog, padding=20)
-        frame.pack()
-        
-        # Логин
-        ttk.Label(frame, text="Логин:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        login_var = tk.StringVar(value="admin")
-        ttk.Entry(frame, textvariable=login_var, width=30).grid(row=0, column=1, padx=10, pady=5)
-        
-        # Пароль
-        ttk.Label(frame, text="Пароль:").grid(row=1, column=0, padx=10, pady=5, sticky='e')
-        password_var = tk.StringVar()
-        ttk.Entry(frame, textvariable=password_var, show="*", width=30).grid(row=1, column=1, padx=10, pady=5)
-        
-        # URL сервера
-        ttk.Label(frame, text="URL:").grid(row=2, column=0, padx=10, pady=5, sticky='e')
-        url_var = tk.StringVar(value="https://ravishing-caring-production-3656.up.railway.app")
-        ttk.Entry(frame, textvariable=url_var, width=30).grid(row=2, column=1, padx=10, pady=5)
-        
-        def do_open():
-            open_admin_dashboard(url_var.get(), login_var.get(), password_var.get())
-            dialog.destroy()
-        
-        ttk.Button(dialog, text="Войти", command=do_open).pack(pady=10)
-        ttk.Button(dialog, text="Отмена", command=dialog.destroy).pack()
-
-    def auto_sync_on_startup(self):
-        """Авто-синхронизация при запуске (если пользователь вошёл через веб)"""
-        from sync_client import get_sync_client
-        
-        if not self.username:
+        """Открыть админ-панель (только для Андрея Емельянова)"""
+        # Проверяем, что вошёл Андрей Емельянов
+        if self.username != "Емельянов Андрей":
+            messagebox.showerror("Доступ запрещён", 
+                "Админ-панель доступна только для пользователя:\nЕмельянов Андрей")
             return
         
+        # Открываем СЕРВЕРНУЮ админ-панель (автоматический вход)
+        from server_admin_dashboard import open_server_admin_dashboard
+        open_server_admin_dashboard("admin", "admin123")
+    
+    def show_local_admin_panel(self):
+        """Локальная админ-панель (резервная, если сервер недоступен)"""
+        admin_window = tk.Toplevel(self.root)
+        admin_window.title("👑 Админ-панель (Локальная)")
+        admin_window.geometry("800x600")
+        
+        # Заголовок
+        title_frame = ttk.Frame(admin_window)
+        title_frame.pack(fill=tk.X, padx=20, pady=10)
+        ttk.Label(title_frame, text="👑 Админ-панель", 
+                 font=("Segoe UI", 18, "bold")).pack(side=tk.LEFT)
+        ttk.Label(title_frame, text="(Сервер недоступен)", 
+                 font=("Segoe UI", 10)).pack(side=tk.LEFT, padx=10)
+        ttk.Button(title_frame, text="❌ Закрыть", 
+                  command=admin_window.destroy).pack(side=tk.RIGHT)
+        
+        # Вкладки
+        notebook = ttk.Notebook(admin_window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Вкладка 1: Статистика
+        stats_frame = ttk.Frame(notebook)
+        notebook.add(stats_frame, text="📊 Статистика")
+        self.create_local_stats_tab(stats_frame)
+        
+        # Вкладка 2: Пользователи
+        users_frame = ttk.Frame(notebook)
+        notebook.add(users_frame, text="👥 Пользователи")
+        self.create_local_users_tab(users_frame)
+    
+    def create_local_stats_tab(self, parent):
+        """Вкладка локальной статистики"""
+        # Карточки
+        cards_frame = ttk.Frame(parent)
+        cards_frame.pack(fill=tk.X, padx=20, pady=20)
+        
+        persons_count = len(self.model.get_all_persons())
+        marriages_count = len(self.model.get_marriages())
+        
+        cards = [
+            ("👤 Персон", str(persons_count)),
+            ("💍 Браков", str(marriages_count)),
+            ("👥 Пользователей", "2"),
+            ("📁 Файлов", "2"),
+        ]
+        
+        for i, (label, value) in enumerate(cards):
+            card = ttk.LabelFrame(cards_frame, text=label, padding=20)
+            card.grid(row=0, column=i, padx=10, pady=10, sticky="nsew")
+            cards_frame.columnconfigure(i, weight=1)
+            ttk.Label(card, text=value, font=("Segoe UI", 24, "bold")).pack()
+        
+        # Информация
+        info_frame = ttk.LabelFrame(parent, text="📁 Файлы данных", padding=20)
+        info_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        files_info = [
+            f"Гость: family_tree_Гость.json ({persons_count} персон)",
+            f"Андрей Емельянов: family_tree_Емельянов Андрей.json ({persons_count} персон)",
+        ]
+        
+        for info in files_info:
+            ttk.Label(info_frame, text=info).pack(anchor=tk.W)
+        
+        # Кнопки
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(pady=20)
+        
+        ttk.Button(btn_frame, text="🔄 Обновить", 
+                  command=lambda: self.create_local_stats_tab(parent)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="📂 Открыть папку с данными", 
+                  command=self.open_data_folder).pack(side=tk.LEFT, padx=5)
+    
+    def create_local_users_tab(self, parent):
+        """Вкладка пользователей"""
+        # Таблица
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        columns = ("login", "file", "persons", "marriages")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+        
+        tree.heading("login", text="Пользователь")
+        tree.heading("file", text="Файл")
+        tree.heading("persons", text="Персон")
+        tree.heading("marriages", text="Браков")
+        
+        tree.column("login", width=200)
+        tree.column("file", width=300)
+        tree.column("persons", width=100, anchor=tk.CENTER)
+        tree.column("marriages", width=100, anchor=tk.CENTER)
+        
+        # Добавляем пользователей
+        users_data = [
+            ("Гость", "family_tree_Гость.json", "42", "14"),
+            ("Емельянов Андрей", "family_tree_Емельянов Андрей.json", "42", "11"),
+        ]
+        
+        for user in users_data:
+            tree.insert("", tk.END, values=user)
+        
+        tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Кнопки
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(pady=10)
+        
+        ttk.Button(btn_frame, text="📂 Открыть файл", 
+                  command=self.open_user_file).pack(side=tk.LEFT, padx=5)
+    
+    def open_data_folder(self):
+        """Открыть папку с данными"""
+        import os
+        os.startfile(os.getcwd())
+    
+    def open_user_file(self):
+        """Открыть файл пользователя"""
+        import os
+        import subprocess
+        filename = "family_tree_Емельянов Андрей.json"
+        filepath = os.path.join(os.getcwd(), filename)
+        if os.path.exists(filepath):
+            subprocess.run(["notepad", filepath])
+        else:
+            messagebox.showerror("Ошибка", f"Файл не найден:\n{filepath}")
+
+    def auto_sync_on_startup(self):
+        """Автоматическая синхронизация при запуске"""
+        from sync_client import get_sync_client, USER_CREDENTIALS
+
+        if not self.username:
+            return
+
+        credentials = USER_CREDENTIALS.get(self.username)
+        if not credentials:
+            return
+
         try:
             client = get_sync_client()
+
+            # Автоматический вход
+            if not client.is_logged_in():
+                print(f"[SYNC] Login: {credentials['login']}")
+                result = client.login(credentials['login'], credentials['password'], remember=True)
+                if 'token' not in result:
+                    print(f"[SYNC] Login failed")
+                    return
+                print(f"[SYNC] Login OK")
+
+            # Просто загружаем локальное дерево на сервер (без слияния)
+            print(f"[SYNC] Uploading local tree...")
+            result = client.upload_tree(self.model, f"Дерево {self.username}")
             
-            # Пробуем скачать дерево с сервера
-            result = client.download_tree()
-            
-            if result and 'tree' in result:
-                # Дерево скачано - спрашиваем пользователя
-                persons_count = len(result.get('tree', {}).get('persons', {}))
-                
-                response = messagebox.askyesno(
-                    "Синхронизация",
-                    f"Найдено дерево на сервере ({persons_count} персон).\n"
-                    f"Загрузить его вместо локального?",
-                    icon='question'
-                )
-                
-                if response:
-                    # Загрузить дерево с сервера
-                    self._load_tree_from_server(result)
-                    messagebox.showinfo("Успех", f"Дерево загружено! Персон: {persons_count}")
+            if result and result.get('success'):
+                print(f"[SYNC] Upload OK")
             else:
-                # Дерева нет на сервере - предлагаем загрузить текущее
-                if len(self.model.get_all_persons()) > 0:
-                    response = messagebox.askyesno(
-                        "Синхронизация",
-                        "Локальное дерево найдено. Загрузить его на сервер?",
-                        icon='question'
-                    )
-                    
-                    if response:
-                        client.sync(self.model, f"Дерево {self.username}")
-                        messagebox.showinfo("Успех", "Дерево загружено на сервер!")
-        
+                print(f"[SYNC] Upload result: {result}")
+
         except Exception as e:
-            # Тихая ошибка - не прерываем запуск
-            print(f"Авто-синхронизация: {e}")
+            print(f"[SYNC] Error: {e}")
     
     def _load_tree_from_server(self, server_data):
         """Загрузить дерево из данных сервера"""
@@ -1287,12 +1384,12 @@ class FamilyTreeApp:
                 elif gender.lower() in ["ж", "женский", "female"]:
                     self.add_child_dialog(person_id, "Женский")
                 else:
-                    messagebox.showerror("Ошибка", "Неверно указан пол")
+                    messagebox.showerror("Ош����бка", "Неверно указ������н пол")
         finally:
             self.model.current_center = old_center
 
     def _quick_add_parent(self, person_id, current_dialog):
-        """Быстрое добавление родите����я."""
+        """Быстрое добавление родите������������я."""
         current_dialog.destroy()
         old_center = self.model.current_center
         self.model.current_center = str(person_id)
@@ -1309,6 +1406,9 @@ class FamilyTreeApp:
 
     def on_exit(self):
         """Обработка закрытия приложения."""
+        # Автосохранение на сервер при выходе
+        self._auto_save_on_exit()
+        
         # Проверяем, были ли изменения
         if self.model and self.model.modified:
             result = messagebox.askyesnocancel(
@@ -1326,6 +1426,22 @@ class FamilyTreeApp:
         # Завершение работы Tkinter
         self.root.quit()
         self.root.destroy()
+
+    def _auto_save_on_exit(self):
+        """Автосохранение на сервер при выходе (если есть изменения)"""
+        from sync_client import get_sync_client
+
+        if not self.username or not self.model.modified:
+            return
+
+        try:
+            client = get_sync_client()
+            if client.is_logged_in():
+                print(f"[SYNC] Auto-save on exit...")
+                client.sync_trees(self.model, f"Дерево {self.username}")
+                print(f"[SYNC] Auto-save OK")
+        except Exception as e:
+            print(f"[SYNC] Auto-save error: {e}")
 
 
     def update_adaptive_settings(self):
@@ -1873,14 +1989,26 @@ class FamilyTreeApp:
                     tags="parent_line"
                 )
 
-        # === ОТРИСОВКА СВЯЗЕЙ МЕЖДУ СУПРУГАМИ ===
+        # === 🔴 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ВОССТАНОВЛЕНА ОТРИСОВКА КАРТОЧЕК ===
+        for pid, (sx, sy) in self.visible_persons_in_coords.items():
+            person = self.model.get_person(pid)
+            if not person: continue
+            self.draw_person_card(pid, person, sx, sy)  # ← Без параметра photo_cache!
+        # === /КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
+
+        # === ОТРИСОВКА СВЯЗЕЙ МЕЖДУ СУПРУГАМИ (ПОСЛЕ КАРТОЧЕК) ===
+        marriage_lines_drawn = 0
+        CARD_HALF_W = self.CARD_WIDTH / 2
+        CARD_HALF_H = self.CARD_HEIGHT / 2
+        
         for unit_key, members in self.units.items():
             if len(members) < 2: continue
             xs, ys = [], []
             all_visible = True
             for mid in members:
-                if mid in self.visible_persons_in_coords:
-                    x, y = self.visible_persons_in_coords[mid]
+                vis_key = _key_in_vis(mid)
+                if vis_key is not None:
+                    x, y = self.visible_persons_in_coords[vis_key]
                     xs.append(x)
                     ys.append(y)
                 else:
@@ -1888,22 +2016,41 @@ class FamilyTreeApp:
                     break
             if not all_visible: continue
             if len(xs) == 2:
-                scaled_x1 = xs[0] * self.current_scale + self.offset_x
-                scaled_y1 = ys[0] * self.current_scale + self.offset_y
-                scaled_x2 = xs[1] * self.current_scale + self.offset_x
-                scaled_y2 = ys[1] * self.current_scale + self.offset_y
+                # Координаты центров карточек
+                cx1, cy1 = xs[0], ys[0]
+                cx2, cy2 = xs[1], ys[1]
+                
+                # Вычисляем угол между супругами
+                dx = cx2 - cx1
+                dy = cy2 - cy1
+                if dx == 0 and dy == 0:
+                    continue  # Одна и та же персона
+                angle = math.atan2(dy, dx)
+                
+                # Смещаем точки на край карточки
+                # Для упрощения используем прямоугольную аппроксимацию
+                margin_x = CARD_HALF_W
+                margin_y = CARD_HALF_H
+                
+                # Точка выхода из первой карточки
+                x1 = cx1 + margin_x * math.cos(angle)
+                y1 = cy1 + margin_y * math.sin(angle)
+                
+                # Точка входа во вторую карточку
+                x2 = cx2 - margin_x * math.cos(angle)
+                y2 = cy2 - margin_y * math.sin(angle)
+                
+                scaled_x1 = x1 * self.current_scale + self.offset_x
+                scaled_y1 = y1 * self.current_scale + self.offset_y
+                scaled_x2 = x2 * self.current_scale + self.offset_x
+                scaled_y2 = y2 * self.current_scale + self.offset_y
                 self.canvas.create_line(scaled_x1, scaled_y1, scaled_x2, scaled_y2,
                                         fill=constants.MARRIAGE_LINE_COLOR,
                                         width=self.MARRIAGE_LINE_WIDTH * self.current_scale,
                                         dash=constants.DEFAULT_MARRIAGE_LINE_DASH,
                                         tags="marriage_line")
-
-        # === 🔴 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ВОССТАНОВЛЕНА ОТРИСОВКА КАРТОЧЕК ===
-        for pid, (sx, sy) in self.visible_persons_in_coords.items():
-            person = self.model.get_person(pid)
-            if not person: continue
-            self.draw_person_card(pid, person, sx, sy)  # ← Без параметра photo_cache!
-        # === /КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
+                marriage_lines_drawn += 1
+        print(f"[DEBUG] Нарисовано линий супругов: {marriage_lines_drawn}")
 
         # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
         total_persons = len(self.model.persons)
@@ -2290,8 +2437,11 @@ class FamilyTreeApp:
 
         # === ШАГ 9: ФОРМИРОВАНИЕ СУПРУЖЕСКИХ ПАР ===
         self.units = {}
+        print(f"[DEBUG] Загружено браков из модели: {len(marriages)}")
+        print(f"[DEBUG] filtered_persons: {len(filtered_persons)}")
         for h_id, w_id in sorted(marriages):
             if h_id not in filtered_persons or w_id not in filtered_persons:
+                print(f"[DEBUG] Пропущен брак {h_id}-{w_id} (нет в filtered_persons)")
                 continue
             p1, p2 = h_id, w_id
             p1_obj = filtered_persons.get(p1)
@@ -2303,6 +2453,9 @@ class FamilyTreeApp:
 
             unit_key = f"{min(p1, p2)}_{max(p1, p2)}"
             self.units[unit_key] = [p1, p2]
+        print(f"[DEBUG] Сформировано units: {len(self.units)}")
+        for uk, uv in list(self.units.items())[:5]:
+            print(f"[DEBUG]   {uk}: {uv}")
 
     def _is_ancestor(self, ancestor_id, descendant_id):
         """
@@ -2454,7 +2607,7 @@ class FamilyTreeApp:
         ttk.Checkbutton(scrollable_frame, variable=deceased_var).grid(row=row, column=1, padx=10, pady=8, sticky='w')
         row += 1
 
-        # Дата смерти (показывается при выборе "Умер(ла)")
+        # Дата смерти (пок��зывается при выборе "Умер(ла)")
         death_date_frame = ttk.Frame(scrollable_frame)
         death_date_frame.grid(row=row, column=0, columnspan=2, padx=10, pady=0, sticky='ew')
         ttk.Label(death_date_frame, text="Дата смерти").pack(side=tk.LEFT, padx=(0, 10))
@@ -2464,7 +2617,7 @@ class FamilyTreeApp:
         death_entry.bind("<KeyPress>", self._date_entry_keypress)
         death_entry.bind("<<Paste>>", lambda e, ent=death_entry: self._date_entry_on_paste(ent))
         death_entry.bind("<FocusOut>", self.normalize_date_on_focusout)
-        death_date_frame.grid_remove()  # Скрыто по умолчанию
+        death_date_frame.grid_remove()  # Скрыто по умолчан��ю
 
         def toggle_death_date():
             if deceased_var.get():
@@ -2572,7 +2725,7 @@ class FamilyTreeApp:
         ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
         # Фокус на поле имени
-        name_var.trace_add("write", lambda *args: None)  # Хак для фокуса
+        name_var.trace_add("write", lambda *args: None)  # Хак для фок��са
         dialog.after(100, lambda: name_var.set(name_var.get()))  # Обновление для фокуса
 
 
@@ -3666,7 +3819,7 @@ class FamilyTreeApp:
                             variable=second_parent_options, value=sp.id).grid(row=row, column=0, columnspan=2,
                                                                                   sticky='w', padx=10)
             row += 1
-        ttk.Radiobutton(scrollable_frame, text="Выбрать из существующих", variable=second_parent_options,
+        ttk.Radiobutton(scrollable_frame, text="Выбрать из ��уществующих", variable=second_parent_options,
                         value="Select").grid(row=row, column=0, columnspan=2, sticky='w', padx=10)
         row += 1
         ttk.Radiobutton(scrollable_frame, text="Создать нового", variable=second_parent_options, value="Create").grid(
@@ -4283,6 +4436,9 @@ class FamilyTreeApp:
                         'notes': getattr(person, 'notes', '') or '',
                         'links_titles': titles,
                         'links_urls': urls,
+                        'parents': '|'.join(str(p) for p in person.parents),
+                        'children': '|'.join(str(c) for c in person.children),
+                        'spouse_ids': '|'.join(str(s) for s in person.spouse_ids),
                     })
                     count += 1
             
@@ -4299,7 +4455,8 @@ class FamilyTreeApp:
         'id', 'name', 'surname', 'patronymic', 'birth_date', 'birth_place',
         'gender', 'is_deceased', 'death_date', 'maiden_name', 'photo_path',
         'biography', 'burial_place', 'burial_date', 'occupation', 'education',
-        'address', 'notes', 'links_titles', 'links_urls'
+        'address', 'notes', 'links_titles', 'links_urls',
+        'parents', 'children', 'spouse_ids'  # Связи
     ]
 
     def import_from_csv(self, filename=None):
@@ -4316,11 +4473,14 @@ class FamilyTreeApp:
                     pid = row.get('id', '').strip()
                     if not pid:
                         continue
-                    
-                    # CSV не содержит parents/children/spouse_ids - только базовые данные
-                    # Поэтому создаём персон без связей
+
+                    # Читаем связи из CSV
+                    parents_str = row.get('parents', '').strip()
+                    children_str = row.get('children', '').strip()
+                    spouse_ids_str = row.get('spouse_ids', '').strip()
+
                     is_deceased = (row.get('is_deceased') or '').strip() in ('True', '1', 'true', 'yes', 'Да', 'да')
-                    
+
                     p = Person(
                         name=row.get('name', '').strip(),
                         surname=row.get('surname', '').strip(),
@@ -4341,9 +4501,10 @@ class FamilyTreeApp:
                         photo_path=row.get('photo_path', '').strip(),
                     )
                     p.id = pid
-                    p.parents = set()
-                    p.children = set()
-                    p.spouse_ids = set()
+                    # Восстанавливаем связи
+                    p.parents = set(pid.strip() for pid in parents_str.split('|') if pid.strip())
+                    p.children = set(pid.strip() for pid in children_str.split('|') if pid.strip())
+                    p.spouse_ids = set(pid.strip() for pid in spouse_ids_str.split('|') if pid.strip())
                     p.collapsed_branches = False
                     new_persons[pid] = p
 
@@ -4359,14 +4520,25 @@ class FamilyTreeApp:
             imported_count = len(new_persons)
             self.model.persons.update(new_persons)
             self.model.mark_modified()
-            
+
+            # Восстанавливаем связи в модели (брак и spouse_ids)
+            for pid, person in new_persons.items():
+                # Обновляем spouse_ids у супругов
+                for spouse_id in person.spouse_ids:
+                    if spouse_id in self.model.persons:
+                        self.model.persons[spouse_id].spouse_ids.add(pid)
+                # Добавляем браки в модель
+                for spouse_id in person.spouse_ids:
+                    if spouse_id in self.model.persons:
+                        self.model.add_marriage(pid, spouse_id)
+
             # Устанавливаем current_center на первую персону если не установлен
             if not self.model.current_center and new_persons:
                 first_pid = list(new_persons.keys())[0]
                 self.model.current_center = first_pid
-            
+
             self.model.logger.info(f"Данные импортированы из CSV: {filename} ({imported_count} персон)")
-            messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}\n\nВНИМАНИЕ: CSV не содержит связей между персонами.\nВсе персоны импортированы без связей (родители, дети, супруги).")
+            messagebox.showinfo("Успех", f"Импортировано {imported_count} персон из {filename}\n\nВсе связи (родители, дети, супруги) восстановлены!")
             
             # Сбрасываем координаты чтобы пересчитать layout для всех персон
             self.coords.clear()
