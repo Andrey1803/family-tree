@@ -694,3 +694,8 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     print(f"🚀 Запуск сервера на порту {port}...")
     app.run(host='0.0.0.0', port=port, debug=debug)
+ 
+@app.route('/api/admin/user/<int:user_id>/trees', methods=['GET']) 
+@require_admin 
+def admin_get_user_trees(user_id): 
+    return jsonify({'trees': []}) 
