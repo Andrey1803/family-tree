@@ -2150,6 +2150,9 @@ function parseCsvImport(text) {
 }
 
 function openFiltersDialog() {
+    console.log('[FILTERS] Opening filters dialog, treeData:', treeData);
+    console.log('[FILTERS] Persons count:', Object.keys(treeData.persons || {}).length);
+    
     const ov = document.createElement("div");
     ov.className = "tree-modal-overlay";
     ov.innerHTML = `
@@ -2180,6 +2183,7 @@ function openFiltersDialog() {
         activeFilters.status = ov.querySelector("#filter-status").value;
         activeFilters.photos_only = !!ov.querySelector("#filter-photos").checked;
         activeFilters.childless = !!ov.querySelector("#filter-childless").checked;
+        console.log('[FILTERS] Applied filters:', activeFilters);
         ov.remove();
         render();
     };
@@ -2188,6 +2192,9 @@ function openFiltersDialog() {
 }
 
 function openSearchDialog() {
+    console.log('[SEARCH] Opening search dialog, treeData:', treeData);
+    console.log('[SEARCH] Persons count:', Object.keys(treeData.persons || {}).length);
+    
     const ov = document.createElement("div");
     ov.className = "tree-modal-overlay";
     ov.innerHTML = `
@@ -2208,11 +2215,13 @@ function openSearchDialog() {
         resultsEl.innerHTML = "";
         if (!q) return;
         const persons = treeData.persons || {};
+        console.log('[SEARCH] Query:', q, 'Persons:', Object.keys(persons).length);
         const found = [];
         for (const [pid, p] of Object.entries(persons)) {
             const text = [p.name, p.patronymic, p.surname, p.birth_date, p.death_date].filter(Boolean).join(" ").toLowerCase();
             if (text.includes(q)) found.push({ pid, p });
         }
+        console.log('[SEARCH] Found:', found.length);
         if (found.length === 0) {
             resultsEl.innerHTML = '<div class="muted">Ничего не найдено</div>';
         } else {
