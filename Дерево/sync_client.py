@@ -18,7 +18,8 @@ REMEMBER_FILE = "login_remember.json"
 # Учётные данные пользователей
 USER_CREDENTIALS = {
     "Гость": {"login": "guest", "password": "guest123"},
-    "Емельянов Андрей": {"login": "andrey", "password": "andrey123"}
+    "Емельянов Андрей": {"login": "andrey", "password": "andrey123"},
+    "Андрей Емельянов": {"login": "admin", "password": "admin123"},  # Для локального входа
 }
 
 
@@ -82,9 +83,13 @@ class SyncClient:
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    return config.get('token')
-            except:
+                    token = config.get('token')
+                    print(f"[SYNC] Loaded token from config: {token[:20] if token else 'None'}...")
+                    return token
+            except Exception as e:
+                print(f"[SYNC] Error loading token: {e}")
                 pass
+        print("[SYNC] No token in config")
         return None
     
     def _save_token(self, token, user_id=None):
@@ -154,15 +159,18 @@ class SyncClient:
     
     def login(self, login, password, remember=False):
         """Войти в систему."""
+        print(f"[SYNC] Login attempt: {login}")
         result = self._request('/api/auth/login', method='POST', data={
             'login': login,
             'password': password
         })
+        print(f"[SYNC] Login result: {result}")
 
         if 'token' in result:
             self._save_token(result['token'], result.get('user_id'))
             if remember:
                 self._save_username(login)
+            print(f"[SYNC] Token saved: {result['token'][:20]}...")
 
         return result
     
@@ -274,29 +282,53 @@ class SyncClient:
 
     def upload_tree(self, model, tree_name='Моё дерево'):
         """Загрузить дерево на сервер из модели"""
+        print(f"[SYNC] Uploading tree: {tree_name}")
+        print(f"[SYNC] Token: {self.token[:20] if self.token else 'None'}...")
+        
         tree_data = {
             'persons': {},
             'marriages': []
         }
-        
-        for pid, person in model.get_all_persons().items():
-            tree_data['persons'][pid] = {
-                'id': pid,
-                'name': person.name,
-                'surname': person.surname,
-                'patronymic': person.patronymic,
-                'birth_date': person.birth_date,
-                'gender': person.gender,
-                'is_deceased': person.is_deceased,
-                'death_date': person.death_date,
-                'parents': list(person.parents),
-                'children': list(person.children),
-                'spouse_ids': list(person.spouse_ids),
-            }
-        
-        for marriage in model.get_marriages():
-            tree_data['marriages'].append(list(marriage))
-        
+
+        # Поддержка и модели, и dict
+        if hasattr(model, 'get_all_persons'):
+            # Это объект модели
+            persons_dict = model.get_all_persons()
+            marriages_list = model.get_marriages()
+        else:
+            # Это dict
+            persons_dict = model if isinstance(model, dict) else {}
+            marriages_list = []
+
+        for pid, person in persons_dict.items():
+            if hasattr(person, 'name'):
+                # Это объект Person
+                tree_data['persons'][pid] = {
+                    'id': pid,
+                    'name': person.name,
+                    'surname': person.surname,
+                    'patronymic': person.patronymic,
+                    'birth_date': person.birth_date,
+                    'gender': person.gender,
+                    'is_deceased': person.is_deceased,
+                    'death_date': person.death_date,
+                    'parents': list(person.parents),
+                    'children': list(person.children),
+                    'spouse_ids': list(person.spouse_ids),
+                }
+            else:
+                # Это dict
+                tree_data['persons'][pid] = person
+
+        if marriages_list:
+            for marriage in marriages_list:
+                if hasattr(marriage, '__iter__'):
+                    tree_data['marriages'].append(list(marriage))
+                else:
+                    tree_data['marriages'].append(marriage)
+
+        print(f"[SYNC] Persons: {len(tree_data['persons'])}, Marriages: {len(tree_data['marriages'])}")
+
         return self.upload_tree_data(tree_data, tree_name)
 
     def upload_tree_data(self, tree_data, tree_name='Моё дерево'):

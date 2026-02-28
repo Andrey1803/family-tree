@@ -91,9 +91,8 @@ class FamilyTreeApp:
         self.modified_indicator = " *"  # Индикатор несохранённых изменений
         
         # Авто-синхронизация при запуске (если есть username)
-        # ОТКЛЮЧЕНО - сервер на Railway требует обновления
-        # if username:
-        #     self.root.after(1000, self.auto_sync_on_startup)
+        if username:
+            self.root.after(1000, self.auto_sync_on_startup)  # Через 1 секунду
         
         # Создание стиля для акцентных кнопок
         style = ttk.Style()
@@ -1180,7 +1179,7 @@ class FamilyTreeApp:
             messagebox.showerror("Ошибка", f"Файл не найден:\n{filepath}")
 
     def auto_sync_on_startup(self):
-        """Автоматическая синхронизация при запуске"""
+        """Автоматическая синхронизация при запуске — загрузка локального дерева на сервер"""
         from sync_client import get_sync_client, USER_CREDENTIALS
 
         if not self.username:
@@ -1188,26 +1187,28 @@ class FamilyTreeApp:
 
         credentials = USER_CREDENTIALS.get(self.username)
         if not credentials:
+            print(f"[SYNC] No credentials for user: {self.username}")
             return
 
         try:
             client = get_sync_client()
 
-            # Автоматический вход
-            if not client.is_logged_in():
-                print(f"[SYNC] Login: {credentials['login']}")
-                result = client.login(credentials['login'], credentials['password'], remember=True)
-                if 'token' not in result:
-                    print(f"[SYNC] Login failed")
-                    return
-                print(f"[SYNC] Login OK")
+            # Всегда логинимся заново (токены быстро истекают)
+            print(f"[SYNC] Login: {credentials['login']}")
+            result = client.login(credentials['login'], credentials['password'], remember=True)
 
-            # Просто загружаем локальное дерево на сервер (без слияния)
+            if not result.get('token'):
+                print(f"[SYNC] Login failed: {result}")
+                return
+
+            print(f"[SYNC] Login OK")
+
+            # Загружаем локальное дерево на сервер
             print(f"[SYNC] Uploading local tree...")
             result = client.upload_tree(self.model, f"Дерево {self.username}")
-            
-            if result and result.get('success'):
-                print(f"[SYNC] Upload OK")
+
+            if result and (result.get('success') or result.get('message')):
+                print(f"[SYNC] Upload OK: {result}")
             else:
                 print(f"[SYNC] Upload result: {result}")
 
@@ -1292,11 +1293,11 @@ class FamilyTreeApp:
                 client.set_server_url(url_var.get())
                 client.login(login_var.get(), password_var.get())
                 status_var.set("✅ Вход успешен!")
-                status_var.configure(foreground="green")
+                status_label.configure(foreground="green")
             except Exception as e:
                 status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
-        
+                status_label.configure(foreground="red")
+
         def do_upload():
             """Загрузить на сервер."""
             try:
@@ -1306,11 +1307,11 @@ class FamilyTreeApp:
                     client.login(login_var.get(), password_var.get())
                 result = client.sync(self.model, "Моё дерево")
                 status_var.set(f"✅ Загрузка успешна! {result}")
-                status_var.configure(foreground="green")
+                status_label.configure(foreground="green")
             except Exception as e:
                 status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
-        
+                status_label.configure(foreground="red")
+
         def do_download():
             """Скачать с сервера."""
             try:
@@ -1320,10 +1321,10 @@ class FamilyTreeApp:
                     client.login(login_var.get(), password_var.get())
                 result = client.download_tree()
                 status_var.set(f"✅ Скачивание успешно! Персон: {len(result.get('tree', {}).get('persons', {}))}")
-                status_var.configure(foreground="green")
+                status_label.configure(foreground="green")
             except Exception as e:
                 status_var.set(f"❌ Ошибка: {str(e)}")
-                status_var.configure(foreground="red")
+                status_label.configure(foreground="red")
         
         # Кнопки
         btn_frame = ttk.Frame(dialog)
@@ -1438,8 +1439,12 @@ class FamilyTreeApp:
             client = get_sync_client()
             if client.is_logged_in():
                 print(f"[SYNC] Auto-save on exit...")
-                client.sync_trees(self.model, f"Дерево {self.username}")
-                print(f"[SYNC] Auto-save OK")
+                # Просто загружаем текущее дерево (перезаписываем сервер)
+                result = client.upload_tree(self.model, f"Дерево {self.username}")
+                if result and result.get('success'):
+                    print(f"[SYNC] Auto-save OK")
+                else:
+                    print(f"[SYNC] Auto-save result: {result}")
         except Exception as e:
             print(f"[SYNC] Auto-save error: {e}")
 
@@ -2601,7 +2606,7 @@ class FamilyTreeApp:
         ttk.Radiobutton(gender_frame, text="Женский", variable=gender_var, value="Женский").pack(side=tk.LEFT, padx=5)
         row += 1
 
-        # Статус смерти
+        # Стат��с смерт��
         ttk.Label(scrollable_frame, text="Умер(ла)").grid(row=row, column=0, padx=10, pady=8, sticky='e')
         deceased_var = tk.BooleanVar()
         ttk.Checkbutton(scrollable_frame, variable=deceased_var).grid(row=row, column=1, padx=10, pady=8, sticky='w')
