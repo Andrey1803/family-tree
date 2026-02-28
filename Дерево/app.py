@@ -160,9 +160,7 @@ class FamilyTreeApp:
         self.file_menu.add_command(label="Импорт из CSV", command=self.import_from_csv)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="🌐 Открыть веб-версию", command=self.open_web_version)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="☁️ Синхронизация...", command=self.open_sync_dialog)
-        
+
         # Админ-панель только для Андрея Емельянова
         if self.username == "Емельянов Андрей":
             self.file_menu.add_separator()
@@ -1244,96 +1242,6 @@ class FamilyTreeApp:
         
         # Обновляем интерфейс
         self.refresh_view()
-
-    def open_sync_dialog(self):
-        """Диалог синхронизации с сервером."""
-        from sync_client import get_sync_client
-        
-        dialog = tk.Toplevel(self.root)
-        dialog.title("☁️ Синхронизация с сервером")
-        dialog.geometry("450x350")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Заголовок
-        ttk.Label(dialog, text="☁️ Синхронизация с сервером", 
-                 font=("Segoe UI", 14, "bold")).pack(pady=10)
-        
-        # Поля ввода
-        frame = ttk.Frame(dialog, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        # URL сервера
-        ttk.Label(frame, text="URL сервера:").grid(row=0, column=0, padx=10, pady=5, sticky='e')
-        url_var = tk.StringVar(value="https://ravishing-caring-production-3656.up.railway.app")
-        url_entry = ttk.Entry(frame, textvariable=url_var, width=50)
-        url_entry.grid(row=0, column=1, padx=10, pady=5, sticky='w')
-        
-        # Логин
-        ttk.Label(frame, text="Логин:").grid(row=1, column=0, padx=10, pady=5, sticky='e')
-        login_var = tk.StringVar()
-        login_entry = ttk.Entry(frame, textvariable=login_var, width=30)
-        login_entry.grid(row=1, column=1, padx=10, pady=5, sticky='w')
-        
-        # Пароль
-        ttk.Label(frame, text="Пароль:").grid(row=2, column=0, padx=10, pady=5, sticky='e')
-        password_var = tk.StringVar()
-        password_entry = ttk.Entry(frame, textvariable=password_var, show="*", width=30)
-        password_entry.grid(row=2, column=1, padx=10, pady=5, sticky='w')
-        
-        # Статус
-        status_var = tk.StringVar(value="")
-        status_label = ttk.Label(frame, textvariable=status_var, foreground="blue")
-        status_label.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
-        
-        def do_login():
-            """Выполнить вход."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                client.login(login_var.get(), password_var.get())
-                status_var.set("✅ Вход успешен!")
-                status_label.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_label.configure(foreground="red")
-
-        def do_upload():
-            """Загрузить на сервер."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                if not client.is_logged_in():
-                    client.login(login_var.get(), password_var.get())
-                result = client.sync(self.model, "Моё дерево")
-                status_var.set(f"✅ Загрузка успешна! {result}")
-                status_label.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_label.configure(foreground="red")
-
-        def do_download():
-            """Скачать с сервера."""
-            try:
-                client = get_sync_client()
-                client.set_server_url(url_var.get())
-                if not client.is_logged_in():
-                    client.login(login_var.get(), password_var.get())
-                result = client.download_tree()
-                status_var.set(f"✅ Скачивание успешно! Персон: {len(result.get('tree', {}).get('persons', {}))}")
-                status_label.configure(foreground="green")
-            except Exception as e:
-                status_var.set(f"❌ Ошибка: {str(e)}")
-                status_label.configure(foreground="red")
-        
-        # Кнопки
-        btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(pady=10)
-        
-        ttk.Button(btn_frame, text="Войти", command=do_login).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="⬆️ Загрузить", command=do_upload).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="⬇️ Скачать", command=do_download).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     def _view_person_by_id(self, person_id):
         """Просмотр персоны по ID."""
