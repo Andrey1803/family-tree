@@ -45,6 +45,9 @@ SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or "FamilyTreeApp_Fixed_Secret_Key_2026"
 app.config["JSON_AS_ASCII"] = False
+app.config["SESSION_COOKIE_SECURE"] = False  # Разрешить HTTP
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
 _data_dir = os.environ.get("DATA_DIR") or _project_root
@@ -385,15 +388,18 @@ def logout():
 def api_tree():
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
     server_token = session.get('server_token')
     server_user_id = session.get('server_user_id')
     
+    print(f"[API_TREE] username={username}, has_token={server_token is not None}, user_id={server_user_id}")
+
     if request.method == "GET":
         # Пробуем загрузить с сервера синхронизации
         if server_token:
             try:
+                print(f"[API_TREE] Downloading from sync server...")
                 req = urllib.request.Request(
                     f"{SYNC_SERVER_URL}/api/sync/download",
                     headers={'Authorization': f'Bearer {server_token}'},
@@ -402,6 +408,8 @@ def api_tree():
                 with urllib.request.urlopen(req, timeout=10) as response:
                     data = json.loads(response.read().decode())
                     tree_data = data.get('tree', {})
+                    persons_count = len(tree_data.get("persons", {}))
+                    print(f"[API_TREE] Sync server returned {persons_count} persons")
                     persons = {str(k): v for k, v in tree_data.get("persons", {}).items()}
                     for p in persons.values():
                         if isinstance(p, dict):
@@ -415,9 +423,10 @@ def api_tree():
                         "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
                     })
             except Exception as e:
-                print(f"[WEB] Download from sync server failed: {e}")
-        
+                print(f"[API_TREE] Download from sync server failed: {e}")
+
         # Fallback на локальный файл
+        print(f"[API_TREE] Fallback to local file")
         data = load_tree(username)
         persons = {str(k): v for k, v in data.get("persons", {}).items()}
         for p in persons.values():
