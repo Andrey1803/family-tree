@@ -383,11 +383,14 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             applyPan();
         }
     }, { passive: false });
-    let pinchDist0, zoom0;
+    let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     panZoomWrapper.addEventListener("touchstart", (e) => {
         if (e.touches.length === 2) {
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             zoom0 = treeZoom;
+            // Вычисляем центр между двумя пальцами (точка масштабирования)
+            pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         }
     }, { passive: true });
     panZoomWrapper.addEventListener("touchmove", (e) => {
@@ -395,7 +398,16 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             e.preventDefault();
             const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             const factor = dist / pinchDist0;
+            const oldZoom = treeZoom;
             applyZoom(zoom0 * factor);
+            // Корректируем панорамирование относительно центра pinch-жеста
+            if (oldZoom !== treeZoom) {
+                const rect = viewport.getBoundingClientRect();
+                const cx = pinchCenterX - rect.left;
+                const cy = pinchCenterY - rect.top;
+                treePanX = cx - (cx - treePanX) * treeZoom / oldZoom;
+                treePanY = cy - (cy - treePanY) * treeZoom / oldZoom;
+            }
             applyPan();
         }
     }, { passive: false });
@@ -620,6 +632,9 @@ function editPerson(pid) {
     const p = persons[pid];
     if (!p) return;
 
+    // Сохраняем состояние перед редактированием
+    if (window.undoManager) window.undoManager.beforeEdit(treeData, pid);
+
     const displayName = (q) => {
         const x = persons[q];
         return x ? [x.name, x.patronymic, x.surname].filter(Boolean).join(" ") : String(q);
@@ -689,7 +704,14 @@ function editPerson(pid) {
                         ${fatherId ? `<span>${escapeHtml(fatherText)}</span>` : '<button type="button" class="btn-add-parent" data-role="father">Добавить из существующих</button>'}
                     </div>
                     <h4>Супруг(и) / Партнёры</h4>
-                    <div id="ed-spouses">${(p.spouse_ids || []).map(s => `<div class="ed-family-item ed-spouse-row"><span>${escapeHtml(displayName(s))}</span><button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить связь">✕</button></div>`).join("") || '<div class="muted">— Нет</div>'}</div>
+                    <div id="ed-spouses">${(p.spouse_ids || []).map((s, idx) => {
+                        const marriageDate = p.spouse_dates && p.spouse_dates[idx] ? p.spouse_dates[idx] : '';
+                        return `<div class="ed-family-item ed-spouse-row" data-spouse-id="${escapeHtml(String(s))}">
+                            <span class="spouse-name">${escapeHtml(displayName(s))}</span>
+                            <input type="text" class="spouse-date" placeholder="Дата брака (ДД.ММ.ГГГГ)" value="${escapeHtml(marriageDate)}" data-spouse="${escapeHtml(String(s))}">
+                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить связь">✕</button>
+                        </div>`;
+                    }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
                     <h4>Дети</h4>
                     <div id="ed-children">${(p.children || []).sort((a,b)=>(persons[a]?.birth_date||"9999").localeCompare(persons[b]?.birth_date||"9999")).map(c => `<div class="ed-family-item">${escapeHtml(displayName(c))}</div>`).join("") || '<div class="muted">— Нет</div>'}</div>
@@ -983,6 +1005,16 @@ function editPerson(pid) {
         p.education = ov.querySelector("#ed-education").value.trim() || "";
         p.address = ov.querySelector("#ed-address").value.trim() || "";
         p.notes = ov.querySelector("#ed-notes").value.trim() || "";
+        
+        // Сохраняем даты браков
+        const spouseDates = [];
+        ov.querySelectorAll(".spouse-date").forEach(inp => {
+            spouseDates.push(inp.value.trim());
+        });
+        if (spouseDates.length > 0) {
+            p.spouse_dates = spouseDates;
+        }
+        
         saveTree();
         ov.remove();
         render();
@@ -994,6 +1026,10 @@ function editPerson(pid) {
 
 function deletePerson(pid) {
     if (!confirm("Удалить эту персону из дерева?")) return;
+    
+    // Сохраняем состояние перед удалением
+    if (window.undoManager) window.undoManager.beforeDeletePerson(treeData, pid);
+    
     const persons = treeData.persons;
     const p = persons[pid];
     if (!p) return;
@@ -1021,6 +1057,9 @@ function deletePerson(pid) {
 }
 
 function addFirstPerson() {
+    // Сохраняем состояние перед добавлением
+    if (window.undoManager) window.undoManager.beforeAddPerson(treeData);
+    
     const ov = document.createElement("div");
     ov.className = "tree-modal-overlay";
     ov.innerHTML = `
@@ -1079,6 +1118,10 @@ function addRelative(pid, relation) {
     const persons = treeData.persons;
     const p = persons[pid];
     if (!p) return;
+    
+    // Сохраняем состояние перед добавлением родственника
+    if (window.undoManager) window.undoManager.beforeAddRelative(treeData);
+    
     if ((relation === "brother" || relation === "sister") && (!p.parents || p.parents.length === 0)) {
         alert("Для добавления брата/сестры у персоны должны быть родители.");
         return;
@@ -1218,7 +1261,7 @@ function generatePatronymic(fatherName, childGender) {
 }
 
 function generateNameFromPatronymic(patronymic, gender) {
-    if (!patronymic || !patronymic.trim()) return gender === "Мужской" ? "Неизвестный" : "Неизвестная";
+    if (!patronymic || !patronymic.trim()) return gender === "Мужской" ? "Неизвестный" : "��������������еизвестная";
     const pat = patronymic.trim().toLowerCase();
     const REVERSE = { никитич: "Никита", ильич: "Илья" };
     if (REVERSE[pat]) return REVERSE[pat];
@@ -1399,15 +1442,501 @@ function openColorPaletteDialog() {
     document.body.appendChild(ov);
 }
 
-function setupMenubar() {
-    document.querySelectorAll(".tree-menubar .menu-dropdown").forEach(dd => {
-        dd.onclick = (e) => e.stopPropagation();
+/**
+ * Менеджер резервных копий
+ */
+function showBackupManager() {
+    fetch("/api/backup/list")
+        .then(r => r.json())
+        .then(data => {
+            const backups = data.backups || [];
+            const ov = document.createElement("div");
+            ov.className = "tree-modal-overlay";
+            ov.innerHTML = `
+                <div class="tree-modal tree-backup-modal">
+                    <h3>Резервные копии</h3>
+                    <div class="backup-list" id="backup-list">
+                        ${backups.length === 0 ? '<div class="muted">Нет резервных копий</div>' : ''}
+                        ${backups.map(b => `
+                            <div class="backup-item" data-filename="${escapeHtml(b.filename)}">
+                                <div class="backup-info">
+                                    <div class="backup-name">${escapeHtml(b.filename)}</div>
+                                    <div class="backup-meta">${formatFileSize(b.size)} • ${formatDate(b.created_at)}</div>
+                                </div>
+                                <button type="button" class="btn-restore" data-filename="${escapeHtml(b.filename)}">Восстановить</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="tree-modal-btns">
+                        <button type="button" class="cancel">Закрыть</button>
+                        <button type="button" class="primary" id="btn-create-backup">Создать копию</button>
+                    </div>
+                </div>`;
+            
+            ov.querySelector(".cancel").onclick = () => ov.remove();
+            ov.querySelector("#btn-create-backup").onclick = () => {
+                ov.remove();
+                fetch("/api/backup/create", { method: "POST" })
+                    .then(r => r.blob())
+                    .then(blob => {
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `backup_${new Date().toISOString().slice(0,10)}.zip`;
+                        a.click();
+                    });
+            };
+            ov.querySelectorAll(".btn-restore").forEach(btn => {
+                btn.onclick = () => {
+                    if (!confirm("Восстановить из этой копии? Текущие данные будут заменены.")) return;
+                    fetch("/api/backup/restore", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ filename: btn.dataset.filename }),
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.ok) {
+                            alert("Дерево восстановлено!");
+                            loadTree();
+                            ov.remove();
+                        } else {
+                            alert("Ошибка: " + (data.error || "Неизвестная"));
+                        }
+                    });
+                };
+            });
+            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            document.body.appendChild(ov);
+        });
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
+function formatDate(iso) {
+    try {
+        const d = new Date(iso);
+        return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+}
+
+/**
+ * Временная шкала (улучшенная версия)
+ * Аналогично desktop-версии: горизонтальные полосы, зум, перетаскивание, события
+ */
+function openTimeline() {
+    const persons = treeData.persons || {};
+    const events = [];
+    const personsWithDates = [];
+    
+    // Фильтруем персоны с датами рождения
+    for (const [pid, p] of Object.entries(persons)) {
+        if (p.birth_date) {
+            const birthYear = parseYear(p.birth_date);
+            const deathYear = p.is_deceased && p.death_date ? parseYear(p.death_date) : null;
+            personsWithDates.push({
+                id: pid,
+                ...p,
+                birthYear,
+                deathYear,
+                age: deathYear && birthYear ? deathYear - birthYear : null,
+            });
+        }
+    }
+    
+    if (personsWithDates.length === 0) {
+        alert("Нет персон с датами рождения");
+        return;
+    }
+    
+    // Диапазон лет
+    const allYears = personsWithDates.flatMap(p => [p.birthYear, p.deathYear].filter(Boolean));
+    const minYear = Math.min(...allYears) - 5;
+    const maxYear = Math.max(...allYears) + 5;
+    
+    // Сортировка по году рождения
+    personsWithDates.sort((a, b) => a.birthYear - b.birthYear);
+    
+    // Создаем модальное окно
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay timeline-overlay";
+    ov.innerHTML = `
+        <div class="tree-timeline-full">
+            <div class="timeline-header">
+                <h3>📅 Временная шкала жизней</h3>
+                <div class="timeline-toolbar">
+                    <div class="toolbar-group">
+                        <label>Масштаб:</label>
+                        <select id="timeline-scale">
+                            <option value="0.5">5 лет/см</option>
+                            <option value="1" selected>2 года/см</option>
+                            <option value="2">1 год/см</option>
+                            <option value="5">0.5 года/см</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-group">
+                        <label>Фильтр:</label>
+                        <select id="timeline-filter">
+                            <option value="all">Все персоны</option>
+                            <option value="male">Мужчины</option>
+                            <option value="female">Женщины</option>
+                            <option value="with_photos">Только с фото</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-group">
+                        <button type="button" class="btn-zoom-in" title="Увеличить">🔍+</button>
+                        <button type="button" class="btn-zoom-out" title="Уменьшить">🔍-</button>
+                        <button type="button" class="btn-refresh" title="Обновить">🔄</button>
+                    </div>
+                </div>
+                <div class="timeline-legend">
+                    <span>👶 Рождение</span>
+                    <span>💍 Брак</span>
+                    <span>📌 Событие</span>
+                    <span class="legend-hint">| Двойной клик — переход к персоне | Колесо — зум | Перетаскивание — панорамирование</span>
+                </div>
+            </div>
+            <div class="timeline-canvas-container" id="timeline-canvas">
+                <svg class="timeline-svg" id="timeline-svg"></svg>
+            </div>
+            <div class="timeline-footer">
+                <span id="timeline-status">Персон: ${personsWithDates.length} | Диапазон: ${minYear}—${maxYear}</span>
+                <button type="button" class="btn-close">Закрыть</button>
+            </div>
+        </div>`;
+    
+    // Переменные состояния
+    let timelineZoom = 1;
+    let timelinePanX = 0;
+    let timelinePanY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    const pixelsPerYearBase = 20;
+    
+    const svg = ov.querySelector("#timeline-svg");
+    const container = ov.querySelector("#timeline-canvas");
+    const scaleSelect = ov.querySelector("#timeline-scale");
+    const filterSelect = ov.querySelector("#timeline-filter");
+    
+    // Функция отрисовки
+    function drawTimeline() {
+        const scaleMultiplier = parseFloat(scaleSelect.value);
+        const filterType = filterSelect.value;
+        const pixelsPerYear = pixelsPerYearBase * timelineZoom * scaleMultiplier;
+        
+        // Применяем фильтр
+        let filtered = [...personsWithDates];
+        if (filterType === "male") filtered = filtered.filter(p => p.gender === "Мужской");
+        else if (filterType === "female") filtered = filtered.filter(p => p.gender === "Женский");
+        else if (filterType === "with_photos") filtered = filtered.filter(p => p.photo || p.photo_path);
+        
+        if (filtered.length === 0) {
+            svg.innerHTML = '<text x="500" y="200" font-size="14" fill="#64748b">Нет персон по выбранному фильтру</text>';
+            return;
+        }
+        
+        const rowHeight = 40;
+        const yOffset = 80;
+        const totalWidth = (maxYear - minYear) * pixelsPerYear + 200;
+        const totalHeight = yOffset + filtered.length * rowHeight + 100;
+        
+        svg.setAttribute("width", totalWidth);
+        svg.setAttribute("height", totalHeight);
+        svg.setAttribute("viewBox", `${-timelinePanX} ${-timelinePanY} ${container.clientWidth} ${container.clientHeight}`);
+        
+        let content = '';
+        
+        // Шкала лет
+        content += `<g class="year-scale">`;
+        for (let year = minYear; year <= maxYear; year++) {
+            const x = (year - minYear) * pixelsPerYear;
+            const isDecade = year % 10 === 0;
+            const isFiveYear = year % 5 === 0;
+            
+            if (isDecade) {
+                content += `<line x1="${x}" y1="40" x2="${x}" y2="55" stroke="#64748b" stroke-width="1"/>`;
+                content += `<text x="${x+3}" y="70" font-size="9" fill="#1e293b">${year}</text>`;
+            } else if (isFiveYear) {
+                content += `<line x1="${x}" y1="40" x2="${x}" y2="50" stroke="#94a3b8" stroke-width="1"/>`;
+            } else {
+                content += `<line x1="${x}" y1="45" x2="${x}" y2="55" stroke="#cbd5e1" stroke-width="1"/>`;
+            }
+        }
+        content += `<line x1="0" y1="55" x2="${totalWidth}" y2="55" stroke="#64748b" stroke-width="1"/>`;
+        content += `</g>`;
+        
+        // Полосы жизней
+        filtered.forEach((p, i) => {
+            const y = yOffset + i * rowHeight;
+            const xStart = (p.birthYear - minYear) * pixelsPerYear;
+            const lifeYears = p.deathYear ? p.deathYear - p.birthYear : (new Date().getFullYear() - p.birthYear);
+            const width = Math.max(50, lifeYears * pixelsPerYear);
+            const color = p.gender === "Мужской" ? "#60a5fa" : "#f472b6";
+            
+            // Полоса
+            content += `<g class="person-bar" data-pid="${p.id}" data-x="${xStart}" data-y="${y}" data-width="${width}">`;
+            content += `<rect x="${xStart}" y="${y}" width="${width}" height="${rowHeight - 4}" fill="${color}" stroke="#1e293b" stroke-width="1" rx="4" class="person-life"/>`;
+            
+            // Имя
+            let nameText = `${p.surname || ''} ${p.name || ''}`.trim();
+            const maxNameWidth = width - 40;
+            while (nameText.length > 3 && nameText.length * 7 > maxNameWidth) {
+                nameText = nameText.slice(0, -1);
+            }
+            if (nameText.length < `${p.surname || ''} ${p.name || ''}`.trim().length) {
+                nameText = nameText.slice(0, -3) + '...';
+            }
+            content += `<text x="${xStart + 5}" y="${y + (rowHeight - 4) / 2 + 3}" font-size="8" font-weight="bold" fill="#ffffff">${escapeHtml(nameText)}</text>`;
+            
+            // Даты и возраст
+            if (width > 80) {
+                const ageText = p.age ? ` (${p.age} лет)` : '';
+                const deathDisplay = p.deathYear || (p.is_deceased ? 'н.д.' : new Date().getFullYear());
+                content += `<text x="${xStart + width - 5}" y="${y + (rowHeight - 4) / 2 + 3}" font-size="7" fill="#ffffff" text-anchor="end">${p.birthYear}—${deathDisplay}${ageText}</text>`;
+            }
+            
+            // События (рождение детей)
+            if (p.children && p.children.length > 0) {
+                p.children.forEach((childId, idx) => {
+                    const child = persons[childId];
+                    if (child && child.birth_date) {
+                        const childYear = parseYear(child.birth_date);
+                        const eventX = (childYear - minYear) * pixelsPerYear;
+                        content += `<text x="${eventX - 5}" y="${y + rowHeight / 2 + 3}" font-size="10" class="event-icon">👶</text>`;
+                    }
+                });
+            }
+            
+            // Двойной клик для перехода
+            content += `</g>`;
+        });
+        
+        svg.innerHTML = content;
+        
+        // Обработчики для полос
+        svg.querySelectorAll(".person-bar").forEach(bar => {
+            bar.style.cursor = "pointer";
+            bar.addEventListener("dblclick", (e) => {
+                const pid = bar.dataset.pid;
+                if (pid) {
+                    ov.remove();
+                    centerId = pid;
+                    treeData.current_center = pid;
+                    saveTree();
+                    render();
+                }
+            });
+        });
+        
+        // Обновляем статус
+        ov.querySelector("#timeline-status").textContent = `Персон: ${filtered.length} | Диапазон: ${minYear}—${maxYear} | Масштаб: ${(timelineZoom * parseFloat(scaleSelect.value)).toFixed(1)}x`;
+    }
+    
+    // Перетаскивание
+    container.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        dragStartX = e.clientX + timelinePanX;
+        dragStartY = e.clientY + timelinePanY;
+        container.style.cursor = "grabbing";
     });
+    
+    container.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        timelinePanX = dragStartX - e.clientX;
+        timelinePanY = dragStartY - e.clientY;
+        drawTimeline();
+    });
+    
+    container.addEventListener("mouseup", () => {
+        isDragging = false;
+        container.style.cursor = "grab";
+    });
+    
+    container.addEventListener("mouseleave", () => {
+        isDragging = false;
+        container.style.cursor = "grab";
+    });
+    
+    // Зум колесом
+    container.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        timelineZoom = Math.max(0.5, Math.min(5, timelineZoom * delta));
+        drawTimeline();
+    }, { passive: false });
+    
+    // Кнопки зума
+    ov.querySelector(".btn-zoom-in").onclick = () => {
+        timelineZoom = Math.min(5, timelineZoom * 1.2);
+        drawTimeline();
+    };
+    ov.querySelector(".btn-zoom-out").onclick = () => {
+        timelineZoom = Math.max(0.5, timelineZoom / 1.2);
+        drawTimeline();
+    };
+    
+    // Изменение масштаба и фильтра
+    scaleSelect.onchange = drawTimeline;
+    filterSelect.onchange = drawTimeline;
+    
+    // Обновление
+    ov.querySelector(".btn-refresh").onclick = () => {
+        loadTree();
+        setTimeout(() => {
+            alert("Данные обновлены");
+        }, 500);
+    };
+    
+    // Закрытие
+    ov.querySelector(".btn-close").onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    
+    document.body.appendChild(ov);
+    
+    // Инициализация
+    container.style.cursor = "grab";
+    drawTimeline();
+}
+
+function parseYear(dateStr) {
+    if (!dateStr) return null;
+    const parts = dateStr.split(".");
+    if (parts.length === 3) {
+        return parseInt(parts[2], 10);
+    }
+    return null;
+}
+
+/**
+ * Статистика дерева
+ */
+function showStats() {
+    fetch("/api/stats")
+        .then(r => r.json())
+        .then(stats => {
+            const ov = document.createElement("div");
+            ov.className = "tree-modal-overlay";
+            ov.innerHTML = `
+                <div class="tree-modal tree-stats-modal">
+                    <h3>📊 Статистика дерева</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item"><span class="stat-label">Всего персон:</span><span class="stat-value">${stats.total_persons}</span></div>
+                        <div class="stat-item"><span class="stat-label">Мужчин:</span><span class="stat-value">${stats.male_count}</span></div>
+                        <div class="stat-item"><span class="stat-label">Женщин:</span><span class="stat-value">${stats.female_count}</span></div>
+                        <div class="stat-item"><span class="stat-label">Живых:</span><span class="stat-value">${stats.living_count}</span></div>
+                        <div class="stat-item"><span class="stat-label">Умерших:</span><span class="stat-value">${stats.deceased_count}</span></div>
+                        <div class="stat-item"><span class="stat-label">Браков:</span><span class="stat-value">${stats.marriages_count}</span></div>
+                        <div class="stat-item"><span class="stat-label">Поколений:</span><span class="stat-value">${stats.max_generations}</span></div>
+                        ${stats.average_age ? `<div class="stat-item"><span class="stat-label">Средний возраст:</span><span class="stat-value">${stats.average_age} лет</span></div>` : ''}
+                    </div>
+                    ${stats.top_birth_places && stats.top_birth_places.length > 0 ? `
+                        <h4>Места рождения</h4>
+                        <ul class="places-list">
+                            ${stats.top_birth_places.map(([place, count]) => `<li>${escapeHtml(place)}: ${count}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                    <div class="tree-modal-btns">
+                        <button type="button" class="cancel">Закрыть</button>
+                    </div>
+                </div>`;
+            
+            ov.querySelector(".cancel").onclick = () => ov.remove();
+            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            document.body.appendChild(ov);
+        });
+}
+
+/**
+ * Проверка обновлений
+ */
+function checkUpdates() {
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal tree-updates-modal">
+            <h3>🔄 Проверка обновлений</h3>
+            <div class="updates-content">
+                <p>Проверка...</p>
+            </div>
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel">Закрыть</button>
+            </div>
+        </div>`;
+    
+    ov.querySelector(".cancel").onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+    
+    fetch("/api/version/check")
+        .then(r => r.json())
+        .then(data => {
+            const content = ov.querySelector(".updates-content");
+            if (data.has_update) {
+                content.innerHTML = `
+                    <p class="update-available">✅ Доступна новая версия: <strong>${data.latest_version}</strong></p>
+                    <p>Ваша версия: ${data.current_version}</p>
+                    ${data.release_notes ? `<div class="release-notes"><h4>Что нового:</h4><pre>${escapeHtml(data.release_notes)}</pre></div>` : ''}
+                    <button type="button" class="primary" onclick="window.open('${data.download_url}', '_blank')">Скачать</button>
+                `;
+            } else {
+                content.innerHTML = `<p class="up-to-date">✅ Установлена последняя версия: ${data.current_version}</p>`;
+            }
+        })
+        .catch(err => {
+            ov.querySelector(".updates-content").innerHTML = `<p class="error">Ошибка проверки: ${err.message}</p>`;
+        });
+}
+
+/**
+ * О программе
+ */
+function showAbout() {
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal tree-about-modal">
+            <h3>ℹ️ О программе</h3>
+            <div class="about-content">
+                <h4>Семейное древо</h4>
+                <p>Веб-версия приложения для построения и редактирования семейного генеалогического дерева.</p>
+                <p><strong>Версия:</strong> 1.3.0 (Web)</p>
+                <p><strong>Технологии:</strong> Flask, JavaScript, CSS</p>
+                <hr>
+                <p>Приложение позволяет:</p>
+                <ul>
+                    <li>Создавать и редактировать персоны</li>
+                    <li>Добавлять родственников (родители, дети, супруги)</li>
+                    <li>Визуализировать дерево с линиями связей</li>
+                    <li>Экспортировать данные в CSV и PDF</li>
+                    <li>Создавать резервные копии</li>
+                    <li>Отменять и повторять действия</li>
+                    <li>Настраивать цвета интерфейса</li>
+                </ul>
+                <hr>
+                <p>GitHub: <a href="https://github.com/Andrey1803/family-tree" target="_blank">Andrey1803/family-tree</a></p>
+            </div>
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel">Закрыть</button>
+            </div>
+        </div>`;
+    
+    ov.querySelector(".cancel").onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+}
+
+function setupMenubar() {
     document.querySelectorAll(".tree-menubar [data-action]").forEach(btn => {
         btn.onclick = () => {
             const act = btn.dataset.action;
             if (act === "new") {
                 if (!confirm("Создать новое дерево? Текущие данные будут утрачены.")) return;
+                if (window.undoManager) window.undoManager.clear();
                 treeData = { persons: {}, marriages: [], current_center: null };
                 centerId = null;
                 saveTree();
@@ -1415,10 +1944,43 @@ function setupMenubar() {
             } else if (act === "save") {
                 saveTree();
                 alert("Данные сохранены.");
+            } else if (act === "undo") {
+                if (window.undoManager && window.undoManager.canUndo()) {
+                    window.undoManager.undo(treeData);
+                    render();
+                    saveTree();
+                    updateUndoRedoMenu();
+                }
+            } else if (act === "redo") {
+                if (window.undoManager && window.undoManager.canRedo()) {
+                    window.undoManager.redo(treeData);
+                    render();
+                    saveTree();
+                    updateUndoRedoMenu();
+                }
             } else if (act === "export-csv") {
                 exportToCsv();
+            } else if (act === "export-pdf") {
+                window.open("/api/export/pdf", "_blank");
             } else if (act === "import-csv") {
                 document.getElementById("import-csv-input")?.click();
+            } else if (act === "backup-create") {
+                fetch("/api/backup/create", { method: "POST" })
+                    .then(r => {
+                        if (!r.ok) throw new Error("Ошибка создания копии");
+                        return r.blob();
+                    })
+                    .then(blob => {
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `backup_${new Date().toISOString().slice(0,10)}.zip`;
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                        alert("Резервная копия создана и загружена.");
+                    })
+                    .catch(err => alert("Ошибка: " + err.message));
+            } else if (act === "backup-list") {
+                showBackupManager();
             } else if (act === "refresh") {
 loadTree();
             } else if (act === "zoom-reset") {
@@ -1427,10 +1989,12 @@ loadTree();
                 treePanY = 0;
                 render();
             } else if (act === "collapse-all") {
+                if (window.undoManager) window.undoManager.saveState(treeData);
                 Object.values(treeData.persons || {}).forEach(p => { p.collapsed_branches = true; });
                 saveTree();
                 render();
             } else if (act === "expand-all") {
+                if (window.undoManager) window.undoManager.saveState(treeData);
                 Object.values(treeData.persons || {}).forEach(p => { p.collapsed_branches = false; });
                 saveTree();
                 render();
@@ -1441,8 +2005,16 @@ loadTree();
                 openFiltersDialog();
             } else if (act === "color-palette") {
                 openColorPaletteDialog();
+            } else if (act === "timeline") {
+                openTimeline();
             } else if (act === "search") {
                 openSearchDialog();
+            } else if (act === "stats") {
+                showStats();
+            } else if (act === "check-updates") {
+                checkUpdates();
+            } else if (act === "about") {
+                showAbout();
             }
             document.querySelectorAll(".menu-item.open").forEach(m => m.classList.remove("open"));
         };
@@ -1732,7 +2304,92 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
 }
 
+// Инициализация менеджера отмены/повтора
+window.undoManager = new UndoManager(50);
+
 loadPalette();
 loadTree();
 setupMenubar();
 setupDesktopAppButtons();
+setupUndoRedo();
+
+// Проверка первого запуска
+checkFirstRun();
+
+function checkFirstRun() {
+    // Показываем приветственный диалог, если дерево пусто
+    setTimeout(() => {
+        const persons = treeData.persons || {};
+        if (Object.keys(persons).length === 0) {
+            showWelcomeDialog();
+        }
+    }, 500);
+}
+
+function showWelcomeDialog() {
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal tree-welcome-modal">
+            <h3>🎉 Добро пожаловать!</h3>
+            <p>Ваше дерево пусто. Давайте создадим первую запись!</p>
+            <p>Заполните свои данные — это будет ваша карточка в дереве.</p>
+            <hr>
+            <label>Имя *</label>
+            <input type="text" id="welcome-name" placeholder="Имя">
+            <label>Фамилия *</label>
+            <input type="text" id="welcome-surname" placeholder="Фамилия">
+            <label>Отчество</label>
+            <input type="text" id="welcome-patronymic" placeholder="Отчество">
+            <label>Дата рождения (ДД.ММ.ГГГГ)</label>
+            <input type="text" id="welcome-birth" placeholder="ДД.ММ.ГГГГ">
+            <label>Место рождения</label>
+            <input type="text" id="welcome-birth-place" value="Минск, Беларусь">
+            <label>Пол</label>
+            <select id="welcome-gender">
+                <option value="Мужской">Мужской</option>
+                <option value="Женский">Женский</option>
+            </select>
+            <hr>
+            <p class="small">* — обязательные поля</p>
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel" id="welcome-skip">Пропустить</button>
+                <button type="button" class="primary" id="welcome-create">Создать</button>
+            </div>
+        </div>`;
+    
+    ov.querySelector("#welcome-skip").onclick = () => ov.remove();
+    ov.querySelector("#welcome-create").onclick = () => {
+        const name = ov.querySelector("#welcome-name").value.trim();
+        const surname = ov.querySelector("#welcome-surname").value.trim();
+        if (!name) { alert("Введите имя."); return; }
+        if (!surname) { alert("Введите фамилию."); return; }
+        
+        fetch("/welcome/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: name,
+                surname: surname,
+                patronymic: ov.querySelector("#welcome-patronymic").value.trim(),
+                birth_date: ov.querySelector("#welcome-birth").value.trim(),
+                birth_place: ov.querySelector("#welcome-birth-place").value.trim(),
+                gender: ov.querySelector("#welcome-gender").value,
+            }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                ov.remove();
+                loadTree();
+                alert(`Добро пожаловать, ${name}! Ваша персона создана.`);
+            } else {
+                alert("Ошибка: " + (data.error || "Неизвестная"));
+            }
+        });
+    };
+    
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+    ov.querySelector("#welcome-name").focus();
+}
