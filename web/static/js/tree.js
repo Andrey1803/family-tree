@@ -2329,74 +2329,86 @@ if ("serviceWorker" in navigator) {
 window.undoManager = new UndoManager(50);
 
 loadPalette();
-loadTree();
+
+// ПРОВЕРЯЕМ admin_view ПЕРЕД загрузкой дерева!
+const urlParamsCheck = new URLSearchParams(window.location.search);
+const isAdminViewCheck = urlParamsCheck.get('admin_view') === '1';
+
+if (isAdminViewCheck) {
+    // Для админ-просмотра НЕ загружаем дерево сразу - загрузим через checkAdminView
+    console.log('[INIT] Admin view detected, skipping initial loadTree()');
+    // Инициализируем пустое дерево
+    treeData = { persons: {}, marriages: [], current_center: null };
+    centerId = null;
+} else {
+    // Обычный режим - загружаем дерево пользователя
+    console.log('[INIT] Normal view, loading tree');
+    loadTree();
+}
+
 setupMenubar();
 setupDesktopAppButtons();
 setupUndoRedo();
 setupAdminButton();
 
+// Проверка режима просмотра из админ-панели (после инициализации)
+if (isAdminViewCheck) {
+    checkAdminView();
+}
+
 // Проверка первого запуска
 checkFirstRun();
-
-// Проверка режима просмотра из админ-панели
-checkAdminView();
 
 async function checkAdminView() {
     // Проверяем, открыли ли дерево из админ-панели
     const urlParams = new URLSearchParams(window.location.search);
     console.log('[ADMIN_VIEW] URL params:', Object.fromEntries(urlParams));
+    console.log('[ADMIN_VIEW] Tree owner:', urlParams.get('tree_owner'));
     
-    if (urlParams.get('admin_view') === '1') {
-        console.log('[ADMIN_VIEW] Admin view detected');
-        
-        const treeOwner = urlParams.get('tree_owner');
-        console.log('[ADMIN_VIEW] Tree owner:', treeOwner);
-        
-        // Пробуем получить данные из localStorage (быстрый путь)
-        const adminTreeData = localStorage.getItem('adminTreeData');
-        console.log('[ADMIN_VIEW] adminTreeData from localStorage:', adminTreeData ? 'found' : 'not found');
-        
-        if (adminTreeData) {
-            try {
-                const treeDataFromStorage = JSON.parse(adminTreeData);
-                console.log('[ADMIN_VIEW] Parsed treeData from localStorage:', treeDataFromStorage);
-                console.log('[ADMIN_VIEW] Persons count:', Object.keys(treeDataFromStorage.persons || {}).length);
-                
-                // Загружаем данные из localStorage
-                treeData = treeDataFromStorage;
-                centerId = treeData.current_center;
-                
-                finalizeAdminView(treeDataFromStorage);
-                return;
-            } catch (e) {
-                console.error('[ADMIN_VIEW] Error parsing localStorage:', e);
-            }
-        }
-        
-        // Если localStorage пуст, пробуем загрузить с сервера
-        console.log('[ADMIN_VIEW] Trying to load from sync server...');
+    // Пробуем получить данные из localStorage (быстрый путь)
+    const adminTreeData = localStorage.getItem('adminTreeData');
+    console.log('[ADMIN_VIEW] adminTreeData from localStorage:', adminTreeData ? 'found' : 'not found');
+    
+    if (adminTreeData) {
         try {
-            const response = await fetch('/api/tree');
-            if (response.ok) {
-                const serverData = await response.json();
-                console.log('[ADMIN_VIEW] Loaded from /api/tree:', serverData);
-                
-                treeData = {
-                    persons: serverData.persons || {},
-                    marriages: serverData.marriages || [],
-                    current_center: serverData.current_center
-                };
-                centerId = treeData.current_center || Object.keys(treeData.persons)[0];
-                
-                finalizeAdminView(treeData);
-            } else {
-                console.error('[ADMIN_VIEW] Failed to load from /api/tree:', response.status);
-                alert('Не удалось загрузить данные дерева. Вернитесь в админ-панель и попробуйте снова.');
-            }
+            const treeDataFromStorage = JSON.parse(adminTreeData);
+            console.log('[ADMIN_VIEW] Parsed treeData from localStorage:', treeDataFromStorage);
+            console.log('[ADMIN_VIEW] Persons count:', Object.keys(treeDataFromStorage.persons || {}).length);
+            
+            // Загружаем данные из localStorage
+            treeData = treeDataFromStorage;
+            centerId = treeData.current_center;
+            
+            finalizeAdminView(treeDataFromStorage);
+            return;
         } catch (e) {
-            console.error('[ADMIN_VIEW] Error loading from server:', e);
-            alert('Ошибка загрузки дерева: ' + e.message);
+            console.error('[ADMIN_VIEW] Error parsing localStorage:', e);
         }
+    }
+    
+    // Если localStorage пуст, пробуем загрузить с сервера
+    console.log('[ADMIN_VIEW] Trying to load from sync server...');
+    try {
+        const response = await fetch('/api/tree');
+        if (response.ok) {
+            const serverData = await response.json();
+            console.log('[ADMIN_VIEW] Loaded from /api/tree:', serverData);
+            
+            treeData = {
+                persons: serverData.persons || {},
+                marriages: serverData.marriages || [],
+                current_center: serverData.current_center
+            };
+            centerId = treeData.current_center || Object.keys(treeData.persons)[0];
+            
+            finalizeAdminView(treeData);
+        } else {
+            console.error('[ADMIN_VIEW] Failed to load from /api/tree:', response.status);
+            alert('Не удалось загрузить данные дерева. Вернитесь в админ-панель и попробуйте снова.');
+        }
+    } catch (e) {
+        console.error('[ADMIN_VIEW] Error loading from server:', e);
+        alert('Ошибка загрузки дерева: ' + e.message);
     }
 }
 
