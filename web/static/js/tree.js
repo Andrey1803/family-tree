@@ -2389,10 +2389,13 @@ async function checkAdminView() {
     // Если localStorage пуст, пробуем загрузить с сервера
     console.log('[ADMIN_VIEW] Trying to load from sync server...');
     try {
-        const response = await fetch('/api/tree');
+        // Передаём tree_owner в запросе!
+        const treeOwner = urlParams.get('tree_owner');
+        const response = await fetch('/api/tree?tree_owner=' + encodeURIComponent(treeOwner));
         if (response.ok) {
             const serverData = await response.json();
             console.log('[ADMIN_VIEW] Loaded from /api/tree:', serverData);
+            console.log('[ADMIN_VIEW] Persons count from server:', Object.keys(serverData.persons || {}).length);
             
             treeData = {
                 persons: serverData.persons || {},
