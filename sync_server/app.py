@@ -330,9 +330,12 @@ def sync_upload():
             'SELECT id FROM family_trees WHERE user_id = ?',
             (g.current_user_id,)
         ).fetchone()
-        
+
         if tree:
             tree_id = tree['id']
+            # Сначала удаляем ВСЕ данные этого пользователя
+            db.execute('DELETE FROM marriages WHERE tree_id = ?', (tree_id,))
+            db.execute('DELETE FROM persons WHERE tree_id = ?', (tree_id,))
             db.execute('UPDATE family_trees SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (tree_id,))
         else:
             cursor = db.execute(
@@ -340,10 +343,6 @@ def sync_upload():
                 (g.current_user_id, tree_name)
             )
             tree_id = cursor.lastrowid
-        
-        # Очищаем старые данные
-        db.execute('DELETE FROM persons WHERE tree_id = ?', (tree_id,))
-        db.execute('DELETE FROM marriages WHERE tree_id = ?', (tree_id,))
         
         # Вставляем персоны
         persons = tree_data.get('persons', {})
