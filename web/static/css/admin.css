@@ -250,10 +250,19 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
+    transition: background 0.2s;
 }
 
 .btn-view:hover {
     background: #2563eb;
+}
+
+.btn-full-tree {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.btn-full-tree:hover {
+    background: linear-gradient(135deg, #16a34a, #15803d);
 }
 
 .btn-toggle {

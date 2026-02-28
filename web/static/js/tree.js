@@ -2338,6 +2338,57 @@ setupAdminButton();
 // Проверка первого запуска
 checkFirstRun();
 
+// Проверка режима просмотра из админ-панели
+checkAdminView();
+
+function checkAdminView() {
+    // Проверяем, открыли ли дерево из админ-панели
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('admin_view') === '1') {
+        const adminTreeData = localStorage.getItem('adminTreeData');
+        if (adminTreeData) {
+            try {
+                const treeDataFromStorage = JSON.parse(adminTreeData);
+                console.log('[ADMIN_VIEW] Loading tree from localStorage:', treeDataFromStorage);
+                
+                // Заменяем данные дерева
+                treeData = treeDataFromStorage;
+                centerId = treeData.current_center;
+                
+                // Показываем информацию о владельце
+                const header = document.querySelector('.tree-header h1');
+                if (header && treeData.treeOwner) {
+                    header.textContent = `🌳 ${treeData.treeName} (владелец: ${treeData.treeOwner})`;
+                }
+                
+                // Перерисовываем дерево
+                render();
+                
+                // Показываем кнопку "Назад в админ-панель"
+                showBackToAdminButton();
+                
+                // Очищаем localStorage
+                localStorage.removeItem('adminTreeData');
+            } catch (e) {
+                console.error('[ADMIN_VIEW] Error loading tree:', e);
+            }
+        }
+    }
+}
+
+function showBackToAdminButton() {
+    // Добавляем кнопку "Назад в админ-панель"
+    const headerRight = document.querySelector('.tree-header-right');
+    if (headerRight) {
+        const backBtn = document.createElement('a');
+        backBtn.href = '/admin';
+        backBtn.textContent = '← Назад в админ-панель';
+        backBtn.className = 'btn-back-admin';
+        backBtn.style.cssText = 'background: #64748b; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; margin-right: 10px;';
+        headerRight.insertBefore(backBtn, headerRight.firstChild);
+    }
+}
+
 function checkFirstRun() {
     // Показываем приветственный диалог, если дерево пусто
     setTimeout(() => {

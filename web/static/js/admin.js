@@ -252,7 +252,8 @@ function renderTreesList(trees) {
                 </div>
             </div>
             <div class="tree-actions">
-                <button class="btn-view" onclick="viewTreeDetails('${t.id}')">Просмотреть</button>
+                <button class="btn-view" onclick="viewTreeDetails('${t.id}')">📋 Список персон</button>
+                <button class="btn-view btn-full-tree" onclick="openFullTree('${t.id}', '${escapeHtml(userLogin)}')">🌳 Открыть полное дерево</button>
             </div>
         </div>
     `}).join('');
@@ -280,6 +281,30 @@ function updateUserFilter() {
         });
         userFilterInitialized = true;
     }
+}
+
+// Открыть полное дерево с визуализацией
+function openFullTree(treeId, userLogin) {
+    const tree = treesData.find(t => String(t.id) === String(treeId));
+    if (!tree) {
+        alert('Дерево не найдено');
+        return;
+    }
+    
+    // Сохраняем дерево в localStorage для передачи на страницу дерева
+    const treeDataForView = {
+        persons: tree.persons,
+        marriages: tree.marriages,
+        current_center: Object.keys(tree.persons)[0] || null,
+        treeName: tree.name,
+        treeOwner: userLogin
+    };
+    
+    localStorage.setItem('adminTreeData', JSON.stringify(treeDataForView));
+    
+    // Открываем страницу дерева в новой вкладке
+    const url = window.location.origin + '/?admin_view=1';
+    window.open(url, '_blank');
 }
 
 // Просмотр деталей дерева
