@@ -2341,50 +2341,82 @@ checkFirstRun();
 // Проверка режима просмотра из админ-панели
 checkAdminView();
 
-function checkAdminView() {
+async function checkAdminView() {
     // Проверяем, открыли ли дерево из админ-панели
     const urlParams = new URLSearchParams(window.location.search);
     console.log('[ADMIN_VIEW] URL params:', Object.fromEntries(urlParams));
     
     if (urlParams.get('admin_view') === '1') {
         console.log('[ADMIN_VIEW] Admin view detected');
+        
+        const treeOwner = urlParams.get('tree_owner');
+        console.log('[ADMIN_VIEW] Tree owner:', treeOwner);
+        
+        // Пробуем получить данные из localStorage (быстрый путь)
         const adminTreeData = localStorage.getItem('adminTreeData');
         console.log('[ADMIN_VIEW] adminTreeData from localStorage:', adminTreeData ? 'found' : 'not found');
         
         if (adminTreeData) {
             try {
                 const treeDataFromStorage = JSON.parse(adminTreeData);
-                console.log('[ADMIN_VIEW] Parsed treeData:', treeDataFromStorage);
+                console.log('[ADMIN_VIEW] Parsed treeData from localStorage:', treeDataFromStorage);
                 console.log('[ADMIN_VIEW] Persons count:', Object.keys(treeDataFromStorage.persons || {}).length);
                 
-                // Заменяем данные дерева
+                // Загружаем данные из localStorage
                 treeData = treeDataFromStorage;
                 centerId = treeData.current_center;
                 
-                // Показываем информацию о владельце
-                const header = document.querySelector('.tree-header h1');
-                if (header && treeData.treeOwner) {
-                    header.textContent = `🌳 ${treeData.treeName} (владелец: ${treeData.treeOwner})`;
-                }
-                
-                // Перерисовываем дерево
-                console.log('[ADMIN_VIEW] Calling render()...');
-                render();
-                
-                // Показываем кнопку "Назад в админ-панель"
-                showBackToAdminButton();
-                
-                // Очищаем localStorage
-                localStorage.removeItem('adminTreeData');
+                finalizeAdminView(treeDataFromStorage);
+                return;
             } catch (e) {
-                console.error('[ADMIN_VIEW] Error loading tree:', e);
-                alert('Ошибка загрузки дерева: ' + e.message);
+                console.error('[ADMIN_VIEW] Error parsing localStorage:', e);
             }
-        } else {
-            console.error('[ADMIN_VIEW] adminTreeData not found in localStorage');
-            alert('Данные дерева не найдены. Вернитесь в админ-панель и попробуйте снова.');
+        }
+        
+        // Если localStorage пуст, пробуем загрузить с сервера
+        console.log('[ADMIN_VIEW] Trying to load from sync server...');
+        try {
+            const response = await fetch('/api/tree');
+            if (response.ok) {
+                const serverData = await response.json();
+                console.log('[ADMIN_VIEW] Loaded from /api/tree:', serverData);
+                
+                treeData = {
+                    persons: serverData.persons || {},
+                    marriages: serverData.marriages || [],
+                    current_center: serverData.current_center
+                };
+                centerId = treeData.current_center || Object.keys(treeData.persons)[0];
+                
+                finalizeAdminView(treeData);
+            } else {
+                console.error('[ADMIN_VIEW] Failed to load from /api/tree:', response.status);
+                alert('Не удалось загрузить данные дерева. Вернитесь в админ-панель и попробуйте снова.');
+            }
+        } catch (e) {
+            console.error('[ADMIN_VIEW] Error loading from server:', e);
+            alert('Ошибка загрузки дерева: ' + e.message);
         }
     }
+}
+
+function finalizeAdminView(treeDataFromStorage) {
+    // Показываем информацию о владельце
+    const header = document.querySelector('.tree-header h1');
+    if (header && treeDataFromStorage.treeOwner) {
+        header.textContent = `🌳 ${treeDataFromStorage.treeName} (владелец: ${treeDataFromStorage.treeOwner})`;
+    }
+    
+    // Перерисовываем дерево
+    console.log('[ADMIN_VIEW] Calling render()...');
+    render();
+    
+    // Показываем кнопку "Назад в админ-панель"
+    showBackToAdminButton();
+    
+    // Очищаем localStorage
+    localStorage.removeItem('adminTreeData');
+    localStorage.removeItem('adminTreeRef');
 }
 
 function showBackToAdminButton() {

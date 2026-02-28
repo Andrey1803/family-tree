@@ -695,10 +695,60 @@ def api_tree():
     username = session["username"]
     server_token = session.get('server_token')
     server_user_id = session.get('server_user_id')
-    
+
     print(f"[API_TREE] username={username}, has_token={server_token is not None}, user_id={server_user_id}")
 
     if request.method == "GET":
+        # Для админа: проверяем, запрашивает ли он дерево конкретного пользователя
+        tree_owner = request.args.get('tree_owner')
+        if username == 'admin' and tree_owner:
+            print(f"[API_TREE] Admin requesting tree for: {tree_owner}")
+            # Админ запрашивает дерево другого пользователя
+            # Загружаем с сервера синхронизации
+            if server_token:
+                try:
+                    # Сначала получаем ID пользователя
+                    users_req = urllib.request.Request(
+                        f"{SYNC_SERVER_URL}/api/admin/users",
+                        headers={'Authorization': f'Bearer {server_token}'},
+                        method='GET'
+                    )
+                    with urllib.request.urlopen(users_req, timeout=10) as users_resp:
+                        users_data = json.loads(users_resp.read().decode())
+                        users_list = users_data.get('users', [])
+                        target_user = next((u for u in users_list if u.get('login') == tree_owner), None)
+                        
+                        if target_user:
+                            target_user_id = target_user.get('id')
+                            # Получаем дерево пользователя
+                            tree_req = urllib.request.Request(
+                                f"{SYNC_SERVER_URL}/api/admin/user/{target_user_id}/trees",
+                                headers={'Authorization': f'Bearer {server_token}'},
+                                method='GET'
+                            )
+                            with urllib.request.urlopen(tree_req, timeout=10) as tree_resp:
+                                tree_data_resp = json.loads(tree_resp.read().decode())
+                                user_trees = tree_data_resp.get('trees', [])
+                                
+                                if user_trees:
+                                    tree = user_trees[0]  # Берём первое дерево
+                                    persons = {str(k): v for k, v in tree.get("persons", {}).items()}
+                                    for p in persons.values():
+                                        if isinstance(p, dict):
+                                            for k in ("parents", "children", "spouse_ids"):
+                                                if k in p and isinstance(p[k], list):
+                                                    p[k] = [str(x) for x in p[k]]
+                                    cc = tree.get("current_center") or next(iter(persons.keys()), None)
+                                    print(f"[API_TREE] Admin loaded tree for {tree_owner}: {len(persons)} persons")
+                                    return jsonify({
+                                        "persons": persons,
+                                        "marriages": tree.get("marriages", []),
+                                        "current_center": cc,
+                                    })
+                except Exception as e:
+                    print(f"[API_TREE] Error loading tree for {tree_owner}: {e}")
+        
+        # Обычная загрузка дерева текущего пользователя
         # Пробуем загрузить с сервера синхронизации
         if server_token:
             try:

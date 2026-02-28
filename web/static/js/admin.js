@@ -310,7 +310,18 @@ function openFullTree(treeId, userLogin) {
     console.log('[ADMIN] Found tree:', tree.name);
     console.log('[ADMIN] Persons count:', Object.keys(tree.persons || {}).length);
 
-    // Сохраняем дерево в localStorage для передачи на страницу дерева
+    // Сохраняем ТОЛЬКО ID дерева и логин, данные загрузим на странице
+    const treeRef = {
+        treeId: treeId,
+        treeName: tree.name,
+        treeOwner: userLogin,
+        personsCount: Object.keys(tree.persons || {}).length
+    };
+
+    console.log('[ADMIN] Saving treeRef to localStorage:', treeRef);
+    localStorage.setItem('adminTreeRef', JSON.stringify(treeRef));
+    
+    // Сохраняем полные данные дерева тоже (на случай если API не сработает)
     const treeDataForView = {
         persons: tree.persons,
         marriages: tree.marriages,
@@ -318,14 +329,17 @@ function openFullTree(treeId, userLogin) {
         treeName: tree.name,
         treeOwner: userLogin
     };
-
-    console.log('[ADMIN] Saving to localStorage:', treeDataForView);
     localStorage.setItem('adminTreeData', JSON.stringify(treeDataForView));
 
     // Открываем страницу дерева в новой вкладке
-    const url = window.location.origin + '/?admin_view=1';
+    const url = window.location.origin + '/?admin_view=1&tree_owner=' + encodeURIComponent(userLogin);
     console.log('[ADMIN] Opening URL:', url);
-    window.open(url, '_blank');
+    const newWindow = window.open(url, '_blank');
+    
+    // Фокус на новую вкладку
+    if (newWindow) {
+        newWindow.focus();
+    }
 }
 
 // Просмотр деталей дерева
