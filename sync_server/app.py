@@ -667,20 +667,48 @@ def health_check():
 def initialize_database():
     """Инициализация БД при старте"""
     import sqlite3
-    DB_FILE = os.environ.get('DATA_DIR', '.') + '/family_tree.db'
+    # Используем DATA_DIR из переменных окружения
+    db_dir = os.environ.get('DATA_DIR', '/data')
+    DB_FILE = os.path.join(db_dir, 'family_tree.db')
+    
+    print(f"📦 DB_DIR: {db_dir}")
+    print(f"📦 DB_FILE: {DB_FILE}")
+    
+    # Создаём директорию если нет
+    try:
+        os.makedirs(db_dir, exist_ok=True)
+        print(f"📦 Dir exists: {os.path.exists(db_dir)}")
+    except Exception as e:
+        print(f"⚠️  Dir create error: {e}")
     
     # Проверяем есть ли таблица users
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-    if not cursor.fetchone():
-        print("📦 Инициализация базы данных...")
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            print("📦 Инициализация базы данных...")
+            conn.close()
+            init_db()
+            print("✅ База данных инициализирована!")
+        else:
+            # Проверяем количество пользователей
+            cursor.execute('SELECT COUNT(*) FROM users')
+            count = cursor.fetchone()[0]
+            print(f"✅ База данных уже инициализирована. Пользователей: {count}")
+            # Выводим логинов
+            cursor.execute('SELECT login FROM users')
+            for row in cursor.fetchall():
+                print(f"   - {row[0]}")
         conn.close()
-        init_db()
-        print("✅ База данных инициализирована!")
-    else:
-        print("✅ База данных уже инициализирована")
-        conn.close()
+    except Exception as e:
+        print(f"❌ DB error: {e}")
+        print("📦 Попытка создания БД...")
+        try:
+            init_db()
+            print("✅ База данных создана!")
+        except Exception as e2:
+            print(f"❌ DB create error: {e2}")
 
 # Авто-инициализация при импорте
 initialize_database()
