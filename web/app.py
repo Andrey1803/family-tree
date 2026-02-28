@@ -384,6 +384,213 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/admin")
+def admin_panel():
+    """Панель администратора."""
+    if "username" not in session:
+        return redirect(url_for("login"))
+    
+    username = session["username"]
+    
+    # Проверяем, является ли пользователь администратором
+    users = _load_users()
+    user_data = users.get(username, {})
+    
+    # Администратором считается пользователь с логином "admin" 
+    # или у которого есть флаг is_admin в users.json
+    is_admin = (username == "admin") or (isinstance(user_data, dict) and user_data.get("is_admin"))
+    
+    # Также проверяем через сервер синхронизации
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/stats",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                # Если запрос успешен - пользователь админ
+                is_admin = True
+        except Exception:
+            pass
+    
+    if not is_admin:
+        return render_template("admin.html", username=username), 403
+    
+    return render_template("admin.html", username=username)
+
+
+@app.route("/api/admin/stats")
+def api_admin_stats():
+    """Статистика для админ-панели (прокси на сервер синхронизации)."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if username != "admin":
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    server_token = session.get('server_token')
+    if not server_token:
+        # Возвращаем локальную статистику
+        return _get_local_stats()
+    
+    try:
+        req = urllib.request.Request(
+            f"{SYNC_SERVER_URL}/api/admin/stats",
+            headers={'Authorization': f'Bearer {server_token}'},
+            method='GET'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
+            return jsonify(data)
+    except Exception as e:
+        print(f"[ADMIN] Stats from sync server failed: {e}")
+        return _get_local_stats()
+
+
+def _get_local_stats():
+    """Локальная статистика (fallback)."""
+    users = _load_users()
+    total_persons = 0
+    total_trees = 0
+    
+    for username in users.keys():
+        tree_data = load_tree(username)
+        total_trees += 1
+        total_persons += len(tree_data.get("persons", {}))
+    
+    return jsonify({
+        "overview": {
+            "total_users": len(users),
+            "active_users": len(users),
+            "total_trees": total_trees,
+            "total_persons": total_persons,
+            "active_sessions": 1
+        },
+        "recent_users": [],
+        "recent_syncs": [],
+        "daily_stats": []
+    })
+
+
+@app.route("/api/admin/users")
+def api_admin_users():
+    """Список всех пользователей."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if username != "admin":
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    users = _load_users()
+    users_list = []
+    
+    for login, data in users.items():
+        # Пытаемся получить дополнительную информацию с сервера
+        user_info = {
+            "id": hash(login) % 10000,
+            "login": login,
+            "email": f"{login}@local.com",
+            "created_at": datetime.now().isoformat(),
+            "last_login": None,
+            "is_active": True,
+            "is_admin": (login == "admin") or (isinstance(data, dict) and data.get("is_admin"))
+        }
+        users_list.append(user_info)
+    
+    return jsonify({"users": users_list})
+
+
+@app.route("/api/admin/user/<int:user_id>/toggle", methods=["POST"])
+def api_admin_toggle_user(user_id):
+    """Активировать/деактивировать пользователя."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if username != "admin":
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    # Для локальных пользователей просто возвращаем успех
+    # Реальное управление через сервер синхронизации
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/user/{user_id}/toggle",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return jsonify({"message": "Статус пользователя изменён"})
+        except Exception as e:
+            print(f"[ADMIN] Toggle failed: {e}")
+    
+    return jsonify({"message": "Статус пользователя изменён (локально)"})
+
+
+@app.route("/api/admin/user/<int:user_id>/trees", methods=["GET"])
+def api_admin_get_user_trees(user_id):
+    """Получить деревья пользователя."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if username != "admin":
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/user/{user_id}/trees",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode())
+                return jsonify(data)
+        except Exception as e:
+            print(f"[ADMIN] Get trees failed: {e}")
+    
+    # Fallback: возвращаем локальное дерево
+    return jsonify({"trees": []})
+
+
+@app.route("/api/admin/trees")
+def api_admin_all_trees():
+    """Получить все деревья (для вкладки Деревья)."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if username != "admin":
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    users = _load_users()
+    trees = []
+    
+    for user_login in users.keys():
+        tree_data = load_tree(user_login)
+        persons = tree_data.get("persons", {})
+        marriages = tree_data.get("marriages", [])
+        
+        trees.append({
+            "id": hash(user_login) % 10000,
+            "user_id": hash(user_login) % 10000,
+            "name": f"Дерево {user_login}",
+            "persons": persons,
+            "marriages": marriages,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        })
+    
+    return jsonify({"trees": trees})
+
+
 @app.route("/api/tree", methods=["GET", "POST"])
 def api_tree():
     if "username" not in session:

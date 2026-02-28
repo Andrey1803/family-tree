@@ -25,6 +25,10 @@
             <input type="hidden" name="guest" value="1">
             <button type="submit" class="btn-guest">Войти без регистрации</button>
         </form>
+        <div class="admin-login-hint">
+            <p>👑 Администратор?</p>
+            <button type="button" class="btn-admin-login" onclick="fillAdminCredentials()">Войти как admin</button>
+        </div>
     </div>
     
     <script>
@@ -112,6 +116,11 @@
             errorDiv.textContent = 'Ошибка подключения к серверу';
         }
     });
+    
+    function fillAdminCredentials() {
+        document.getElementById('login').value = 'admin';
+        document.getElementById('password').focus();
+    }
     </script>
 </body>
 </html>

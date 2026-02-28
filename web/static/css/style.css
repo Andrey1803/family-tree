@@ -103,6 +103,38 @@ body {
 
 .btn-guest:hover { background: #f1f5f9; }
 
+.admin-login-hint {
+  margin-top: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.admin-login-hint p {
+  margin: 0 0 8px 0;
+  color: #7c3aed;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.btn-admin-login {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.btn-admin-login:hover {
+  opacity: 0.9;
+}
+
 /* Tree page */
 .tree-header {
   display: flex;
@@ -252,6 +284,18 @@ body {
 }
 .btn-pwa-install:hover, .btn-pwa-open:hover { opacity: 0.9; }
 .btn-pwa-open { background: transparent; color: var(--card-male); }
+.btn-admin {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #a855f7;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.btn-admin:hover { opacity: 0.9; }
 .desktop-app-hint {
   cursor: pointer;
   color: #64748b;
