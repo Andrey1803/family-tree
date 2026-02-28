@@ -7,12 +7,12 @@
 # SMTP настройки
 SMTP_SERVER = "smtp.gmail.com"  # или smtp.yandex.ru
 SMTP_PORT = 587  # 587 для TLS, 465 для SSL
-SMTP_LOGIN = "your-email@gmail.com"  # Ваш email
-SMTP_PASSWORD = "your-app-password"  # Пароль приложения (не обычный пароль!)
+SMTP_LOGIN = "familyroots010326@gmail.com"  # Ваш email
+SMTP_PASSWORD = "zsyanddzbfdbwgtj"  # Пароль приложения (не обычный пароль!)
 SMTP_USE_TLS = True
 
 # От кого
-EMAIL_FROM = "Family Tree <your-email@gmail.com>"
+EMAIL_FROM = "Family Tree <familyroots010326@gmail.com>"
 EMAIL_SUBJECT = "Код подтверждения регистрации"
 
 # Время жизни кода (секунды)
