@@ -326,15 +326,29 @@ def api_session():
     data = request.get_json() or {}
     token = data.get('token')
     user_id = data.get('user_id')
-    login = data.get('login')  # Добавляем логин
+    login = data.get('login')
 
     if token:
         session['server_token'] = token
         session['server_user_id'] = user_id
-        # Сохраняем username для редиректа
         if login:
             session['username'] = login
-        return jsonify({"ok": True}), 200
+        
+        # Проверяем, что токен работает
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/sync/download",
+                headers={'Authorization': f'Bearer {token}'},
+                method='GET'
+            )
+            resp = urllib.request.urlopen(req, timeout=10)
+            tree_data = json.loads(resp.read().decode())
+            persons_count = len(tree_data.get('tree', {}).get('persons', {}))
+            print(f"[SESSION] Token OK, persons: {persons_count}")
+            return jsonify({"ok": True, "persons": persons_count}), 200
+        except Exception as e:
+            print(f"[SESSION] Token check failed: {e}")
+            return jsonify({"error": str(e)}), 500
 
     return jsonify({"error": "No token"}), 400
 
