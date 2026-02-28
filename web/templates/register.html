@@ -10,65 +10,212 @@
     <div class="auth-card">
         <h1>Регистрация</h1>
         <div id="error" class="error" style="color: red; margin: 10px 0;"></div>
+        
+        <!-- Шаг 1: Ввод данных -->
         <form id="registerForm">
-            <label>Логин</label>
-            <input type="text" name="login" id="login" value="{{ login or '' }}" required autofocus>
-            <label>Пароль</label>
-            <input type="password" name="password" id="password" required minlength="4">
-            <label>Повторите пароль</label>
-            <input type="password" name="password2" id="password2" required minlength="4">
+            <label>Логин *</label>
+            <input type="text" name="login" id="login" value="{{ login or '' }}" required autofocus placeholder="Придумайте логин">
+            
+            <label>Email *</label>
+            <input type="email" name="email" id="email" required placeholder="your@email.com">
+            <small style="color: #64748b; font-size: 12px;">На этот email будет отправлен код подтверждения</small>
+            
+            <label>Пароль *</label>
+            <input type="password" name="password" id="password" required minlength="4" placeholder="Минимум 4 символа">
+            
+            <label>Повторите пароль *</label>
+            <input type="password" name="password2" id="password2" required minlength="4" placeholder="Повторите пароль">
+            
             <div class="auth-buttons">
-                <button type="submit">Зарегистрироваться</button>
+                <button type="submit">Отправить код</button>
                 <a href="{{ url_for('login') }}" class="btn-link">Назад к входу</a>
             </div>
         </form>
-    </div>
-    
-    <script>
-    // URL сервера синхронизации
-    const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
-    
-    document.getElementById('registerForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
         
+        <!-- Шаг 2: Ввод кода -->
+        <form id="verifyForm" style="display: none;">
+            <h3 style="margin-top: 20px;">✅ Код отправлен!</h3>
+            <p style="font-size: 14px; color: #64748b;">
+                Введите код из письма, отправленного на <strong id="verify-email"></strong>
+            </p>
+            
+            <label>Код подтверждения *</label>
+            <input type="text" name="code" id="code" required maxlength="6" pattern="[0-9]{6}" 
+                   placeholder="123456" style="font-size: 24px; letter-spacing: 5px; text-align: center;">
+            
+            <input type="hidden" id="verify-login">
+            <input type="hidden" id="verify-password">
+            <input type="hidden" id="verify-email-hidden">
+            
+            <div class="auth-buttons">
+                <button type="submit" class="primary">Подтвердить</button>
+                <button type="button" id="resend-code" style="background: #64748b;">Отправить код повторно</button>
+                <button type="button" id="cancel-verify" style="background: transparent; color: #64748b; border: 1px solid #64748b;">Назад</button>
+            </div>
+            
+            <p id="resend-timer" style="font-size: 12px; color: #64748b; margin-top: 10px;"></p>
+        </form>
+    </div>
+
+    <script>
+    const registerForm = document.getElementById('registerForm');
+    const verifyForm = document.getElementById('verifyForm');
+    const errorDiv = document.getElementById('error');
+
+    // Шаг 1: Отправка данных и кода
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
         const login = document.getElementById('login').value.trim();
+        const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
         const password2 = document.getElementById('password2').value;
-        const errorDiv = document.getElementById('error');
-        
+
         if (password !== password2) {
             errorDiv.textContent = 'Пароли не совпадают';
             return;
         }
-        
-        errorDiv.textContent = 'Регистрация...';
-        
+
+        if (password.length < 4) {
+            errorDiv.textContent = 'Пароль должен быть не менее 4 символов';
+            return;
+        }
+
+        errorDiv.textContent = 'Отправка кода подтверждения...';
+
         try {
-            const response = await fetch(SYNC_SERVER_URL + '/api/auth/register', {
+            // Отправляем запрос на отправку кода
+            const response = await fetch('/api/auth/send-code', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    login: login,
-                    password: password,
-                    email: login + '@local.com'
-                })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({login: login, email: email, password: password})
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
-                // Успех — перенаправляем на вход
-                window.location.href = '/login';
+                // Переходим к шагу 2
+                registerForm.style.display = 'none';
+                verifyForm.style.display = 'block';
+                document.getElementById('verify-email').textContent = email;
+                document.getElementById('verify-email-hidden').value = email;
+                document.getElementById('verify-login').value = login;
+                document.getElementById('verify-password').value = password;
+                errorDiv.textContent = '';
+                
+                // Запускаем таймер для повторной отправки
+                startResendTimer();
             } else {
-                errorDiv.textContent = data.error || data.message || 'Ошибка регистрации';
+                errorDiv.textContent = data.error || 'Ошибка отправки кода';
             }
         } catch (err) {
             errorDiv.textContent = 'Ошибка подключения к серверу';
             console.error(err);
         }
     });
+
+    // Шаг 2: Проверка кода и регистрация
+    verifyForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const login = document.getElementById('verify-login').value;
+        const email = document.getElementById('verify-email-hidden').value;
+        const password = document.getElementById('verify-password').value;
+        const code = document.getElementById('code').value.trim();
+
+        errorDiv.textContent = 'Проверка кода...';
+
+        try {
+            // Проверяем код
+            const verifyResp = await fetch('/api/auth/verify-code', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email, code: code})
+            });
+
+            const verifyData = await verifyResp.json();
+
+            if (!verifyResp.ok) {
+                errorDiv.textContent = verifyData.error || 'Неверный код';
+                return;
+            }
+
+            // Код верный - регистрируем пользователя
+            const regResp = await fetch(SYNC_SERVER_URL + '/api/auth/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({login: login, password: password, email: email})
+            });
+
+            const regData = await regResp.json();
+
+            if (regResp.ok) {
+                // Успех - перенаправляем на вход
+                window.location.href = '/login?registered=1';
+            } else {
+                errorDiv.textContent = regData.error || regData.message || 'Ошибка регистрации';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Ошибка подключения к серверу';
+            console.error(err);
+        }
+    });
+
+    // Отправка кода повторно
+    document.getElementById('resend-code').addEventListener('click', async function() {
+        const login = document.getElementById('verify-login').value;
+        const email = document.getElementById('verify-email-hidden').value;
+        
+        errorDiv.textContent = 'Отправка кода...';
+        
+        try {
+            const response = await fetch('/api/auth/send-code', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({login: login, email: email})
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                errorDiv.textContent = 'Код отправлен повторно!';
+                startResendTimer();
+            } else {
+                errorDiv.textContent = data.error || 'Ошибка отправки кода';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Ошибка подключения к серверу';
+        }
+    });
+
+    // Отмена и возврат к форме регистрации
+    document.getElementById('cancel-verify').addEventListener('click', function() {
+        verifyForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        errorDiv.textContent = '';
+    });
+
+    // Таймер для повторной отправки
+    let resendTimeout = 60; // 60 секунд
+    function startResendTimer() {
+        resendTimeout = 60;
+        const timerEl = document.getElementById('resend-timer');
+        const resendBtn = document.getElementById('resend-code');
+        resendBtn.disabled = true;
+        resendBtn.style.opacity = '0.5';
+        
+        const interval = setInterval(() => {
+            resendTimeout--;
+            if (resendTimeout <= 0) {
+                clearInterval(interval);
+                timerEl.textContent = '';
+                resendBtn.disabled = false;
+                resendBtn.style.opacity = '1';
+            } else {
+                timerEl.textContent = `Повторная отправка доступна через ${resendTimeout} сек.`;
+            }
+        }, 1000);
+    }
     </script>
 </body>
 </html>

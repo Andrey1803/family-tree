@@ -212,6 +212,15 @@ def auth_register(login: str, password: str):
 
 from tree_service import load_tree, save_tree, DATA_DIR
 
+# Импортируем email сервис
+try:
+    from email_service import send_verification_code, verify_code, cleanup_expired_codes
+except ImportError:
+    # Если email_service не доступен
+    def send_verification_code(email): return None
+    def verify_code(email, code): return False
+    def cleanup_expired_codes(): pass
+
 # Создать папку данных, если её нет (для Railway)
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -392,6 +401,64 @@ def api_login_local():
         return jsonify({"ok": True}), 200
 
     return jsonify({"error": "Неверный логин или пароль"}), 401
+
+
+@app.route("/api/auth/send-code", methods=["POST"])
+def api_send_code():
+    """Отправить код подтверждения на email."""
+    data = request.get_json() or {}
+    email = data.get('email', '').strip()
+    login = data.get('login', '').strip()
+    
+    if not email:
+        return jsonify({"error": "Введите email"}), 400
+    
+    # Проверяем формат email
+    if '@' not in email or '.' not in email:
+        return jsonify({"error": "Неверный формат email"}), 400
+    
+    # Проверяем, не занят ли email
+    try:
+        req = urllib.request.Request(
+            f"{SYNC_SERVER_URL}/api/auth/check-email",
+            data=json.dumps({"email": email}).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            check_data = json.loads(resp.read().decode())
+            if check_data.get('exists'):
+                return jsonify({"error": "Этот email уже зарегистрирован"}), 400
+    except:
+        pass  # Игнорируем ошибки проверки
+    
+    # Отправляем код
+    code = send_verification_code(email)
+    
+    if code:
+        # Для тестирования возвращаем код в ответе (удалить в production!)
+        return jsonify({
+            "message": "Код отправлен",
+            "test_code": code  # УДАЛИТЬ в production!
+        }), 200
+    else:
+        return jsonify({"error": "Ошибка отправки кода"}), 500
+
+
+@app.route("/api/auth/verify-code", methods=["POST"])
+def api_verify_code():
+    """Проверить код подтверждения."""
+    data = request.get_json() or {}
+    email = data.get('email', '').strip()
+    code = data.get('code', '').strip()
+    
+    if not email or not code:
+        return jsonify({"error": "Введите email и код"}), 400
+    
+    if verify_code(email, code):
+        return jsonify({"message": "Код подтверждён"}), 200
+    else:
+        return jsonify({"error": "Неверный код или истёк срок действия"}), 400
 
 
 @app.route("/sw.js")
