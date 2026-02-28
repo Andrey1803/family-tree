@@ -2300,6 +2300,18 @@ function setupDesktopAppButtons() {
     }
 }
 
+function setupAdminButton() {
+    const btnAdmin = document.getElementById("btn-admin");
+    if (!btnAdmin) return;
+    
+    // Показываем кнопку для пользователя admin
+    // Используем data-атрибут, который устанавливается в шаблоне
+    const isAdmin = document.body.dataset.isAdmin === "true";
+    if (isAdmin) {
+        btnAdmin.style.display = "inline-block";
+    }
+}
+
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
 }
@@ -2312,6 +2324,7 @@ loadTree();
 setupMenubar();
 setupDesktopAppButtons();
 setupUndoRedo();
+setupAdminButton();
 
 // Проверка первого запуска
 checkFirstRun();

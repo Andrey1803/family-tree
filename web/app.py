@@ -392,15 +392,18 @@ def admin_panel():
     
     username = session["username"]
     
-    # Проверяем, является ли пользователь администратором
+    # Администратором считается пользователь с логином "admin"
+    # Это простая проверка по имени (для совместимости с desktop-версией)
+    if username == "admin":
+        return render_template("admin.html", username=username)
+    
+    # Проверяем флаг is_admin в локальных пользователях
     users = _load_users()
     user_data = users.get(username, {})
+    if isinstance(user_data, dict) and user_data.get("is_admin"):
+        return render_template("admin.html", username=username)
     
-    # Администратором считается пользователь с логином "admin" 
-    # или у которого есть флаг is_admin в users.json
-    is_admin = (username == "admin") or (isinstance(user_data, dict) and user_data.get("is_admin"))
-    
-    # Также проверяем через сервер синхронизации
+    # Проверяем через сервер синхронизации (если есть токен)
     server_token = session.get('server_token')
     if server_token:
         try:
@@ -411,14 +414,12 @@ def admin_panel():
             )
             with urllib.request.urlopen(req, timeout=5) as response:
                 # Если запрос успешен - пользователь админ
-                is_admin = True
-        except Exception:
-            pass
+                return render_template("admin.html", username=username)
+        except Exception as e:
+            print(f"[ADMIN] Access denied for {username}: {e}")
     
-    if not is_admin:
-        return render_template("admin.html", username=username), 403
-    
-    return render_template("admin.html", username=username)
+    # Доступ запрещён
+    return render_template("admin.html", username=username), 403
 
 
 @app.route("/api/admin/stats")
