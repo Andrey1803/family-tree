@@ -2422,6 +2422,15 @@ function finalizeAdminView(treeDataFromStorage) {
         header.textContent = `🌳 ${treeDataFromStorage.treeName} (владелец: ${treeDataFromStorage.treeOwner})`;
     }
     
+    // Нормализуем браки (преобразуем из {persons: [a,b]} в [a,b])
+    if (treeData.marriages && treeData.marriages.length) {
+        treeData.marriages = treeData.marriages.map(m => {
+            if (Array.isArray(m)) return m;
+            if (m.persons && Array.isArray(m.persons)) return m.persons;
+            return [];
+        }).filter(m => m.length === 2);
+    }
+    
     // Перерисовываем дерево
     console.log('[ADMIN_VIEW] Calling render()...');
     render();
