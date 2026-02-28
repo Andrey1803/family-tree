@@ -519,14 +519,32 @@ def api_admin_users():
     """Список всех пользователей."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
     if username != "admin":
         return jsonify({"error": "Требуется права администратора"}), 403
-    
+
+    # Пробуем загрузить с сервера синхронизации
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/users",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                server_data = json.loads(response.read().decode())
+                # Возвращаем данные с сервера
+                return jsonify(server_data)
+        except Exception as e:
+            print(f"[ADMIN] Error loading users from sync server: {e}")
+            # Fallback на локальные данные
+
+    # Локальные данные (fallback)
     users = _load_users()
     users_list = []
-    
+
     for login, data in users.items():
         # Пытаемся получить дополнительную информацию с сервера
         user_info = {
@@ -539,7 +557,7 @@ def api_admin_users():
             "is_admin": (login == "admin") or (isinstance(data, dict) and data.get("is_admin"))
         }
         users_list.append(user_info)
-    
+
     return jsonify({"users": users_list})
 
 
