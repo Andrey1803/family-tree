@@ -550,7 +550,7 @@ def api_admin_users():
         user_info = {
             "id": hash(login) % 10000,
             "login": login,
-            "email": f"{login}@local.com",
+            "email": None,  # Заглушка для локальных пользователей
             "created_at": datetime.now().isoformat(),
             "last_login": None,
             "is_active": True,
