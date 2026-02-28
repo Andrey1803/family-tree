@@ -19,7 +19,7 @@ REMEMBER_FILE = "login_remember.json"
 USER_CREDENTIALS = {
     "Гость": {"login": "guest", "password": "guest123"},
     "Емельянов Андрей": {"login": "andrey", "password": "andrey123"},
-    "Андрей Емельянов": {"login": "admin", "password": "admin123"},  # Для локального входа
+    "Андрей Емельянов": {"login": "Андрей Емельянов", "password": "18031981asdF"},  # Правильный пароль
 }
 
 
