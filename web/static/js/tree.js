@@ -2313,11 +2313,19 @@ function setupAdminButton() {
     const btnAdmin = document.getElementById("btn-admin");
     if (!btnAdmin) return;
     
-    // Показываем кнопку для пользователя admin
-    // Используем data-атрибут, который устанавливается в шаблоне
-    const isAdmin = document.body.dataset.isAdmin === "true";
-    if (isAdmin) {
-        btnAdmin.style.display = "inline-block";
+    // Показываем кнопку для пользователя admin, только если он НЕ на админ-панели
+    // Но так как admin теперь сразу попадает на /admin, кнопка ему не нужна
+    // Показываем кнопку только для других пользователей с правами админа
+    const username = "{{ username }}";
+    if (username === "admin") {
+        // Админу кнопка не нужна - он уже в админ-панели
+        btnAdmin.style.display = "none";
+    } else {
+        // Для других пользователей с is_admin показываем кнопку
+        const isAdmin = document.body.dataset.isAdmin === "true";
+        if (isAdmin) {
+            btnAdmin.style.display = "inline-block";
+        }
     }
 }
 

@@ -262,6 +262,9 @@ def download_exe():
 def login():
     if request.method == "GET":
         if "username" in session:
+            # Админу сразу перенаправляем на админ-панель
+            if session["username"] == "admin":
+                return redirect(url_for("admin_panel"))
             return redirect(url_for("index"))
         return render_template("login.html")
     login_val = (request.form.get("login") or "").strip()
@@ -276,6 +279,9 @@ def login():
         return render_template("login.html", error="Введите пароль.", login=login_val)
     if auth_check(login_val, password_val):
         session["username"] = login_val
+        # Админу сразу перенаправляем на админ-панель
+        if login_val == "admin":
+            return redirect(url_for("admin_panel"))
         return redirect(url_for("index"))
     return render_template("login.html", error="Неверный логин или пароль.", login=login_val)
 
