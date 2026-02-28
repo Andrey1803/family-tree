@@ -583,30 +583,93 @@ def api_admin_all_trees():
     """Получить все деревья (для вкладки Деревья)."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
     if username != "admin":
         return jsonify({"error": "Требуется права администратора"}), 403
-    
-    users = _load_users()
-    trees = []
-    
-    for user_login in users.keys():
-        tree_data = load_tree(user_login)
-        persons = tree_data.get("persons", {})
-        marriages = tree_data.get("marriages", [])
-        
-        trees.append({
-            "id": hash(user_login) % 10000,
-            "user_id": hash(user_login) % 10000,
-            "name": f"Дерево {user_login}",
-            "persons": persons,
-            "marriages": marriages,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        })
-    
-    return jsonify({"trees": trees})
+
+    # Пробуем получить деревья с сервера синхронизации
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            # Получаем список пользователей с сервера
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/users",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                users_data = json.loads(response.read().decode())
+                users_list = users_data.get('users', [])
+                
+                trees = []
+                for user in users_list:
+                    user_login = user.get('login')
+                    user_id = user.get('id')
+                    
+                    # Получаем дерево пользователя
+                    try:
+                        tree_req = urllib.request.Request(
+                            f"{SYNC_SERVER_URL}/api/admin/user/{user_id}/trees",
+                            headers={'Authorization': f'Bearer {server_token}'},
+                            method='GET'
+                        )
+                        with urllib.request.urlopen(tree_req, timeout=10) as tree_resp:
+                            tree_data = json.loads(tree_resp.read().decode())
+                            user_trees = tree_data.get('trees', [])
+                            
+                            for tree in user_trees:
+                                trees.append({
+                                    "id": tree.get('id'),
+                                    "user_id": user_id,
+                                    "user_login": user_login,
+                                    "name": tree.get('name', f"Дерево {user_login}"),
+                                    "persons": tree.get('persons', {}),
+                                    "marriages": tree.get('marriages', []),
+                                    "created_at": tree.get('created_at'),
+                                    "updated_at": tree.get('updated_at')
+                                })
+                    except Exception as e:
+                        print(f"[ADMIN] Error loading tree for {user_login}: {e}")
+                
+                return jsonify({"trees": trees})
+                
+        except Exception as e:
+            print(f"[ADMIN] Error loading from sync server: {e}")
+            # Fallback на локальные данные
+
+    # Локальные данные (fallback)
+    try:
+        users = _load_users()
+        trees = []
+
+        for user_login in users.keys():
+            # Пропускаем admin - у него нет дерева
+            if user_login == "admin":
+                continue
+                
+            try:
+                tree_data = load_tree(user_login)
+                persons = tree_data.get("persons", {})
+                marriages = tree_data.get("marriages", [])
+
+                trees.append({
+                    "id": hash(user_login) % 10000,
+                    "user_id": hash(user_login) % 10000,
+                    "user_login": user_login,
+                    "name": f"Дерево {user_login}",
+                    "persons": persons,
+                    "marriages": marriages,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                })
+            except Exception as e:
+                print(f"[ADMIN] Error loading local tree for {user_login}: {e}")
+
+        return jsonify({"trees": trees})
+    except Exception as e:
+        print(f"[ADMIN] Error loading local trees: {e}")
+        return jsonify({"trees": []})
 
 
 @app.route("/api/tree", methods=["GET", "POST"])
