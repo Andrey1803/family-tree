@@ -386,14 +386,13 @@ def logout():
 
 @app.route("/admin")
 def admin_panel():
-    """Панель администратора."""
+    """Панель администратора — только статистика и просмотр чужих деревьев."""
     if "username" not in session:
         return redirect(url_for("login"))
     
     username = session["username"]
     
     # Администратором считается пользователь с логином "admin"
-    # Это простая проверка по имени (для совместимости с desktop-версией)
     if username == "admin":
         return render_template("admin.html", username=username)
     
@@ -429,12 +428,30 @@ def api_admin_stats():
         return jsonify({"error": "Не авторизован"}), 401
     
     username = session["username"]
+    # Администратор = пользователь с логином "admin"
     if username != "admin":
-        return jsonify({"error": "Требуется права администратора"}), 403
+        # Проверяем флаг is_admin локально
+        users = _load_users()
+        user_data = users.get(username, {})
+        if not (isinstance(user_data, dict) and user_data.get("is_admin")):
+            return jsonify({"error": "Требуется права администратора"}), 403
     
     server_token = session.get('server_token')
     if not server_token:
         # Возвращаем локальную статистику
+        return _get_local_stats()
+    
+    try:
+        req = urllib.request.Request(
+            f"{SYNC_SERVER_URL}/api/admin/stats",
+            headers={'Authorization': f'Bearer {server_token}'},
+            method='GET'
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
+            return jsonify(data)
+    except Exception as e:
+        print(f"[ADMIN] Stats from sync server failed: {e}")
         return _get_local_stats()
     
     try:

@@ -1,5 +1,6 @@
 /**
  * Админ-панель — Семейное древо
+ * ТОЛЬКО статистика и просмотр деревьев других пользователей
  */
 
 let usersData = [];
@@ -30,7 +31,7 @@ function setupTabs() {
             
             // Загрузка данных для вкладки
             if (tabId === 'users') loadUsers();
-            if (tabId === 'trees') loadTrees();
+            if (tabId === 'trees') loadAllTrees();  // Загружаем ВСЕ деревья
         });
     });
 }
@@ -187,7 +188,29 @@ async function viewUserTrees(userId) {
     document.querySelector('[data-tab="trees"]').click();
 }
 
-// Загрузка деревьев
+// Загрузка всех деревьев (для вкладки Деревья)
+async function loadAllTrees() {
+    try {
+        // Сначала загружаем пользователей для фильтра
+        if (!usersData.length) {
+            await loadUsers();
+        }
+        
+        const r = await fetch('/api/admin/trees');
+        if (!r.ok) throw new Error('Ошибка загрузки деревьев');
+        const data = await r.json();
+        treesData = data.trees || [];
+        
+        renderTreesList(treesData);
+        updateUserFilter();
+        
+    } catch (err) {
+        console.error('Trees error:', err);
+        document.getElementById('trees-list').innerHTML = '<div class="muted">Ошибка загрузки деревьев</div>';
+    }
+}
+
+// Загрузка деревьев конкретного пользователя
 async function loadTrees(userId = null) {
     try {
         const url = userId ? `/api/admin/user/${userId}/trees` : '/api/admin/trees';
@@ -230,15 +253,27 @@ function renderTreesList(trees) {
 }
 
 // Обновление фильтра пользователей
-async function updateUserFilter() {
+let userFilterInitialized = false;
+
+function updateUserFilter() {
     const select = document.getElementById('user-filter');
     select.innerHTML = '<option value="">Все пользователи</option>' +
         usersData.map(u => `<option value="${u.id}">${escapeHtml(u.login)}</option>`).join('');
-    
-    select.addEventListener('change', () => {
-        const userId = select.value || null;
-        loadTrees(userId ? parseInt(userId) : null);
-    });
+
+    // Предотвращаем дублирование обработчика
+    if (!userFilterInitialized) {
+        select.addEventListener('change', () => {
+            const userId = select.value || null;
+            if (userId) {
+                // Фильтруем деревья по пользователю
+                const userTrees = treesData.filter(t => t.user_id == userId);
+                renderTreesList(userTrees);
+            } else {
+                renderTreesList(treesData);
+            }
+        });
+        userFilterInitialized = true;
+    }
 }
 
 // Просмотр деталей дерева
