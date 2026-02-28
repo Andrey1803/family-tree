@@ -326,10 +326,14 @@ def api_session():
     data = request.get_json() or {}
     token = data.get('token')
     user_id = data.get('user_id')
+    login = data.get('login')  # Добавляем логин
 
     if token:
         session['server_token'] = token
         session['server_user_id'] = user_id
+        # Сохраняем username для редиректа
+        if login:
+            session['username'] = login
         return jsonify({"ok": True}), 200
 
     return jsonify({"error": "No token"}), 400
