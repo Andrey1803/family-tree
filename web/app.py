@@ -336,19 +336,34 @@ def api_session():
         session['server_user_id'] = user_id
         if login:
             session['username'] = login
-        
+
         # Проверяем, что токен работает
+        # Для админа проверяем через /api/admin/stats, для остальных через /api/sync/download
         try:
-            req = urllib.request.Request(
-                f"{SYNC_SERVER_URL}/api/sync/download",
-                headers={'Authorization': f'Bearer {token}'},
-                method='GET'
-            )
-            resp = urllib.request.urlopen(req, timeout=10)
-            tree_data = json.loads(resp.read().decode())
-            persons_count = len(tree_data.get('tree', {}).get('persons', {}))
-            print(f"[SESSION] Token OK, persons: {persons_count}")
-            return jsonify({"ok": True, "persons": persons_count}), 200
+            if login == 'admin':
+                # Админ проверяется через admin/stats
+                req = urllib.request.Request(
+                    f"{SYNC_SERVER_URL}/api/admin/stats",
+                    headers={'Authorization': f'Bearer {token}'},
+                    method='GET'
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    stats = json.loads(resp.read().decode())
+                    total_persons = stats.get('overview', {}).get('total_persons', 0)
+                    print(f"[SESSION] Admin token OK, total persons on server: {total_persons}")
+                    return jsonify({"ok": True, "persons": total_persons, "is_admin": True}), 200
+            else:
+                # Обычные пользователи через sync/download
+                req = urllib.request.Request(
+                    f"{SYNC_SERVER_URL}/api/sync/download",
+                    headers={'Authorization': f'Bearer {token}'},
+                    method='GET'
+                )
+                resp = urllib.request.urlopen(req, timeout=10)
+                tree_data = json.loads(resp.read().decode())
+                persons_count = len(tree_data.get('tree', {}).get('persons', {}))
+                print(f"[SESSION] Token OK, persons: {persons_count}")
+                return jsonify({"ok": True, "persons": persons_count}), 200
         except Exception as e:
             print(f"[SESSION] Token check failed: {e}")
             return jsonify({"error": str(e)}), 500
