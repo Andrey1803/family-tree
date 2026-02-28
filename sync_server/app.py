@@ -487,9 +487,9 @@ def sync_download():
             'chronic_conditions': row['chronic_conditions'] or '',
             'links': json.loads(row['links'] or '[]'),
             'photo_album': json.loads(row['photo_album'] or '[]'),
-            'parents': set(json.loads(row['parents'] or '[]')),
-            'children': set(json.loads(row['children'] or '[]')),
-            'spouse_ids': set(json.loads(row['spouse_ids'] or '[]')),
+            'parents': json.loads(row['parents'] or '[]'),
+            'children': json.loads(row['children'] or '[]'),
+            'spouse_ids': json.loads(row['spouse_ids'] or '[]'),
             'collapsed_branches': bool(row['collapsed_branches'])
         }
     
