@@ -322,10 +322,17 @@ class SyncClient:
 
         if marriages_list:
             for marriage in marriages_list:
-                if hasattr(marriage, '__iter__'):
-                    tree_data['marriages'].append(list(marriage))
-                else:
+                if hasattr(marriage, '__iter__') and not isinstance(marriage, dict):
+                    marr_list = list(marriage)
+                    # Формат: {'persons': [id1, id2], 'date': ''}
+                    tree_data['marriages'].append({
+                        'persons': marr_list[:2] if len(marr_list) >= 2 else marr_list,
+                        'date': marr_list[2] if len(marr_list) > 2 else ''
+                    })
+                elif isinstance(marriage, dict):
                     tree_data['marriages'].append(marriage)
+                else:
+                    tree_data['marriages'].append({'persons': [marriage], 'date': ''})
 
         print(f"[SYNC] Persons: {len(tree_data['persons'])}, Marriages: {len(tree_data['marriages'])}")
 
