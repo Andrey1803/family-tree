@@ -19,7 +19,11 @@
                     <button type="button" data-action="save">Сохранить</button>
                     <hr>
                     <button type="button" data-action="export-csv">Экспорт в CSV</button>
+                    <button type="button" data-action="export-pdf">Экспорт в PDF</button>
                     <button type="button" data-action="import-csv">Импорт из CSV</button>
+                    <hr>
+                    <button type="button" data-action="backup-create">Создать резервную копию</button>
+                    <button type="button" data-action="backup-list">Управление копиями</button>
                     <hr>
                     <a href="{{ url_for('logout') }}">Выход</a>
                 </div>
@@ -37,12 +41,26 @@
                     <button type="button" data-action="filters">Фильтры</button>
                     <hr>
                     <button type="button" data-action="color-palette">Цвет интерфейса...</button>
+                    <hr>
+                    <button type="button" data-action="timeline">📅 Временная шкала</button>
                 </div>
             </div>
             <div class="menu-item">
                 <span class="menu-label">Правка</span>
                 <div class="menu-dropdown">
+                    <button type="button" data-action="undo">Отмена</button>
+                    <button type="button" data-action="redo">Повтор</button>
+                    <hr>
                     <button type="button" data-action="search">Найти</button>
+                </div>
+            </div>
+            <div class="menu-item">
+                <span class="menu-label">Справка</span>
+                <div class="menu-dropdown">
+                    <button type="button" data-action="stats">Статистика дерева</button>
+                    <button type="button" data-action="check-updates">Проверить обновления</button>
+                    <hr>
+                    <button type="button" data-action="about">О программе</button>
                 </div>
             </div>
         </nav>
@@ -66,6 +84,7 @@
         <span id="status-center">Центр: не выбран</span>
         <span id="status-msg"></span>
     </footer>
+    <script src="{{ url_for('static', filename='js/undo.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
 </body>
 </html>

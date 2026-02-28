@@ -30,20 +30,23 @@
     <script>
     // URL сервера синхронизации
     const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
-    
+
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const login = document.getElementById('login').value.trim();
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('error');
-        
+
         errorDiv.textContent = 'Вход...';
-        
+        console.log('[LOGIN] Attempting login for:', login);
+        console.log('[LOGIN] Server:', SYNC_SERVER_URL);
+
         try {
+            // Шаг 1: Вход на сервер синхронизации
             const response = await fetch(SYNC_SERVER_URL + '/api/auth/login', {
                 method: 'POST',
-                credentials: 'include',
+                mode: 'cors',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -52,29 +55,83 @@
                     password: password
                 })
             });
+
+            console.log('[LOGIN] Response status:', response.status);
             
             const data = await response.json();
-            
+            console.log('[LOGIN] Response data:', data);
+
             if (response.ok && data.token) {
-                // Успех — отправляем токен на сервер для сохранения в сессии
+                console.log('[LOGIN] Got token, saving session...');
+                
+                // Шаг 2: Сохраняем токен в сессии веб-приложения
                 const sessionResp = await fetch('/api/auth/session', {
                     method: 'POST',
-                    credentials: 'include',
+                    mode: 'cors',
+                    credentials: 'same-origin',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({token: data.token, user_id: data.user_id})
                 });
-                
+
+                console.log('[LOGIN] Session response:', sessionResp.status);
+
                 if (sessionResp.ok) {
+                    console.log('[LOGIN] Success! Redirecting...');
                     window.location.href = '/';
                 } else {
-                    errorDiv.textContent = 'Ошибка сохранения сессии';
+                    const sessionError = await sessionResp.json().catch(() => ({}));
+                    errorDiv.textContent = 'Ошибка сохранения сессии: ' + (sessionError.error || 'неизвестная ошибка');
+                }
+            } else if (response.status === 401) {
+                // Сервер отверг — пробуем локальный вход
+                console.log('[LOGIN] Server rejected, trying local login...');
+                errorDiv.textContent = 'Пользователь не найден на сервере. Попробуйте локальный вход...';
+                
+                const localResp = await fetch('/api/auth/login-local', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({login: login, password: password})
+                });
+                
+                const localData = await localResp.json();
+                
+                if (localResp.ok && localData.ok) {
+                    console.log('[LOGIN] Local login success!');
+                    window.location.href = '/';
+                } else {
+                    errorDiv.textContent = localData.error || 'Неверный логин или пароль';
                 }
             } else {
+                console.log('[LOGIN] Auth failed:', data.error || data.message);
                 errorDiv.textContent = data.error || data.message || 'Неверный логин или пароль';
             }
         } catch (err) {
-            errorDiv.textContent = 'Ошибка подключения к серверу';
-            console.error(err);
+            console.error('[LOGIN] Error:', err);
+            // Ошибка сети — пробуем локальный вход
+            console.log('[LOGIN] Network error, trying local login...');
+            errorDiv.textContent = 'Ошибка подключения к серверу. Пробуем локальный вход...';
+            
+            try {
+                const localResp = await fetch('/api/auth/login-local', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({login: login, password: password})
+                });
+                
+                const localData = await localResp.json();
+                
+                if (localResp.ok && localData.ok) {
+                    console.log('[LOGIN] Local login success!');
+                    window.location.href = '/';
+                } else {
+                    errorDiv.textContent = localData.error || 'Неверный логин или пароль';
+                }
+            } catch (localErr) {
+                console.error('[LOGIN] Local login error:', localErr);
+                errorDiv.textContent = 'Ошибка подключения и локального входа';
+            }
         }
     });
     </script>

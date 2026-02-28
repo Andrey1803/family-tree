@@ -48,7 +48,8 @@ app.config["JSON_AS_ASCII"] = False
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
 _data_dir = os.environ.get("DATA_DIR") or _project_root
-USERS_FILE = os.path.join(_data_dir, "users.json")
+# Файл пользователей — в корневой папке проекта
+USERS_FILE = os.path.join(_project_root, "users.json")
 
 # Версия хеширования для миграции
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
@@ -115,15 +116,17 @@ def _verify_password(login: str, password: str, stored_hash: str) -> bool:
 
 
 def auth_check(login: str, password: str) -> bool:
-    """Проверить логин/пароль ТОЛЬКО через сервер синхронизации"""
+    """Проверить логин/пароль: сначала сервер, потом локально"""
     if not (login or "").strip() or not password:
         return False
+
+    login_clean = (login or "").strip()
     
-    # Проверяем ТОЛЬКО на сервере синхронизации
+    # 1. Пробуем сервер синхронизации
     try:
         req = urllib.request.Request(
             f"{SYNC_SERVER_URL}/api/auth/login",
-            data=json.dumps({"login": login.strip(), "password": password}).encode(),
+            data=json.dumps({"login": login_clean, "password": password}).encode(),
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
@@ -133,11 +136,33 @@ def auth_check(login: str, password: str) -> bool:
                 # Сохраняем токен в сессии
                 session['server_token'] = data['token']
                 session['server_user_id'] = data.get('user_id')
+                print(f"[AUTH] Server login OK: {login_clean}")
                 return True
+            elif data.get('error'):
+                print(f"[AUTH] Server error: {data['error']}")
+                return False
+    except urllib.error.HTTPError as e:
+        # HTTP 401 — неверный пароль
+        print(f"[AUTH] Server HTTP {e.code}: неверный логин/пароль")
+        return False
+    except urllib.error.URLError as e:
+        print(f"[AUTH] Server URL Error: {e.reason} — trying local")
+        pass  # Пробуем локально
     except Exception as e:
-        print(f"[AUTH] Server login failed: {e}")
-        pass
+        print(f"[AUTH] Server Error: {type(e).__name__}: {e} — trying local")
+        pass  # Пробуем локально
+
+    # 2. Локальная проверка
+    users = _load_users()
+    stored = users.get(login_clean)
+    if stored:
+        result = _verify_password(login_clean, password, stored)
+        print(f"[AUTH] Local {'OK' if result else 'FAIL'}: {login_clean}")
+        if result:
+            session['username'] = login_clean
+        return result
     
+    print(f"[AUTH] User not found: {login_clean}")
     return False
 
 
@@ -301,13 +326,30 @@ def api_session():
     data = request.get_json() or {}
     token = data.get('token')
     user_id = data.get('user_id')
-    
+
     if token:
         session['server_token'] = token
         session['server_user_id'] = user_id
         return jsonify({"ok": True}), 200
-    
+
     return jsonify({"error": "No token"}), 400
+
+
+@app.route("/api/auth/login-local", methods=["POST"])
+def api_login_local():
+    """Локальный вход (для пользователей из users.json)"""
+    data = request.get_json() or {}
+    login_val = (data.get("login") or "").strip()
+    password = data.get("password") or ""
+
+    if not login_val or not password:
+        return jsonify({"error": "Введите логин и пароль"}), 400
+
+    if auth_check(login_val, password):
+        session["username"] = login_val
+        return jsonify({"ok": True}), 200
+
+    return jsonify({"error": "Неверный логин или пароль"}), 401
 
 
 @app.route("/sw.js")
