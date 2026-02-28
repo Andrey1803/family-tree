@@ -190,20 +190,31 @@ async function viewUserTrees(userId) {
 
 // Загрузка всех деревьев (для вкладки Деревья)
 async function loadAllTrees() {
+    console.log('[ADMIN] loadAllTrees called');
     try {
         // Сначала загружаем пользователей для фильтра
         if (!usersData.length) {
+            console.log('[ADMIN] Loading users first...');
             await loadUsers();
+            console.log('[ADMIN] Users loaded:', usersData.length);
         }
-        
+
+        console.log('[ADMIN] Fetching /api/admin/trees...');
         const r = await fetch('/api/admin/trees');
+        console.log('[ADMIN] Response status:', r.status);
         if (!r.ok) throw new Error('Ошибка загрузки деревьев');
         const data = await r.json();
+        console.log('[ADMIN] Received trees:', data.trees ? data.trees.length : 0);
         treesData = data.trees || [];
         
+        // Логируем каждое дерево
+        treesData.forEach((t, i) => {
+            console.log(`[ADMIN] Tree ${i}: ${t.name}, persons: ${Object.keys(t.persons || {}).length}`);
+        });
+
         renderTreesList(treesData);
         updateUserFilter();
-        
+
     } catch (err) {
         console.error('Trees error:', err);
         document.getElementById('trees-list').innerHTML = '<div class="muted">Ошибка загрузки деревьев</div>';
@@ -285,12 +296,20 @@ function updateUserFilter() {
 
 // Открыть полное дерево с визуализацией
 function openFullTree(treeId, userLogin) {
+    console.log('[ADMIN] openFullTree called:', treeId, userLogin);
+    console.log('[ADMIN] treesData:', treesData);
+    console.log('[ADMIN] treesData length:', treesData.length);
+    
     const tree = treesData.find(t => String(t.id) === String(treeId));
     if (!tree) {
-        alert('Дерево не найдено');
+        console.error('[ADMIN] Дерево не найдено! ID:', treeId);
+        alert('Дерево не найдено. Попробуйте обновить страницу.');
         return;
     }
-    
+
+    console.log('[ADMIN] Found tree:', tree.name);
+    console.log('[ADMIN] Persons count:', Object.keys(tree.persons || {}).length);
+
     // Сохраняем дерево в localStorage для передачи на страницу дерева
     const treeDataForView = {
         persons: tree.persons,
@@ -299,11 +318,13 @@ function openFullTree(treeId, userLogin) {
         treeName: tree.name,
         treeOwner: userLogin
     };
-    
+
+    console.log('[ADMIN] Saving to localStorage:', treeDataForView);
     localStorage.setItem('adminTreeData', JSON.stringify(treeDataForView));
-    
+
     // Открываем страницу дерева в новой вкладке
     const url = window.location.origin + '/?admin_view=1';
+    console.log('[ADMIN] Opening URL:', url);
     window.open(url, '_blank');
 }
 

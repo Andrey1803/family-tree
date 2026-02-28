@@ -2344,12 +2344,18 @@ checkAdminView();
 function checkAdminView() {
     // Проверяем, открыли ли дерево из админ-панели
     const urlParams = new URLSearchParams(window.location.search);
+    console.log('[ADMIN_VIEW] URL params:', Object.fromEntries(urlParams));
+    
     if (urlParams.get('admin_view') === '1') {
+        console.log('[ADMIN_VIEW] Admin view detected');
         const adminTreeData = localStorage.getItem('adminTreeData');
+        console.log('[ADMIN_VIEW] adminTreeData from localStorage:', adminTreeData ? 'found' : 'not found');
+        
         if (adminTreeData) {
             try {
                 const treeDataFromStorage = JSON.parse(adminTreeData);
-                console.log('[ADMIN_VIEW] Loading tree from localStorage:', treeDataFromStorage);
+                console.log('[ADMIN_VIEW] Parsed treeData:', treeDataFromStorage);
+                console.log('[ADMIN_VIEW] Persons count:', Object.keys(treeDataFromStorage.persons || {}).length);
                 
                 // Заменяем данные дерева
                 treeData = treeDataFromStorage;
@@ -2362,6 +2368,7 @@ function checkAdminView() {
                 }
                 
                 // Перерисовываем дерево
+                console.log('[ADMIN_VIEW] Calling render()...');
                 render();
                 
                 // Показываем кнопку "Назад в админ-панель"
@@ -2371,7 +2378,11 @@ function checkAdminView() {
                 localStorage.removeItem('adminTreeData');
             } catch (e) {
                 console.error('[ADMIN_VIEW] Error loading tree:', e);
+                alert('Ошибка загрузки дерева: ' + e.message);
             }
+        } else {
+            console.error('[ADMIN_VIEW] adminTreeData not found in localStorage');
+            alert('Данные дерева не найдены. Вернитесь в админ-панель и попробуйте снова.');
         }
     }
 }
