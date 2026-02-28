@@ -230,18 +230,24 @@ async function loadTrees(userId = null) {
 // Рендер списка деревьев
 function renderTreesList(trees) {
     const list = document.getElementById('trees-list');
-    if (!trees.length) {
+    if (!trees || !trees.length) {
         list.innerHTML = '<div class="muted">Нет деревьев</div>';
         return;
     }
     
-    list.innerHTML = trees.map(t => `
+    list.innerHTML = trees.map(t => {
+        const personsCount = t.persons ? Object.keys(t.persons).length : 0;
+        const marriagesCount = (t.marriages || []).length;
+        const userLogin = t.user_login || 'Неизвестно';
+        
+        return `
         <div class="tree-item">
             <div class="tree-info">
                 <h4>🌳 ${escapeHtml(t.name)}</h4>
                 <div class="tree-meta">
-                    <span>👤 Персон: ${Object.keys(t.persons || {}).length}</span>
-                    <span>💍 Браков: ${(t.marriages || []).length}</span>
+                    <span>👤 Пользователь: ${escapeHtml(userLogin)}</span>
+                    <span>👤 Персон: ${personsCount}</span>
+                    <span>💍 Браков: ${marriagesCount}</span>
                     <span>📅 Обновлено: ${formatDate(t.updated_at)}</span>
                 </div>
             </div>
@@ -249,7 +255,7 @@ function renderTreesList(trees) {
                 <button class="btn-view" onclick="viewTreeDetails('${t.id}')">Просмотреть</button>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 // Обновление фильтра пользователей
@@ -258,15 +264,15 @@ let userFilterInitialized = false;
 function updateUserFilter() {
     const select = document.getElementById('user-filter');
     select.innerHTML = '<option value="">Все пользователи</option>' +
-        usersData.map(u => `<option value="${u.id}">${escapeHtml(u.login)}</option>`).join('');
+        usersData.map(u => `<option value="${escapeHtml(u.login)}">${escapeHtml(u.login)}</option>`).join('');
 
     // Предотвращаем дублирование обработчика
     if (!userFilterInitialized) {
         select.addEventListener('change', () => {
-            const userId = select.value || null;
-            if (userId) {
+            const selectedUser = select.value || null;
+            if (selectedUser) {
                 // Фильтруем деревья по пользователю
-                const userTrees = treesData.filter(t => t.user_id == userId);
+                const userTrees = treesData.filter(t => t.user_login === selectedUser);
                 renderTreesList(userTrees);
             } else {
                 renderTreesList(treesData);
