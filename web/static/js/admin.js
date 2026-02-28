@@ -284,31 +284,37 @@ function updateUserFilter() {
 
 // Просмотр деталей дерева
 async function viewTreeDetails(treeId) {
-    const tree = treesData.find(t => t.id == treeId);
-    if (!tree) return;
-    
+    const tree = treesData.find(t => String(t.id) === String(treeId));
+    if (!tree) {
+        console.error('[ADMIN] Дерево не найдено:', treeId, treesData);
+        return;
+    }
+
+    console.log('[ADMIN] Opening tree:', tree.name, 'Persons:', Object.keys(tree.persons || {}).length);
+
     const modal = document.getElementById('tree-modal-overlay');
     const title = document.getElementById('modal-tree-title');
     const viewer = document.getElementById('tree-viewer');
-    
-    title.textContent = `🌳 ${tree.name}`;
-    
+
+    title.textContent = `🌳 ${tree.name} (${tree.user_login || 'владелец'})`;
+
     const persons = Object.values(tree.persons || {});
     if (!persons.length) {
         viewer.innerHTML = '<div class="muted">Дерево пусто</div>';
     } else {
-        viewer.innerHTML = persons.map(p => `
+        viewer.innerHTML = `<div style="margin-bottom:15px;font-size:13px;color:#64748b;">Персон: ${persons.length} | Браков: ${(tree.marriages || []).length}</div>` +
+            persons.map(p => `
             <div class="tree-viewer-person ${p.gender === 'Женский' ? 'female' : ''}">
                 <h5>${escapeHtml([p.surname, p.name, p.patronymic].filter(Boolean).join(' '))}</h5>
                 <div class="meta">
-                    ${p.gender} • 
+                    ${p.gender} •
                     ${p.birth_date || '??'} — ${p.is_deceased ? (p.death_date || '??') : 'н.в.'}
                     ${p.birth_place ? ' • ' + p.birth_place : ''}
                 </div>
             </div>
         `).join('');
     }
-    
+
     modal.style.display = 'flex';
 }
 
