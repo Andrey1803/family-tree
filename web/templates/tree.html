@@ -37,12 +37,7 @@
                 <span class="menu-label">Вид</span>
                 <div class="menu-dropdown">
                     <button type="button" data-action="refresh">Обновить</button>
-                    <button type="button" data-action="zoom-reset">Масштаб 1:1</button>
                     <hr>
-                    <button type="button" data-action="collapse-all">Свернуть все ветви</button>
-                    <button type="button" data-action="expand-all">Развернуть все ветви</button>
-                    <hr>
-                    <button type="button" data-action="focus-mode">Режим фокуса</button>
                     <button type="button" data-action="filters">Фильтры</button>
                     <hr>
                     <button type="button" data-action="color-palette">Цвет интерфейса...</button>
@@ -63,8 +58,8 @@
                 <span class="menu-label">Справка</span>
                 <div class="menu-dropdown">
                     <button type="button" data-action="stats">Статистика дерева</button>
-                    <button type="button" data-action="check-updates">Проверить обновления</button>
                     <hr>
+                    <button type="button" data-action="about-dev">О разработчике</button>
                     <button type="button" data-action="about">О программе</button>
                 </div>
             </div>
@@ -143,7 +138,7 @@
     });
     </script>
     
-    <script src="{{ url_for('static', filename='js/undo.js') }}?v=20260301"></script>
-    <script src="{{ url_for('static', filename='js/tree.js') }}?v=20260301"></script>
+    <script src="{{ url_for('static', filename='js/undo.js') }}?v=20260301-2"></script>
+    <script src="{{ url_for('static', filename='js/tree.js') }}?v=20260301-2"></script>
 </body>
 </html>

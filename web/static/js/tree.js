@@ -2083,6 +2083,34 @@ function showAbout() {
     document.body.appendChild(ov);
 }
 
+/**
+ * О разработчике
+ */
+function showAboutDeveloper() {
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal tree-about-modal">
+            <h3>👨‍💻 О разработчике</h3>
+            <div class="about-content">
+                <h4>Емельянов Андрей Николаевич</h4>
+                <p><strong>Разработчик приложения «Семейное древо»</strong></p>
+                <hr>
+                <p><strong>📞 Телефон:</strong> <a href="tel:+375291472108">+375 29 147-21-08</a></p>
+                <p><strong>📧 Email:</strong> <a href="mailto:familyroots010326@gmail.com">familyroots010326@gmail.com</a></p>
+                <hr>
+                <p>Приложение создано для удобного построения и визуализации семейных генеалогических деревьев с возможностью экспорта, резервного копирования и работы в веб-интерфейсе.</p>
+            </div>
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel">Закрыть</button>
+            </div>
+        </div>`;
+
+    ov.querySelector(".cancel").onclick = () => ov.remove();
+    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+}
+
 function setupMenubar() {
     document.querySelectorAll(".tree-menubar [data-action]").forEach(btn => {
         btn.onclick = () => {
@@ -2166,6 +2194,8 @@ loadTree();
                 showStats();
             } else if (act === "check-updates") {
                 checkUpdates();
+            } else if (act === "about-dev") {
+                showAboutDeveloper();
             } else if (act === "about") {
                 showAbout();
             }
