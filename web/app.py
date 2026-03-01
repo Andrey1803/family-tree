@@ -647,11 +647,11 @@ def api_admin_toggle_user(user_id):
     """Активировать/деактивировать пользователя."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
     if username != "admin":
         return jsonify({"error": "Требуется права администратора"}), 403
-    
+
     # Для локальных пользователей просто возвращаем успех
     # Реальное управление через сервер синхронизации
     server_token = session.get('server_token')
@@ -666,8 +666,48 @@ def api_admin_toggle_user(user_id):
                 return jsonify({"message": "Статус пользователя изменён"})
         except Exception as e:
             print(f"[ADMIN] Toggle failed: {e}")
-    
+
     return jsonify({"message": "Статус пользователя изменён (локально)"})
+
+
+@app.route("/api/admin/user/<login>/delete", methods=["POST"])
+def api_admin_delete_user(login):
+    """Удалить пользователя (только супер-админ admin)."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+
+    username = session["username"]
+    # Только супер-админ может удалять
+    if username != "admin":
+        return jsonify({"error": "Только супер-админ может удалять пользователей"}), 403
+
+    # Нельзя удалить самого себя
+    if login == "admin":
+        return jsonify({"error": "Нельзя удалить супер-админа"}), 400
+
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/user/{login}/delete",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return jsonify({"message": "Пользователь удалён"})
+        except Exception as e:
+            print(f"[ADMIN] Delete failed: {e}")
+
+    # Локальное удаление (если пользователь в users.json)
+    users = _load_users()
+    if login in users:
+        del users[login]
+        if _save_users(users):
+            return jsonify({"message": "Пользователь удалён"})
+        else:
+            return jsonify({"error": "Ошибка сохранения"}), 500
+
+    return jsonify({"error": "Пользователь не найден"}), 404
 
 
 @app.route("/api/admin/user/<int:user_id>/trees", methods=["GET"])

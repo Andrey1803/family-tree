@@ -121,10 +121,10 @@ async function loadUsers() {
 function renderUsersTable(users) {
     const tbody = document.getElementById('users-table');
     if (!users.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="muted">Нет пользователей</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="muted">Нет пользователей</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = users.map(u => `
         <tr>
             <td>${u.id}</td>
@@ -135,10 +135,15 @@ function renderUsersTable(users) {
             <td><span class="status-${u.is_active ? 'active' : 'inactive'}">${u.is_active ? 'Активен' : 'Не активен'}</span></td>
             <td>${u.is_admin ? '👑' : '—'}</td>
             <td>
-                <button class="btn-view" onclick="viewUserTrees(${u.id})">🌳 Деревья</button>
+                <button class="btn-view" onclick="viewUserTrees('${escapeHtml(u.login)}')">🌳 Деревья</button>
                 <button class="btn-toggle ${u.is_active ? 'active' : ''}" onclick="toggleUser(${u.id})">
                     ${u.is_active ? 'Деактивировать' : 'Активировать'}
                 </button>
+                ${u.login !== 'admin' ? `
+                <button class="btn-delete" onclick="deleteUser('${escapeHtml(u.login)}')">
+                    ❌ Удалить
+                </button>
+                ` : ''}
             </td>
         </tr>
     `).join('');
@@ -165,7 +170,7 @@ function setupRefresh() {
 // Переключение статуса пользователя
 async function toggleUser(userId) {
     if (!confirm('Изменить статус пользователя?')) return;
-    
+
     try {
         const r = await fetch(`/api/admin/user/${userId}/toggle`, { method: 'POST' });
         if (r.ok) {
@@ -175,6 +180,26 @@ async function toggleUser(userId) {
         }
     } catch (err) {
         console.error('Toggle error:', err);
+        alert('Ошибка: ' + err.message);
+    }
+}
+
+// Удаление пользователя
+async function deleteUser(login) {
+    if (!confirm(`⚠️ Вы уверены, что хотите удалить пользователя "${login}"?\n\nЭто действие нельзя отменить!`)) return;
+
+    try {
+        const r = await fetch(`/api/admin/user/${login}/delete`, { method: 'POST' });
+        const data = await r.json();
+        
+        if (r.ok) {
+            alert('✅ ' + data.message);
+            loadUsers();
+        } else {
+            alert('❌ ' + (data.error || 'Ошибка удаления'));
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
         alert('Ошибка: ' + err.message);
     }
 }
