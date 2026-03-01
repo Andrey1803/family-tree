@@ -9,6 +9,7 @@ _block_cipher = None
 # Корень проекта
 root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
+services_dir = tree_dir / 'services'
 
 # Данные для приложения + Tcl/Tk (минимальный набор — без tzdata/msgs, чтобы избежать PermissionError)
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
@@ -29,15 +30,32 @@ a = Analysis(
     binaries=[],
     datas=datas_list,
     hiddenimports=[
+        # Кодировки
         'encodings', 'encodings.utf_8', 'encodings.cp1251',
-        'PIL', 'PIL._tkinter_finder',
+        # PIL
+        'PIL', 'PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk',
+        # Модули Дерево
         'app', 'auth', 'models', 'constants', 'ui_helpers', 'protocol_win',
-        'version', 'update_check',
+        'version', 'update_check', 'backup', 'undo', 'kinship', 'theme',
+        'timeline', 'export_pdf', 'sync', 'check_parents', 'data_migrations',
+        # Сервисы
+        'services',
+        'services.tree_service',
+        'services.export_service',
+        'services.backup_service',
+        'services.undo_service',
+        'services.kinship_service',
+        'services.theme_service',
+        'services.settings_service',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'matplotlib', 'numpy', 'scipy', 'pandas',  # Не используются
+        'tkinter.test',  # Тесты tkinter
+        'reportlab',  # Нет в requirements
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=_block_cipher,
@@ -56,7 +74,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,  # Включено для уменьшения размера
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,

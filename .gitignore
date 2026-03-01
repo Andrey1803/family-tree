@@ -50,3 +50,6 @@ Thumbs.db
 *.log
 *.tmp
 __pycache__/
+exe_builds/  
+dist/  
+build/  
