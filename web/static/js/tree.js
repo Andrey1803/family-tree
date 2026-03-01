@@ -363,25 +363,38 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
 
     const applyZoom = (newZoom, centerX, centerY) => {
         const oldZoom = treeZoom;
-        treeZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
-        if (treeZoom === oldZoom) return;
+        const clampedZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+        
+        // Если зум не изменился, всё равно обновляем панорамирование для точки
+        if (clampedZoom === oldZoom) {
+            // Даже если зум не изменился, точка должна остаться на месте
+            if (centerX !== undefined && centerY !== undefined) {
+                const contentX = (centerX - treePanX) / oldZoom;
+                const contentY = (centerY - treePanY) / oldZoom;
+                treePanX = centerX - contentX * oldZoom;
+                treePanY = centerY - contentY * oldZoom;
+                panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
+            }
+            return;
+        }
+        
+        treeZoom = clampedZoom;
 
         zoomContainer.style.width = (totalW * treeZoom) + "px";
         zoomContainer.style.height = (totalH * treeZoom) + "px";
         wrap.style.transform = `scale(${treeZoom})`;
 
         // Корректируем панорамирование: точка (centerX, centerY) должна остаться на месте
-        // Формула: новая точка зума в системе координат контента
         if (centerX !== undefined && centerY !== undefined) {
             // Координата точки в масштабируемом контенте до зума
             const contentX = (centerX - treePanX) / oldZoom;
             const contentY = (centerY - treePanY) / oldZoom;
-            
+
             // После зума эта точка контента должна быть на (centerX, centerY)
             treePanX = centerX - contentX * treeZoom;
             treePanY = centerY - contentY * treeZoom;
         }
-        
+
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
     };
 
@@ -412,56 +425,54 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
         if (e.touches.length === 2 && pinchDist0) {
             e.preventDefault();
             const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
-            
+
             // Пересчитываем центр щипка для текущего кадра
             const rect = viewport.getBoundingClientRect();
             const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
             const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-            
+
             // Вычисляем новый зум
             const newZoom = zoom0 * (dist / pinchDist0);
             applyZoom(newZoom, currentCenterX, currentCenterY);
-            
-            // Обновляем pinchDist0 для следующего кадра (чтобы избежать накопления ошибки)
+
+            // Обновляем pinchDist0 и zoom0 для следующего кадра (чтобы избежать накопления ошибки)
             pinchDist0 = dist;
-            zoom0 = treeZoom;
+            zoom0 = treeZoom; // Используем актуальный treeZoom после применения зума
         }
     }, { passive: false });
 
     panZoomWrapper.addEventListener("touchend", (e) => {
+        // Сначала проверяем pinch — если был, не делаем double-tap
+        const wasPinch = pinchDist0 !== null;
+        
+        // Очищаем pinch переменные
         if (e.touches.length < 2) {
             pinchDist0 = null;
             pinchCenterX = null;
             pinchCenterY = null;
             zoom0 = null;
         }
-    });
-
-    // Double tap zoom (mobile)
-    let lastTap = 0;
-    panZoomWrapper.addEventListener("touchend", (e) => {
-        // Не делаем зум, если было панорамирование или pinch
-        if (window._treeDidPan || pinchDist0) {
-            return;
-        }
         
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        if (tapLength < 500 && tapLength > 0 && e.changedTouches.length === 1) {
-            e.preventDefault();
-            const rect = viewport.getBoundingClientRect();
-            const touch = e.changedTouches[0];
-            const tx = touch.clientX - rect.left;
-            const ty = touch.clientY - rect.top;
+        // Double tap zoom (mobile) — только если не было pinch и pan
+        if (!wasPinch && !window._treeDidPan) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0 && e.changedTouches.length === 1) {
+                e.preventDefault();
+                const rect = viewport.getBoundingClientRect();
+                const touch = e.changedTouches[0];
+                const tx = touch.clientX - rect.left;
+                const ty = touch.clientY - rect.top;
 
-            // Увеличиваем или уменьшаем зум
-            if (treeZoom > 1) {
-                applyZoom(1, tx, ty);
-            } else {
-                applyZoom(2, tx, ty);
+                // Увеличиваем или уменьшаем зум
+                if (treeZoom > 1) {
+                    applyZoom(1, tx, ty);
+                } else {
+                    applyZoom(2, tx, ty);
+                }
             }
+            lastTap = currentTime;
         }
-        lastTap = currentTime;
     });
 }
 
