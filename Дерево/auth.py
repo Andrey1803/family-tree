@@ -5,19 +5,42 @@ import hashlib
 import json
 import os
 import webbrowser
+from pathlib import Path
 from typing import Dict, Optional
 
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
+
 USERS_FILE = "users.json"
-REMEMBER_FILE = "login_remember.json"
+# Используем правильный путь для файла запоминания (в той же директории, где и auth.py)
+REMEMBER_FILE = Path(__file__).parent / "login_remember.json"
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
 
 def _password_hash(login: str, password: str) -> str:
     raw = (AUTH_SALT + login + password).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _verify_password(login: str, password: str, stored_hash: str) -> bool:
+    """Проверить пароль с поддержкой bcrypt и SHA256."""
+    if stored_hash.startswith("$2"):
+        # bcrypt хеш
+        if BCRYPT_AVAILABLE:
+            try:
+                return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
+            except Exception:
+                return False
+        return False
+    else:
+        # SHA256 хеш (локальный формат)
+        return _password_hash(login, password) == stored_hash
 
 
 def _load_users() -> Dict[str, str]:
@@ -43,6 +66,8 @@ def _save_users(users: Dict[str, str]) -> bool:
 def auth_check(login: str, password: str) -> bool:
     if not login.strip() or not password:
         return False
+
+    login_clean = login.strip()
     
     # Пробуем проверить на сервере синхронизации
     try:
@@ -50,28 +75,49 @@ def auth_check(login: str, password: str) -> bool:
         sync_url = "https://ravishing-caring-production-3656.up.railway.app"
         req = urllib.request.Request(
             f"{sync_url}/api/auth/login",
-            data=json.dumps({"login": login.strip(), "password": password}).encode(),
+            data=json.dumps({"login": login_clean, "password": password}).encode(),
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
             if data.get('token'):
                 return True  # Успешный вход на сервере
-    except Exception:
-        pass  # Ошибка сервера — пробуем локально
-    
+            elif data.get('error'):
+                # Сервер явно отверг пароль
+                print(f"[AUTH] Server error: {data['error']}")
+                return False
+    except urllib.error.HTTPError as e:
+        # HTTP ошибка (401, 403, etc.) — неверный логин/пароль
+        try:
+            error_data = json.loads(e.read().decode())
+            print(f"[AUTH] HTTP Error {e.code}: {error_data.get('error', 'Unknown')}")
+        except Exception:
+            print(f"[AUTH] HTTP Error {e.code}")
+        return False
+    except urllib.error.URLError as e:
+        # Проблема с подключением к серверу
+        print(f"[AUTH] URL Error: {e.reason} — trying local")
+        pass  # Пробуем локально
+    except Exception as e:
+        # Другие ошибки — пробуем локально
+        print(f"[AUTH] Error: {type(e).__name__}: {e} — trying local")
+        pass
+
     # Локальная проверка
     users = _load_users()
-    stored = users.get(login.strip())
+    stored = users.get(login_clean)
     if not stored:
+        print(f"[AUTH] Local: user '{login_clean}' not found")
         return False
-    return _password_hash(login.strip(), password) == stored
+    result = _verify_password(login_clean, password, stored)
+    print(f"[AUTH] Local: {'OK' if result else 'FAIL'}")
+    return result
 
 
 def _load_remember() -> Dict:
     """Загружает сохранённые логин/пароль (если галочка была включена)."""
-    if not os.path.exists(REMEMBER_FILE):
+    if not REMEMBER_FILE.exists():
         return {}
     try:
         with open(REMEMBER_FILE, "r", encoding="utf-8") as f:
@@ -94,9 +140,9 @@ def _save_remember(login: str, password: str):
 
 def _clear_remember():
     """Очищает сохранённые данные (галочка снята)."""
-    if os.path.exists(REMEMBER_FILE):
+    if REMEMBER_FILE.exists():
         try:
-            os.remove(REMEMBER_FILE)
+            REMEMBER_FILE.unlink()
         except Exception:
             pass
 
@@ -189,7 +235,17 @@ def run_login_window(on_success):
         if not password:
             messagebox.showwarning("Вход", "Введите пароль.", parent=login_root)
             return
-        if auth_check(login, password):
+        
+        print(f"[LOGIN] Attempting login for: {login}")
+        try:
+            auth_result = auth_check(login, password)
+            print(f"[LOGIN] auth_check returned: {auth_result}")
+        except Exception as e:
+            print(f"[LOGIN] auth_check raised: {type(e).__name__}: {e}")
+            auth_result = False
+        
+        if auth_result:
+            print(f"[LOGIN] Success for: {login}")
             if remember_var.get():
                 _save_remember(login, password)
             else:
@@ -197,6 +253,7 @@ def run_login_window(on_success):
             login_root.destroy()
             on_success(login)
         else:
+            print(f"[LOGIN] Failed for: {login}")
             messagebox.showerror("Вход", "Неверный логин или пароль.", parent=login_root)
 
     def do_register():
