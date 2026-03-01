@@ -22,6 +22,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Логирование переменных окружения при старте
+logger.info("=== Переменные окружения SMTP ===")
+logger.info(f"SMTP_SERVER: {os.environ.get('SMTP_SERVER', 'NOT_SET')}")
+logger.info(f"SMTP_PORT: {os.environ.get('SMTP_PORT', 'NOT_SET')}")
+logger.info(f"SMTP_LOGIN: {os.environ.get('SMTP_LOGIN', 'NOT_SET')}")
+logger.info(f"SMTP_PASSWORD задан: {bool(os.environ.get('SMTP_PASSWORD'))}")
+logger.info(f"SMTP_USE_TLS: {os.environ.get('SMTP_USE_TLS', 'NOT_SET')}")
+logger.info("==================================")
+
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
