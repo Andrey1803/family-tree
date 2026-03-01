@@ -358,26 +358,30 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     const viewport = wrap.closest("#tree-root");
     if (!viewport) return;
 
+    // Изначально transform-origin в 0 0
+    wrap.style.transformOrigin = "0 0";
+
     const applyZoom = (newZoom, centerX, centerY) => {
         const oldZoom = treeZoom;
         treeZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
         if (treeZoom === oldZoom) return;
-        
+
         zoomContainer.style.width = (totalW * treeZoom) + "px";
         zoomContainer.style.height = (totalH * treeZoom) + "px";
-        
-        // Устанавливаем transform-origin в точку зумирования
-        if (centerX !== undefined && centerY !== undefined) {
-            wrap.style.transformOrigin = `${centerX}px ${centerY}px`;
-        }
-        
         wrap.style.transform = `scale(${treeZoom})`;
-        
-        // Корректируем панорамирование относительно точки зумирования
+
+        // Корректируем панорамирование: точка (centerX, centerY) должна остаться на месте
+        // Формула: новая точка зума в системе координат контента
         if (centerX !== undefined && centerY !== undefined) {
-            treePanX = centerX - (centerX - treePanX) * treeZoom / oldZoom;
-            treePanY = centerY - (centerY - treePanY) * treeZoom / oldZoom;
+            // Координата точки в масштабируемом контенте до зума
+            const contentX = (centerX - treePanX) / oldZoom;
+            const contentY = (centerY - treePanY) / oldZoom;
+            
+            // После зума эта точка контента должна быть на (centerX, centerY)
+            treePanX = centerX - contentX * treeZoom;
+            treePanY = centerY - contentY * treeZoom;
         }
+        
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
     };
 
@@ -390,7 +394,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         applyZoom(treeZoom * factor, cx, cy);
     }, { passive: false });
-    
+
     // Pinch zoom (mobile)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     panZoomWrapper.addEventListener("touchstart", (e) => {
@@ -403,7 +407,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
         }
     }, { passive: true });
-    
+
     panZoomWrapper.addEventListener("touchmove", (e) => {
         if (e.touches.length === 2 && pinchDist0) {
             e.preventDefault();
@@ -412,11 +416,11 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             applyZoom(zoom0 * factor, pinchCenterX, pinchCenterY);
         }
     }, { passive: false });
-    
+
     panZoomWrapper.addEventListener("touchend", (e) => {
         if (e.touches.length < 2) pinchDist0 = null;
     });
-    
+
     // Double tap zoom (mobile)
     let lastTap = 0;
     panZoomWrapper.addEventListener("touchend", (e) => {
@@ -428,7 +432,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             const touch = e.changedTouches[0];
             const tx = touch.clientX - rect.left;
             const ty = touch.clientY - rect.top;
-            
+
             // Увеличиваем или уменьшаем зум
             if (treeZoom > 1) {
                 applyZoom(1, tx, ty);
