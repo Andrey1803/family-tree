@@ -434,9 +434,14 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     // Double tap zoom (mobile)
     let lastTap = 0;
     panZoomWrapper.addEventListener("touchend", (e) => {
+        // Не делаем зум, если было панорамирование или pinch
+        if (window._treeDidPan || pinchDist0) {
+            return;
+        }
+        
         const currentTime = new Date().getTime();
         const tapLength = currentTime - lastTap;
-        if (tapLength < 500 && tapLength > 0) {
+        if (tapLength < 500 && tapLength > 0 && e.changedTouches.length === 1) {
             e.preventDefault();
             const rect = viewport.getBoundingClientRect();
             const touch = e.changedTouches[0];
@@ -475,6 +480,8 @@ function setupPan(wrap, panZoomWrapper) {
         viewport.style.cursor = "grab";
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
+        // Сбрасываем флаг через небольшую задержку, чтобы double-tap не сработал сразу после pan
+        setTimeout(() => { window._treeDidPan = false; }, 100);
     };
 
     const startPan = (clientX, clientY) => {
@@ -490,6 +497,11 @@ function setupPan(wrap, panZoomWrapper) {
     };
     const onTouchMove = (e) => {
         if (!active || !e.touches) return;
+        // Если 2 пальца — это pinch, не панорамируем
+        if (e.touches.length !== 1) {
+            stopTouchPan();
+            return;
+        }
         e.preventDefault();
         const t = e.touches[0];
         window._treeDidPan = true;
@@ -503,6 +515,8 @@ function setupPan(wrap, panZoomWrapper) {
         document.removeEventListener("touchmove", onTouchMove, { passive: false });
         document.removeEventListener("touchend", onTouchEnd);
         document.removeEventListener("touchcancel", onTouchEnd);
+        // Сбрасываем флаг через небольшую задержку, чтобы double-tap не сработал сразу после pan
+        setTimeout(() => { window._treeDidPan = false; }, 100);
     };
     const onTouchEnd = stopTouchPan;
     viewport.style.cursor = "grab";
@@ -511,6 +525,7 @@ function setupPan(wrap, panZoomWrapper) {
         startPan(e.clientX, e.clientY);
     });
     viewport.addEventListener("touchstart", (e) => {
+        // Начинаем pan только если 1 палец и не было недавнего double-tap
         if (e.touches.length !== 1) return;
         e.preventDefault(); // важно для iOS: блокируем браузерный скролл, чтобы pan работал
         const t = e.touches[0];
