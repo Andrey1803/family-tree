@@ -921,18 +921,45 @@ def api_tree():
                     tree_data = data.get('tree', {})
                     persons_count = len(tree_data.get("persons", {}))
                     print(f"[API_TREE] Sync server returned {persons_count} persons")
-                    persons = {str(k): v for k, v in tree_data.get("persons", {}).items()}
-                    for p in persons.values():
-                        if isinstance(p, dict):
-                            for k in ("parents", "children", "spouse_ids"):
-                                if k in p and isinstance(p[k], list):
-                                    p[k] = [str(x) for x in p[k]]
-                    cc = tree_data.get("current_center")
-                    return jsonify({
-                        "persons": persons,
-                        "marriages": tree_data.get("marriages", []),
-                        "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
-                    })
+                    
+                    # Если сервер вернул пустое дерево, пробуем загрузить локальное
+                    if persons_count == 0:
+                        print(f"[API_TREE] Server returned empty tree, trying local file...")
+                        local_data = load_tree(username)
+                        if len(local_data.get("persons", {})) > 0:
+                            print(f"[API_TREE] Loaded {len(local_data['persons'])} persons from local file")
+                            persons = {str(k): v for k, v in local_data.get("persons", {}).items()}
+                            for p in persons.values():
+                                if isinstance(p, dict):
+                                    for k in ("parents", "children", "spouse_ids"):
+                                        if k in p and isinstance(p[k], list):
+                                            p[k] = [str(x) for x in p[k]]
+                            cc = local_data.get("current_center")
+                            return jsonify({
+                                "persons": persons,
+                                "marriages": local_data.get("marriages", []),
+                                "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
+                            })
+                        else:
+                            print(f"[API_TREE] Local file also empty, creating empty tree for {username}")
+                            # Создаём пустое дерево для нового пользователя
+                            empty_tree = {"persons": {}, "marriages": [], "current_center": None}
+                            save_tree(username, empty_tree)
+                    
+                    # Если сервер вернул дерево с персонами, используем его
+                    if persons_count > 0:
+                        persons = {str(k): v for k, v in tree_data.get("persons", {}).items()}
+                        for p in persons.values():
+                            if isinstance(p, dict):
+                                for k in ("parents", "children", "spouse_ids"):
+                                    if k in p and isinstance(p[k], list):
+                                        p[k] = [str(x) for x in p[k]]
+                        cc = tree_data.get("current_center")
+                        return jsonify({
+                            "persons": persons,
+                            "marriages": tree_data.get("marriages", []),
+                            "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
+                        })
             except Exception as e:
                 print(f"[API_TREE] Download from sync server failed: {e}")
 
