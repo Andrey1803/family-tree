@@ -695,6 +695,13 @@ def api_admin_delete_user(login):
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 return jsonify({"message": "Пользователь удалён"})
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return jsonify({"error": "Пользователь не найден на сервере"}), 404
+            elif e.code == 403:
+                return jsonify({"error": "Нет прав для удаления на сервере"}), 403
+            else:
+                print(f"[ADMIN] Delete HTTP error: {e.code}")
         except Exception as e:
             print(f"[ADMIN] Delete failed: {e}")
 
@@ -703,11 +710,11 @@ def api_admin_delete_user(login):
     if login in users:
         del users[login]
         if _save_users(users):
-            return jsonify({"message": "Пользователь удалён"})
+            return jsonify({"message": "Пользователь удалён локально"})
         else:
             return jsonify({"error": "Ошибка сохранения"}), 500
 
-    return jsonify({"error": "Пользователь не найден"}), 404
+    return jsonify({"error": "Пользователь не найден. Удаление работает только через сервер синхронизации."}), 404
 
 
 @app.route("/api/admin/user/<int:user_id>/trees", methods=["GET"])

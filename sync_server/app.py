@@ -588,6 +588,44 @@ def admin_toggle_user(user_id):
 
     return jsonify({'message': 'Статус пользователя изменён'})
 
+
+@app.route('/api/admin/user/<login>/delete', methods=['POST'])
+@require_admin
+def admin_delete_user(login):
+    """Удалить пользователя (только супер-админ)."""
+    db = get_db()
+    
+    # Нельзя удалить самого себя
+    if login == 'admin':
+        return jsonify({'error': 'Нельзя удалить супер-админа'}), 400
+    
+    # Проверяем существование пользователя
+    user = db.execute('SELECT id FROM users WHERE login = ?', (login,)).fetchone()
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    # Получаем все деревья пользователя
+    trees = db.execute('SELECT id FROM family_trees WHERE user_id = ?', (user[0],)).fetchall()
+    tree_ids = [t[0] for t in trees]
+    
+    # Удаляем персон из деревьев
+    if tree_ids:
+        placeholders = ','.join('?' * len(tree_ids))
+        db.execute(f'DELETE FROM persons WHERE tree_id IN ({placeholders})', tree_ids)
+    
+    # Удаляем деревья
+    db.execute('DELETE FROM family_trees WHERE user_id = ?', (user[0],))
+    
+    # Удаляем сессии
+    db.execute('DELETE FROM sessions WHERE user_id = ?', (user[0],))
+    
+    # Удаляем пользователя
+    db.execute('DELETE FROM users WHERE id = ?', (user[0],))
+    
+    db.commit()
+    
+    return jsonify({'message': 'Пользователь удалён'})
+
 @app.route('/api/admin/user/<int:user_id>/trees', methods=['GET'])
 @require_admin
 def admin_get_user_trees(user_id):
