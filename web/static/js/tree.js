@@ -58,6 +58,26 @@ async function loadTree() {
     treePanY = 0;
     
     render();
+    
+    // Центрируем дерево после рендеринга
+    setTimeout(() => {
+        const root = document.getElementById("tree-root");
+        const wrap = root.querySelector(".tree-wrap");
+        if (wrap) {
+            const rootRect = root.getBoundingClientRect();
+            const wrapRect = wrap.getBoundingClientRect();
+            
+            // Центрируем по центру экрана
+            treePanX = (rootRect.width - wrapRect.width * treeZoom) / 2;
+            treePanY = (rootRect.height - wrapRect.height * treeZoom) / 2;
+            
+            const panZoomWrapper = root.querySelector(".tree-pan-zoom");
+            if (panZoomWrapper) {
+                panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
+            }
+            console.log('[LOAD_TREE] Centered: panX=', treePanX, 'panY=', treePanY);
+        }
+    }, 100);
 }
 
 function render() {
