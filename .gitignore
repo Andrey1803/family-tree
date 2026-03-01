@@ -24,12 +24,16 @@ build/
 Семейное_древо_*_source.zip
 
 # Данные пользователя (создаются при работе, см. docs/DATA.md)
+data/
 users.json
 family_tree*.json
 user_settings*.json
 login_remember.json
 palette.json
 window_settings.json
+
+# Старые версии
+_old_versions/
 
 # IDE
 .idea/
@@ -45,3 +49,4 @@ Thumbs.db
 # Debug / temp
 *.log
 *.tmp
+__pycache__/
