@@ -11,7 +11,9 @@ DATA_DIR = os.environ.get("DATA_DIR") or os.path.dirname(os.path.dirname(os.path
 def get_data_path(username):
     """Путь к файлу дерева пользователя."""
     safe = (username or "Гость").replace("..", "").strip() or "Гость"
-    return os.path.join(DATA_DIR, f"family_tree_{safe}.json")
+    path = os.path.join(DATA_DIR, f"family_tree_{safe}.json")
+    print(f"[TREE_SERVICE] get_data_path: username='{username}', safe='{safe}', path='{path}'")
+    return path
 
 
 def load_tree(username):

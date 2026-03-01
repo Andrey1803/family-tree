@@ -964,8 +964,10 @@ def api_tree():
                 print(f"[API_TREE] Download from sync server failed: {e}")
 
         # Fallback на локальный файл
-        print(f"[API_TREE] Fallback to local file")
+        print(f"[API_TREE] Fallback to local file for username='{username}'")
         data = load_tree(username)
+        persons_count = len(data.get("persons", {}))
+        print(f"[API_TREE] Local file loaded {persons_count} persons for '{username}'")
         persons = {str(k): v for k, v in data.get("persons", {}).items()}
         for p in persons.values():
             if isinstance(p, dict):
