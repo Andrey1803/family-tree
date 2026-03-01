@@ -616,9 +616,6 @@ def admin_delete_user(user_id):
     # Удаляем деревья
     db.execute('DELETE FROM family_trees WHERE user_id = ?', (user_id,))
     
-    # Удаляем сессии
-    db.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
-    
     # Удаляем пользователя
     db.execute('DELETE FROM users WHERE id = ?', (user_id,))
     
