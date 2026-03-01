@@ -175,26 +175,34 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 def send_verification_code(email: str) -> Optional[str]:
     """
     Отправить код подтверждения на email.
-    
+
     Args:
         email: Email пользователя
-        
+
     Returns:
         Код если успешно (для тестирования), None если ошибка
     """
+    logger.info(f"=== send_verification_code вызван для {email} ===")
+    
     # Генерируем код
     code = create_verification_code(email)
-    
+    logger.info(f"Код сгенерирован: {code}")
+
     # Формируем письмо
     body = EMAIL_TEMPLATE.format(code=code)
-    
+
     # Отправляем
+    logger.info("Вызов send_email...")
     success = send_email(email, EMAIL_SUBJECT, body)
+
+    logger.info(f"send_email вернул: {success}")
     
     if success:
+        logger.info(f"Код {code} отправлен на {email}")
         return code
     else:
         # Для тестирования возвращаем код даже если SMTP не настроен
+        logger.warning(f"SMTP отправка не удалась, возвращаем код для теста: {code}")
         return code
 
 
