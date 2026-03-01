@@ -413,12 +413,22 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             e.preventDefault();
             const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             const factor = dist / pinchDist0;
-            applyZoom(zoom0 * factor, pinchCenterX, pinchCenterY);
+            
+            // Пересчитываем центр щипка для текущего кадра
+            const rect = viewport.getBoundingClientRect();
+            const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+            const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+            
+            applyZoom(zoom0 * factor, currentCenterX, currentCenterY);
         }
     }, { passive: false });
 
     panZoomWrapper.addEventListener("touchend", (e) => {
-        if (e.touches.length < 2) pinchDist0 = null;
+        if (e.touches.length < 2) {
+            pinchDist0 = null;
+            pinchCenterX = null;
+            pinchCenterY = null;
+        }
     });
 
     // Double tap zoom (mobile)
