@@ -365,6 +365,12 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
         
         zoomContainer.style.width = (totalW * treeZoom) + "px";
         zoomContainer.style.height = (totalH * treeZoom) + "px";
+        
+        // Устанавливаем transform-origin в точку зумирования
+        if (centerX !== undefined && centerY !== undefined) {
+            wrap.style.transformOrigin = `${centerX}px ${centerY}px`;
+        }
+        
         wrap.style.transform = `scale(${treeZoom})`;
         
         // Корректируем панорамирование относительно точки зумирования
