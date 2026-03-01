@@ -6,10 +6,19 @@ Email сервис для отправки кодов подтверждения
 import smtplib
 import random
 import string
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from typing import Optional, Dict
+
+# Настройка логирования для Railway
+logging.basicConfig(
+    level=logging.INFO,
+    format='[EMAIL] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 try:
     from .email_config import (
@@ -102,18 +111,18 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     Returns:
         True если отправлено успешно
     """
-    print(f"[EMAIL] === Начало отправки письма ===")
-    print(f"[EMAIL] Получатель: {to_email}")
-    print(f"[EMAIL] Тема: {subject}")
-    print(f"[EMAIL] SMTP_SERVER: {SMTP_SERVER}")
-    print(f"[EMAIL] SMTP_PORT: {SMTP_PORT}")
-    print(f"[EMAIL] SMTP_LOGIN: {SMTP_LOGIN}")
-    print(f"[EMAIL] SMTP_PASSWORD задан: {bool(SMTP_PASSWORD)}")
-    print(f"[EMAIL] SMTP_USE_TLS: {SMTP_USE_TLS}")
+    logger.info("=== Начало отправки письма ===")
+    logger.info(f"Получатель: {to_email}")
+    logger.info(f"Тема: {subject}")
+    logger.info(f"SMTP_SERVER: {SMTP_SERVER}")
+    logger.info(f"SMTP_PORT: {SMTP_PORT}")
+    logger.info(f"SMTP_LOGIN: {SMTP_LOGIN}")
+    logger.info(f"SMTP_PASSWORD задан: {bool(SMTP_PASSWORD)}")
+    logger.info(f"SMTP_USE_TLS: {SMTP_USE_TLS}")
     
     if not SMTP_LOGIN or not SMTP_PASSWORD:
-        print(f"[EMAIL] ❌ SMTP не настроен (пустой логин или пароль). Письмо для {to_email} не отправлено.")
-        print(f"[EMAIL] Тело: {body[:100]}...")
+        logger.error(f"SMTP не настроен (пустой логин или пароль). Письмо для {to_email} не отправлено.")
+        logger.info(f"Тело: {body[:100]}...")
         return False
 
     try:
@@ -124,42 +133,42 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-        print(f"[EMAIL] 📤 Подключение к {SMTP_SERVER}:{SMTP_PORT} ...")
+        logger.info(f"Подключение к {SMTP_SERVER}:{SMTP_PORT} ...")
         
         # Подключаемся к SMTP серверу
         if SMTP_USE_TLS:
-            print(f"[EMAIL] 🔐 Используем SMTP + STARTTLS")
+            logger.info("Используем SMTP + STARTTLS")
             server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-            server.set_debuglevel(1)  # Включаем отладку
+            server.set_debuglevel(1)
             server.starttls()
         else:
-            print(f"[EMAIL] 🔒 Используем SMTP_SSL")
+            logger.info("Используем SMTP_SSL")
             server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-            server.set_debuglevel(1)  # Включаем отладку
+            server.set_debuglevel(1)
 
-        print(f"[EMAIL] 🔑 Выполняем вход...")
+        logger.info("Выполняем вход...")
         server.login(SMTP_LOGIN, SMTP_PASSWORD)
         
-        print(f"[EMAIL] 📨 Отправляем письмо...")
+        logger.info("Отправляем письмо...")
         server.send_message(msg)
         
-        print(f"[EMAIL] ✅ Письмо успешно отправлено на {to_email}")
+        logger.info(f"Письмо успешно отправлено на {to_email}")
         server.quit()
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        print(f"[EMAIL] ❌ Ошибка аутентификации SMTP: {e}")
-        print(f"[EMAIL] Проверьте логин/пароль. Для Gmail используйте App Password.")
+        logger.error(f"Ошибка аутентификации SMTP: {e}")
+        logger.error("Проверьте логин/пароль. Для Gmail используйте App Password.")
         return False
     except smtplib.SMTPConnectError as e:
-        print(f"[EMAIL] ❌ Ошибка подключения к SMTP серверу: {e}")
-        print(f"[EMAIL] Проверьте SMTP_SERVER и SMTP_PORT")
+        logger.error(f"Ошибка подключения к SMTP серверу: {e}")
+        logger.error(f"Проверьте SMTP_SERVER и SMTP_PORT")
         return False
     except smtplib.SMTPException as e:
-        print(f"[EMAIL] ❌ SMTP ошибка: {e}")
+        logger.error(f"SMTP ошибка: {e}")
         return False
     except Exception as e:
-        print(f"[EMAIL] ❌ Неизвестная ошибка: {type(e).__name__}: {e}")
+        logger.error(f"Неизвестная ошибка: {type(e).__name__}: {e}")
         return False
 
 

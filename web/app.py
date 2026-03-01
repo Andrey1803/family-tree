@@ -8,10 +8,19 @@ import urllib.request
 import secrets
 import shutil
 import base64
+import logging
 from datetime import datetime
 
 import zipfile
 from io import BytesIO
+
+# Настройка логирования для Railway
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 try:
     import bcrypt
@@ -410,7 +419,7 @@ def api_send_code():
     email = data.get('email', '').strip()
     login = data.get('login', '').strip()
 
-    print(f"[AUTH] Запрос кода подтверждения для email: {email}")
+    logger.info(f"Запрос кода подтверждения для email: {email}")
 
     if not email:
         return jsonify({"error": "Введите email"}), 400
@@ -432,22 +441,22 @@ def api_send_code():
             if check_data.get('exists'):
                 return jsonify({"error": "Этот email уже зарегистрирован"}), 400
     except Exception as e:
-        print(f"[AUTH] Ошибка проверки email: {e}")
+        logger.error(f"Ошибка проверки email: {e}")
         pass  # Игнорируем ошибки проверки
 
     # Отправляем код
-    print(f"[AUTH] Вызов send_verification_code для {email}")
+    logger.info(f"Вызов send_verification_code для {email}")
     code = send_verification_code(email)
 
     if code:
         # Для тестирования возвращаем код в ответе (удалить в production!)
-        print(f"[AUTH] Код {code} сгенерирован и отправлен")
+        logger.info(f"Код {code} сгенерирован и отправлен")
         return jsonify({
             "message": "Код отправлен",
             "test_code": code  # УДАЛИТЬ в production!
         }), 200
     else:
-        print(f"[AUTH] Ошибка при отправке кода")
+        logger.error("Ошибка при отправке кода")
         return jsonify({"error": "Ошибка отправки кода"}), 500
 
 
