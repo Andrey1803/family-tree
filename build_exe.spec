@@ -3,27 +3,16 @@
 # Требуется: pip install pyinstaller pillow
 
 from pathlib import Path
+import os
 
 _block_cipher = None
 
 # Корень проекта
 root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
-services_dir = tree_dir / 'services'
 
-# Данные для приложения + Tcl/Tk
+# Данные для приложения
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
-try:
-    from PyInstaller.utils.hooks.tcl_tk import tcltk_info
-    if tcltk_info.data_files:
-        for dest, src, kind in tcltk_info.data_files:
-            s, d = str(src), str(dest)
-            # Исключаем ненужные файлы локализации
-            skip = any(x in d or x in s for x in ('tzdata', 'msgs', 'macRoman', 'macCyrillic', 'macUkraine', 'macIceland', 'macTurkish', 'macDingbats'))
-            if not skip:
-                datas_list.append((src, dest))
-except Exception as e:
-    print(f"Warning: Could not get Tcl/Tk info: {e}")
 
 a = Analysis(
     [str(root / 'main.py')],
@@ -33,10 +22,10 @@ a = Analysis(
     hiddenimports=[
         # Кодировки
         'encodings', 'encodings.utf_8', 'encodings.cp1251', 'encodings.cp1252',
-        'encodings.latin_1', 'encodings.ascii',
+        'encodings.latin_1', 'encodings.ascii', 'encodings.cp866',
         # PIL
         'PIL', 'PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk', 'PIL.PngImagePlugin',
-        'PIL.JpegImagePlugin', 'PIL.GifImagePlugin',
+        'PIL.JpegImagePlugin', 'PIL.GifImagePlugin', 'PIL.BmpImagePlugin',
         # Модули Дерево
         'app', 'auth', 'models', 'constants', 'ui_helpers', 'protocol_win',
         'version', 'update_check', 'backup', 'undo', 'kinship', 'theme',
@@ -55,9 +44,9 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'matplotlib', 'numpy', 'scipy', 'pandas', 'pygame',  # Не используются
-        'tkinter.test',  # Тесты tkinter
-        'reportlab',  # Нет в requirements
+        'matplotlib', 'numpy', 'scipy', 'pandas', 'pygame',
+        'tkinter.test',
+        'reportlab',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -67,7 +56,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=_block_cipher)
 
-# onedir — Tcl/Tk стабильно работает на других ПК
+# EXE с данными
 exe = EXE(
     pyz,
     a.scripts,
