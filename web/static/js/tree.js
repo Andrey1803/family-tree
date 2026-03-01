@@ -44,6 +44,11 @@ async function loadTree() {
     treeData = await r.json();
     console.log('[LOAD_TREE] Loaded treeData:', treeData);
     console.log('[LOAD_TREE] Persons count:', Object.keys(treeData.persons || {}).length);
+    console.log('[LOAD_TREE] Marriages:', treeData.marriages);
+    console.log('[LOAD_TREE] Marriages type:', Array.isArray(treeData.marriages) ? 'array' : typeof treeData.marriages);
+    if (Array.isArray(treeData.marriages)) {
+        console.log('[LOAD_TREE] First marriage:', treeData.marriages[0]);
+    }
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId);
     render();
@@ -278,7 +283,17 @@ function render() {
         svg.appendChild(path);
     });
     // Линии между супругами
-    (treeData.marriages || []).forEach(([a, b]) => {
+    (treeData.marriages || []).forEach(m => {
+        // Поддерживаем форматы: [a, b] или {persons: [a, b]}
+        let a, b;
+        if (Array.isArray(m)) {
+            [a, b] = m;
+        } else if (m.persons && Array.isArray(m.persons)) {
+            [a, b] = m.persons;
+        } else {
+            return; // Неверный формат
+        }
+        
         const idA = String(a), idB = String(b);
         if (!coords[idA] || !coords[idB] || !related.has(idA) || !related.has(idB)) return;
             const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
