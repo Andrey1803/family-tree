@@ -6,10 +6,10 @@
 
 # SMTP настройки
 SMTP_SERVER = "smtp.gmail.com"  # или smtp.yandex.ru
-SMTP_PORT = 587  # 587 для TLS, 465 для SSL
+SMTP_PORT = 465  # 587 для TLS, 465 для SSL
 SMTP_LOGIN = "familyroots010326@gmail.com"  # Ваш email
-SMTP_PASSWORD = "zsyanddzbfdbwgtj"  # Пароль приложения (не обычный пароль!)
-SMTP_USE_TLS = True
+SMTP_PASSWORD = "xryylsrdahhkjvvm"  # Пароль приложения (не обычный пароль!)
+SMTP_USE_TLS = False
 
 # От кого
 EMAIL_FROM = "Family Tree <familyroots010326@gmail.com>"
