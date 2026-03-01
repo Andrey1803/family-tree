@@ -51,6 +51,12 @@ async function loadTree() {
     }
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId);
+    
+    // Сбрасываем зум и панорамирование при загрузке
+    treeZoom = 1;
+    treePanX = 0;
+    treePanY = 0;
+    
     render();
 }
 
@@ -1866,16 +1872,16 @@ function openTimeline() {
     // Перетаскивание
     container.addEventListener("mousedown", (e) => {
         isDragging = true;
-        dragStartX = e.clientX + timelinePanX;
-        dragStartY = e.clientY + timelinePanY;
+        dragStartX = e.clientX - timelinePanX;
+        dragStartY = e.clientY - timelinePanY;
         container.style.cursor = "grabbing";
     });
-    
+
     container.addEventListener("mousemove", (e) => {
         if (!isDragging) return;
         e.preventDefault();
-        timelinePanX = dragStartX - e.clientX;
-        timelinePanY = dragStartY - e.clientY;
+        timelinePanX = e.clientX - dragStartX;
+        timelinePanY = e.clientY - dragStartY;
         drawTimeline();
     });
     
@@ -2619,7 +2625,7 @@ function showWelcomeDialog() {
             <label>Дата рождения (ДД.ММ.ГГГГ)</label>
             <input type="text" id="welcome-birth" placeholder="ДД.ММ.ГГГГ">
             <label>Место рождения</label>
-            <input type="text" id="welcome-birth-place" value="Минск, Беларусь">
+            <input type="text" id="welcome-birth-place" value="Минск, Б���ларусь">
             <label>Пол</label>
             <select id="welcome-gender">
                 <option value="Мужской">Мужской</option>
