@@ -22,15 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Логирование переменных окружения при старте
-logger.info("=== Переменные окружения SMTP ===")
-logger.info(f"SMTP_SERVER: {os.environ.get('SMTP_SERVER', 'NOT_SET')}")
-logger.info(f"SMTP_PORT: {os.environ.get('SMTP_PORT', 'NOT_SET')}")
-logger.info(f"SMTP_LOGIN: {os.environ.get('SMTP_LOGIN', 'NOT_SET')}")
-logger.info(f"SMTP_PASSWORD задан: {bool(os.environ.get('SMTP_PASSWORD'))}")
-logger.info(f"SMTP_USE_TLS: {os.environ.get('SMTP_USE_TLS', 'NOT_SET')}")
-logger.info("==================================")
-
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
@@ -458,11 +449,10 @@ def api_send_code():
     code = send_verification_code(email)
 
     if code:
-        # Для тестирования возвращаем код в ответе (удалить в production!)
-        logger.info(f"Код {code} сгенерирован и отправлен")
+        # Код отправлен на email (не показываем код на экране)
+        logger.info(f"Код сгенерирован и отправлен на {email}")
         return jsonify({
-            "message": "Код отправлен",
-            "test_code": code  # УДАЛИТЬ в production!
+            "message": "Код отправлен на email"
         }), 200
     else:
         logger.error("Ошибка при отправке кода")

@@ -118,11 +118,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     Returns:
         True если отправлено успешно
     """
-    logger.info("=== Начало отправки письма ===")
-    logger.info(f"Получатель: {to_email}")
-    logger.info(f"Тема: {subject}")
-    logger.info(f"SendGrid API ключ задан: {bool(SENDGRID_API_KEY)}")
-    logger.info(f"From: {SENDGRID_FROM_EMAIL}")
+    logger.info(f"Отправка письма на {to_email}")
     
     if not SENDGRID_API_KEY:
         logger.warning("SendGrid API ключ не задан, пробуем SMTP...")
@@ -250,27 +246,19 @@ def send_verification_code(email: str) -> Optional[str]:
     Returns:
         Код если успешно (для тестирования), None если ошибка
     """
-    logger.info(f"=== send_verification_code вызван для {email} ===")
-    
     # Генерируем код
     code = create_verification_code(email)
-    logger.info(f"Код сгенерирован: {code}")
 
     # Формируем письмо
     body = EMAIL_TEMPLATE.format(code=code)
 
     # Отправляем
-    logger.info("Вызов send_email...")
     success = send_email(email, EMAIL_SUBJECT, body)
 
-    logger.info(f"send_email вернул: {success}")
-    
     if success:
-        logger.info(f"Код {code} отправлен на {email}")
         return code
     else:
         # Для тестирования возвращаем код даже если SMTP не настроен
-        logger.warning(f"SMTP отправка не удалась, возвращаем код для теста: {code}")
         return code
 
 
