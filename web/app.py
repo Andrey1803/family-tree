@@ -1315,10 +1315,12 @@ def api_stats():
     """Статистика дерева."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
+    print(f"[API_STATS] username='{username}'")
     data = load_tree(username)
     persons = data.get("persons", {})
+    print(f"[API_STATS] Loaded {len(persons)} persons")
     
     # Подсчёт статистики
     male_count = sum(1 for p in persons.values() if p.get('gender') == 'Мужской')

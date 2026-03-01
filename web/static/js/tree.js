@@ -53,7 +53,7 @@ async function loadTree() {
     console.log('[LOAD_TREE] centerId:', centerId);
     
     // Сбрасываем зум и панорамирование при загрузке
-    treeZoom = 1;
+    treeZoom = 0.5;  // Уменьшенный начальный зум
     treePanX = 0;
     treePanY = 0;
     
@@ -2632,7 +2632,7 @@ function showWelcomeDialog() {
     ov.className = "tree-modal-overlay";
     ov.innerHTML = `
         <div class="tree-modal tree-welcome-modal">
-            <h3>🎉 Добро пожаловать!</h3>
+            <h3>�� Добро пожаловать!</h3>
             <p>Ваше дерево пусто. Давайте создадим первую запись!</p>
             <p>Заполните свои данные — это будет ваша карточка в дереве.</p>
             <hr>
