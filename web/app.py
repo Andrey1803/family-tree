@@ -670,8 +670,8 @@ def api_admin_toggle_user(user_id):
     return jsonify({"message": "Статус пользователя изменён (локально)"})
 
 
-@app.route("/api/admin/user/<login>/delete", methods=["POST"])
-def api_admin_delete_user(login):
+@app.route("/api/admin/user/<int:user_id>/delete", methods=["POST"])
+def api_admin_delete_user(user_id):
     """Удалить пользователя (только супер-админ admin)."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
@@ -681,15 +681,11 @@ def api_admin_delete_user(login):
     if username != "admin":
         return jsonify({"error": "Только супер-админ может удалять пользователей"}), 403
 
-    # Нельзя удалить самого себя
-    if login == "admin":
-        return jsonify({"error": "Нельзя удалить супер-админа"}), 400
-
     server_token = session.get('server_token')
     if server_token:
         try:
             req = urllib.request.Request(
-                f"{SYNC_SERVER_URL}/api/admin/user/{login}/delete",
+                f"{SYNC_SERVER_URL}/api/admin/user/{user_id}/delete",
                 headers={'Authorization': f'Bearer {server_token}'},
                 method='POST'
             )
@@ -707,8 +703,18 @@ def api_admin_delete_user(login):
 
     # Локальное удаление (если пользователь в users.json)
     users = _load_users()
-    if login in users:
-        del users[login]
+    # Находим пользователя по ID (хеш от login)
+    target_login = None
+    for login, data in users.items():
+        if login == "admin":
+            continue
+        # Для локальных пользователей просто проверяем наличие
+        if hash(login) % 10000 == user_id:
+            target_login = login
+            break
+    
+    if target_login and target_login in users:
+        del users[target_login]
         if _save_users(users):
             return jsonify({"message": "Пользователь удалён локально"})
         else:

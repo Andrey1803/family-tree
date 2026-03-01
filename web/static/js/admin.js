@@ -140,7 +140,7 @@ function renderUsersTable(users) {
                     ${u.is_active ? 'Деактивировать' : 'Активировать'}
                 </button>
                 ${u.login !== 'admin' ? `
-                <button class="btn-delete" onclick="deleteUser('${escapeHtml(u.login)}')">
+                <button class="btn-delete" onclick="deleteUser(${u.id}, '${escapeHtml(u.login)}')">
                     ❌ Удалить
                 </button>
                 ` : ''}
@@ -185,13 +185,13 @@ async function toggleUser(userId) {
 }
 
 // Удаление пользователя
-async function deleteUser(login) {
+async function deleteUser(userId, login) {
     if (!confirm(`⚠️ Вы уверены, что хотите удалить пользователя "${login}"?\n\nЭто действие нельзя отменить!`)) return;
 
     try {
-        const r = await fetch(`/api/admin/user/${login}/delete`, { method: 'POST' });
+        const r = await fetch(`/api/admin/user/${userId}/delete`, { method: 'POST' });
         const data = await r.json();
-        
+
         if (r.ok) {
             alert('✅ ' + data.message);
             loadUsers();
