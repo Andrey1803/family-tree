@@ -17,8 +17,10 @@
             <input type="text" name="login" id="login" value="{{ login or '' }}" required autofocus placeholder="Придумайте логин">
             
             <label>Email *</label>
-            <input type="email" name="email" id="email" required placeholder="your@email.com">
-            <small style="color: #64748b; font-size: 12px;">На этот email будет отправлен код подтверждения</small>
+            <input type="email" name="email" id="email" required placeholder="your@gmail.com">
+            <small style="color: #64748b; font-size: 12px;">
+                ⚠️ Временно принимаем только <strong>Gmail</strong> (mail.ru блокирует письма)
+            </small>
             
             <label>Пароль *</label>
             <input type="password" name="password" id="password" required minlength="4" placeholder="Минимум 4 символа">
@@ -73,6 +75,12 @@
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
         const password2 = document.getElementById('password2').value;
+
+        // Проверяем, что email Gmail
+        if (!email.toLowerCase().endsWith('@gmail.com')) {
+            errorDiv.textContent = '⚠️ Временно принимаем только Gmail (другие почты блокируются)';
+            return;
+        }
 
         if (password !== password2) {
             errorDiv.textContent = 'Пароли не совпадают';
