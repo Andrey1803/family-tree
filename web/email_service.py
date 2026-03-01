@@ -7,6 +7,7 @@ import smtplib
 import random
 import string
 import logging
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -20,23 +21,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-try:
-    from .email_config import (
-        SMTP_SERVER, SMTP_PORT, SMTP_LOGIN, SMTP_PASSWORD,
-        SMTP_USE_TLS, EMAIL_FROM, EMAIL_SUBJECT, CODE_EXPIRY_SECONDS,
-        EMAIL_TEMPLATE
-    )
-except ImportError:
-    # Значения по умолчанию (для тестирования без SMTP)
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_LOGIN = ""
-    SMTP_PASSWORD = ""
-    SMTP_USE_TLS = True
-    EMAIL_FROM = "Family Tree <noreply@familytree.local>"
-    EMAIL_SUBJECT = "Код подтверждения регистрации"
-    CODE_EXPIRY_SECONDS = 600
-    EMAIL_TEMPLATE = "Ваш код: {code}"
+# Читаем переменные окружения напрямую (не через email_config)
+SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_LOGIN = os.environ.get("SMTP_LOGIN", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
+
+# Остальные настройки
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "Family Tree <familyroots010326@gmail.com>")
+EMAIL_SUBJECT = "Код подтверждения регистрации"
+CODE_EXPIRY_SECONDS = 600
+EMAIL_TEMPLATE = """
+Здравствуйте!
+
+Ваш код подтверждения для регистрации в Family Tree: {code}
+
+Код действителен в течение 10 минут.
+
+Если вы не регистрировались, просто проигнорируйте это письмо.
+
+---
+Семейное древо (Family Tree)
+"""
 
 # Хранилище кодов (в памяти, для production нужна БД)
 _verification_codes: Dict[str, dict] = {}
