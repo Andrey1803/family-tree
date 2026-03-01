@@ -11,18 +11,19 @@ root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
 services_dir = tree_dir / 'services'
 
-# Данные для приложения + Tcl/Tk (минимальный набор — без tzdata/msgs, чтобы избежать PermissionError)
+# Данные для приложения + Tcl/Tk
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
 try:
     from PyInstaller.utils.hooks.tcl_tk import tcltk_info
     if tcltk_info.data_files:
         for dest, src, kind in tcltk_info.data_files:
             s, d = str(src), str(dest)
+            # Исключаем ненужные файлы локализации
             skip = any(x in d or x in s for x in ('tzdata', 'msgs', 'macRoman', 'macCyrillic', 'macUkraine', 'macIceland', 'macTurkish', 'macDingbats'))
             if not skip:
                 datas_list.append((src, dest))
-except Exception:
-    pass
+except Exception as e:
+    print(f"Warning: Could not get Tcl/Tk info: {e}")
 
 a = Analysis(
     [str(root / 'main.py')],
@@ -31,13 +32,15 @@ a = Analysis(
     datas=datas_list,
     hiddenimports=[
         # Кодировки
-        'encodings', 'encodings.utf_8', 'encodings.cp1251',
+        'encodings', 'encodings.utf_8', 'encodings.cp1251', 'encodings.cp1252',
+        'encodings.latin_1', 'encodings.ascii',
         # PIL
-        'PIL', 'PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk',
+        'PIL', 'PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk', 'PIL.PngImagePlugin',
+        'PIL.JpegImagePlugin', 'PIL.GifImagePlugin',
         # Модули Дерево
         'app', 'auth', 'models', 'constants', 'ui_helpers', 'protocol_win',
         'version', 'update_check', 'backup', 'undo', 'kinship', 'theme',
-        'timeline', 'export_pdf', 'sync', 'check_parents', 'data_migrations',
+        'timeline', 'sync', 'check_parents', 'data_migrations',
         # Сервисы
         'services',
         'services.tree_service',
@@ -52,7 +55,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'matplotlib', 'numpy', 'scipy', 'pandas',  # Не используются
+        'matplotlib', 'numpy', 'scipy', 'pandas', 'pygame',  # Не используются
         'tkinter.test',  # Тесты tkinter
         'reportlab',  # Нет в requirements
     ],
@@ -64,30 +67,23 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=_block_cipher)
 
-# onedir — Tcl/Tk стабильно работает на других ПК (onefile даёт init.tcl error)
+# onedir — Tcl/Tk стабильно работает на других ПК
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='Семейное_древо',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,  # Включено для уменьшения размера
+    upx=True,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name='Семейное_древо',
+    entitlements_file=None,
 )
