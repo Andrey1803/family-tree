@@ -2,6 +2,11 @@
 chcp 65001 >nul
 title Семейное древо
 
+echo ========================================
+echo    Семейное древо - Запуск
+echo ========================================
+echo.
+
 REM Проверка наличия Python
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -15,5 +20,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [OK] Python найден
+echo.
+echo Запуск приложения...
+echo.
+echo Нажмите любую клавишу для запуска...
+pause >nul
+
 REM Запуск приложения
-start "Семейное древо" python main.py
+python main.py
+
+if errorlevel 1 (
+    echo.
+    echo ========================================
+    echo ОШИБКА при запуске приложения!
+    echo ========================================
+    echo.
+    pause
+)
