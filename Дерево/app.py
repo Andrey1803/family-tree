@@ -1177,7 +1177,7 @@ class FamilyTreeApp:
             messagebox.showerror("Ошибка", f"Файл не найден:\n{filepath}")
 
     def auto_sync_on_startup(self):
-        """Автоматическая синхронизация при запуске — загрузка локального дерева на сервер"""
+        """Автоматическая синхронизация при запуске — загрузка дерева с сервера"""
         from sync_client import get_sync_client, USER_CREDENTIALS
 
         if not self.username:
@@ -1201,7 +1201,29 @@ class FamilyTreeApp:
 
             print(f"[SYNC] Login OK")
 
-            # Загружаем локальное дерево на сервер
+            # Сначала пробуем загрузить дерево с сервера
+            print(f"[SYNC] Downloading tree from server...")
+            try:
+                server_data = client.download_tree()
+                
+                if server_data and 'tree' in server_data:
+                    tree_data = server_data.get('tree', {})
+                    persons = tree_data.get('persons', {})
+                    
+                    if persons:
+                        print(f"[SYNC] Downloaded tree with {len(persons)} persons")
+                        # Загружаем дерево из сервера
+                        self._load_tree_from_server(server_data)
+                        return  # Успешно загрузили с сервера
+                    else:
+                        print(f"[SYNC] Server tree is empty")
+                else:
+                    print(f"[SYNC] No tree on server")
+            except Exception as e:
+                print(f"[SYNC] Download error: {e}")
+                # Если ошибка загрузки — продолжаем с локальным деревом
+
+            # Если сервер пуст или ошибка — загружаем локальное дерево на сервер
             print(f"[SYNC] Uploading local tree...")
             result = client.upload_tree(self.model, f"Дерево {self.username}")
 
