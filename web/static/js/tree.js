@@ -403,12 +403,20 @@ function render() {
 function updateStatusBar() {
     const centerEl = document.getElementById("status-center");
     const msgEl = document.getElementById("status-msg");
+    const statsEl = document.getElementById("status-stats");
     if (!centerEl) return;
     const persons = treeData.persons || {};
     const p = centerId ? persons[centerId] : null;
     const name = p ? [p.name, p.patronymic, p.surname].filter(Boolean).join(" ") : "не выбран";
     centerEl.textContent = "Центр: " + name + (focusModeActive ? " 🔍" : "");
     if (msgEl) msgEl.textContent = focusModeActive ? "Режим фокуса: предки скрыты" : "";
+    
+    // Обновляем краткую статистику
+    if (statsEl) {
+        const personsCount = Object.keys(persons).length;
+        const marriagesCount = (treeData.marriages || []).length;
+        statsEl.textContent = `📊 Персон: ${personsCount} | Браков: ${marriagesCount}`;
+    }
 }
 
 function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
@@ -1276,7 +1284,7 @@ function addRelative(pid, relation) {
     if (window.undoManager) window.undoManager.beforeAddRelative(treeData);
     
     if ((relation === "brother" || relation === "sister") && (!p.parents || p.parents.length === 0)) {
-        alert("Для добавления брата/сестры у персоны должны быть родители.");
+        alert("Для добавления брата/сестры у персоны должны бы��ь родители.");
         return;
     }
     const labels = { father: "Отец", mother: "Мать", son: "Сын", daughter: "Дочь", brother: "Брат", sister: "Сестра", spouse: "Супруг(а)" };
