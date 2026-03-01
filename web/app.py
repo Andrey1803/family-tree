@@ -854,7 +854,10 @@ def api_tree():
     server_token = session.get('server_token')
     server_user_id = session.get('server_user_id')
 
-    print(f"[API_TREE] username={username}, has_token={server_token is not None}, user_id={server_user_id}")
+    print(f"[API_TREE] ===== START =====")
+    print(f"[API_TREE] username='{username}'")
+    print(f"[API_TREE] username repr={repr(username)}")
+    print(f"[API_TREE] has_token={server_token is not None}, user_id={server_user_id}")
 
     if request.method == "GET":
         # Для админа: проверяем, запрашивает ли он дерево конкретного пользователя
