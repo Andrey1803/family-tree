@@ -1388,6 +1388,40 @@ def _get_lan_ip():
         return None
 
 
+@app.route("/api/debug/smtp")
+def api_debug_smtp():
+    """Debug: проверка SMTP настроек (только для админа)."""
+    if "username" not in session or session.get("username") != "admin":
+        return jsonify({"error": "Требуется авторизация админа"}), 403
+    
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    
+    try:
+        from email_config import SMTP_SERVER, SMTP_PORT, SMTP_LOGIN, SMTP_PASSWORD, SMTP_USE_TLS
+        config_ok = bool(SMTP_SERVER and SMTP_PORT and SMTP_LOGIN and SMTP_PASSWORD)
+        
+        return jsonify({
+            "status": "ok" if config_ok else "not_configured",
+            "smtp_config": {
+                "SMTP_SERVER": SMTP_SERVER,
+                "SMTP_PORT": SMTP_PORT,
+                "SMTP_LOGIN": SMTP_LOGIN,
+                "SMTP_PASSWORD_set": bool(SMTP_PASSWORD),
+                "SMTP_USE_TLS": SMTP_USE_TLS,
+            },
+            "env_vars": {
+                "SMTP_SERVER": os.environ.get("SMTP_SERVER", "NOT_SET"),
+                "SMTP_PORT": os.environ.get("SMTP_PORT", "NOT_SET"),
+                "SMTP_LOGIN": os.environ.get("SMTP_LOGIN", "NOT_SET"),
+                "SMTP_PASSWORD": "***" if os.environ.get("SMTP_PASSWORD") else "NOT_SET",
+                "SMTP_USE_TLS": os.environ.get("SMTP_USE_TLS", "NOT_SET"),
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     lan_ip = _get_lan_ip()
     if lan_ip:
