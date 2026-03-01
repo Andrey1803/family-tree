@@ -358,61 +358,79 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     const viewport = wrap.closest("#tree-root");
     if (!viewport) return;
 
-    const applyZoom = (newZoom) => {
+    const applyZoom = (newZoom, centerX, centerY) => {
+        const oldZoom = treeZoom;
         treeZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+        if (treeZoom === oldZoom) return;
+        
         zoomContainer.style.width = (totalW * treeZoom) + "px";
         zoomContainer.style.height = (totalH * treeZoom) + "px";
         wrap.style.transform = `scale(${treeZoom})`;
-    };
-    const applyPan = () => {
+        
+        // Корректируем панорамирование относительно точки зумирования
+        if (centerX !== undefined && centerY !== undefined) {
+            treePanX = centerX - (centerX - treePanX) * treeZoom / oldZoom;
+            treePanY = centerY - (centerY - treePanY) * treeZoom / oldZoom;
+        }
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
     };
 
+    // Wheel zoom (desktop + touchpad)
     panZoomWrapper.addEventListener("wheel", (e) => {
         e.preventDefault();
         const rect = viewport.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = treeZoom * factor;
-        const oldZoom = treeZoom;
-        applyZoom(newZoom);
-        if (oldZoom !== treeZoom) {
-            treePanX = cx - (cx - treePanX) * treeZoom / oldZoom;
-            treePanY = cy - (cy - treePanY) * treeZoom / oldZoom;
-            applyPan();
-        }
+        applyZoom(treeZoom * factor, cx, cy);
     }, { passive: false });
+    
+    // Pinch zoom (mobile)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     panZoomWrapper.addEventListener("touchstart", (e) => {
         if (e.touches.length === 2) {
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             zoom0 = treeZoom;
-            // Вычисляем центр между двумя пальцами (точка масштабирования)
-            pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            const rect = viewport.getBoundingClientRect();
+            // Вычисляем центр между двумя пальцами относительно viewport
+            pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+            pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
         }
     }, { passive: true });
+    
     panZoomWrapper.addEventListener("touchmove", (e) => {
         if (e.touches.length === 2 && pinchDist0) {
             e.preventDefault();
             const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             const factor = dist / pinchDist0;
-            const oldZoom = treeZoom;
-            applyZoom(zoom0 * factor);
-            // Корректируем панорамирование относительно центра pinch-жеста
-            if (oldZoom !== treeZoom) {
-                const rect = viewport.getBoundingClientRect();
-                const cx = pinchCenterX - rect.left;
-                const cy = pinchCenterY - rect.top;
-                treePanX = cx - (cx - treePanX) * treeZoom / oldZoom;
-                treePanY = cy - (cy - treePanY) * treeZoom / oldZoom;
-            }
-            applyPan();
+            applyZoom(zoom0 * factor, pinchCenterX, pinchCenterY);
         }
     }, { passive: false });
+    
     panZoomWrapper.addEventListener("touchend", (e) => {
         if (e.touches.length < 2) pinchDist0 = null;
+    });
+    
+    // Double tap zoom (mobile)
+    let lastTap = 0;
+    panZoomWrapper.addEventListener("touchend", (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        if (tapLength < 500 && tapLength > 0) {
+            e.preventDefault();
+            const rect = viewport.getBoundingClientRect();
+            const touch = e.changedTouches[0];
+            const tx = touch.clientX - rect.left;
+            const ty = touch.clientY - rect.top;
+            
+            // Увеличиваем или уменьшаем зум
+            if (treeZoom > 1) {
+                applyZoom(1, tx, ty);
+            } else {
+                applyZoom(2, tx, ty);
+            }
+        }
+        lastTap = currentTime;
     });
 }
 
@@ -510,8 +528,31 @@ function showContextMenu(pid, x, y, persons) {
 
     const menu = document.createElement("div");
     menu.className = "tree-context-menu";
-    menu.style.left = x + "px";
-    menu.style.top = y + "px";
+    
+    // Адаптивное позиционирование для мобильных
+    const isMobile = window.innerWidth <= 480;
+    const menuWidth = isMobile ? Math.min(200, window.innerWidth - 16) : 180;
+    const menuHeight = 300; // примерная высота
+    
+    let left = x;
+    let top = y;
+    
+    // На мобильных центрируем меню по горизонтали
+    if (isMobile) {
+        left = (window.innerWidth - menuWidth) / 2;
+        top = Math.max(10, (window.innerHeight - menuHeight) / 2);
+    } else {
+        // На десктопе позиционируем рядом с кликом
+        if (x + menuWidth > window.innerWidth) {
+            left = x - menuWidth;
+        }
+        if (y + menuHeight > window.innerHeight) {
+            top = y - menuHeight;
+        }
+    }
+    
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
 
     const hasFather = (p.parents || []).some(prId => persons[prId]?.gender === "Мужской");
     const hasMother = (p.parents || []).some(prId => persons[prId]?.gender === "Женский");
@@ -589,9 +630,12 @@ function showContextMenu(pid, x, y, persons) {
         document.addEventListener("keydown", onEscape);
     }, 0);
 
-    const rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + "px";
-    if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + "px";
+    // Финальная проверка границ (для десктопа)
+    if (!isMobile) {
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + "px";
+        if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + "px";
+    }
 }
 
 let _ctxMenuClickCleanup = null;

@@ -1053,3 +1053,218 @@ body {
     align-items: center;
   }
 }
+
+/* Маленькие экраны (до 480px) */
+@media (max-width: 480px) {
+  /* Hamburger-меню */
+  .tree-menubar {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 8px 0;
+    z-index: 999;
+    flex-direction: column;
+  }
+  .tree-menubar.open {
+    display: flex;
+  }
+  .tree-menubar .menu-item {
+    width: 100%;
+  }
+  .tree-menubar .menu-label {
+    display: block;
+    width: 100%;
+    border-radius: 0;
+  }
+  .tree-menubar .menu-dropdown {
+    position: static;
+    box-shadow: none;
+    border: none;
+    margin-left: 16px;
+    min-width: auto;
+  }
+  
+  /* Кнопка hamburger */
+  .hamburger-btn {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 8px;
+    gap: 4px;
+  }
+  .hamburger-btn span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: #475569;
+    transition: all 0.2s;
+  }
+  .hamburger-btn:hover {
+    background: #f1f5f9;
+  }
+  .hamburger-btn.active span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+  .hamburger-btn.active span:nth-child(2) {
+    opacity: 0;
+  }
+  .hamburger-btn.active span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+  
+  .tree-header h1 {
+    font-size: 1rem;
+  }
+  
+  .tree-header-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .tree-header-right .user {
+    order: 1;
+    width: 100%;
+    text-align: right;
+    margin-bottom: 4px;
+  }
+  .tree-header-right a,
+  .tree-header-right .btn-pwa-open,
+  .tree-header-right .btn-admin,
+  .tree-header-right .desktop-app-hint {
+    order: 2;
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+  
+  /* Модальные окна */
+  .tree-modal,
+  .tree-edit-modal,
+  .tree-backup-modal,
+  .tree-timeline-modal,
+  .tree-stats-modal,
+  .tree-updates-modal,
+  .tree-about-modal,
+  .tree-welcome-modal {
+    width: 95%;
+    max-width: none;
+    min-width: auto;
+    padding: 16px;
+  }
+  .tree-edit-modal {
+    min-width: auto;
+    width: 95%;
+  }
+  
+  /* Временная шкала */
+  .tree-timeline-full {
+    width: 98vw;
+    height: 85vh;
+  }
+  .timeline-header h3 {
+    font-size: 1.1rem;
+  }
+  .timeline-toolbar {
+    gap: 8px;
+  }
+  .toolbar-group select,
+  .toolbar-group button {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+  
+  /* Статистика */
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Контекстное меню — адаптивное позиционирование */
+  .tree-context-menu {
+    max-width: calc(100vw - 16px);
+    min-width: auto;
+  }
+  .tree-context-menu .cm-submenu {
+    left: auto;
+    right: 100%;
+  }
+}
+
+/* Очень маленькие экраны (до 360px) */
+@media (max-width: 360px) {
+  .tree-card {
+    width: 100px;
+    min-height: 75px;
+  }
+  .tree-card .name { font-size: 9px; }
+  .tree-card .dates { font-size: 7px; }
+  .tree-card .card-photo {
+    height: 40px;
+  }
+  
+  .tree-header {
+    padding: 6px 8px;
+  }
+  .tree-header h1 {
+    font-size: 0.95rem;
+  }
+  
+  .hamburger-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .hamburger-btn span {
+    width: 20px;
+  }
+  
+  .tree-statusbar {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+  
+  /* Уменьшаем модальные окна */
+  .tree-modal,
+  .tree-edit-modal {
+    padding: 12px;
+  }
+  .tree-modal h3,
+  .tree-edit-modal h3 {
+    font-size: 1rem;
+  }
+  .tree-modal input,
+  .tree-modal select,
+  .tree-edit-content input,
+  .tree-edit-content select,
+  .tree-edit-content textarea {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+  }
+  
+  /* Кнопки в модальных окнах */
+  .tree-modal-btns {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tree-modal-btns button {
+    width: 100%;
+  }
+  
+  /* Вкладки редактирования */
+  .tree-edit-tabs {
+    gap: 1px;
+  }
+  .tree-edit-tabs .tab-btn {
+    padding: 4px 6px;
+    font-size: 0.75rem;
+  }
+}

@@ -11,7 +11,12 @@
 <body data-is-admin="{{ 'true' if username == 'admin' else 'false' }}">
     <header class="tree-header">
         <h1>Семейное древо</h1>
-        <nav class="tree-menubar">
+        <button class="hamburger-btn" id="hamburger-btn" aria-label="Меню" style="display:none">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="tree-menubar" id="tree-menubar">
             <div class="menu-item">
                 <span class="menu-label">Файл</span>
                 <div class="menu-dropdown">
@@ -85,6 +90,59 @@
         <span id="status-center">Центр: не выбран</span>
         <span id="status-msg"></span>
     </footer>
+    
+    <!-- Hamburger menu toggle script -->
+    <script>
+    // Показываем hamburger-кнопку только на мобильных
+    function updateHamburgerVisibility() {
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const menubar = document.getElementById('tree-menubar');
+        if (window.innerWidth <= 480) {
+            hamburgerBtn.style.display = 'flex';
+        } else {
+            hamburgerBtn.style.display = 'none';
+            menubar.classList.remove('open');
+            hamburgerBtn.classList.remove('active');
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const menubar = document.getElementById('tree-menubar');
+        
+        // Инициализация видимости
+        updateHamburgerVisibility();
+        
+        // Переключение меню
+        hamburgerBtn.addEventListener('click', function() {
+            menubar.classList.toggle('open');
+            hamburgerBtn.classList.toggle('active');
+        });
+        
+        // Закрытие меню при клике вне его
+        document.addEventListener('click', function(e) {
+            if (!menubar.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+                menubar.classList.remove('open');
+                hamburgerBtn.classList.remove('active');
+            }
+        });
+        
+        // Закрытие меню при выборе пункта
+        const menuItems = menubar.querySelectorAll('.menu-dropdown button, .menu-dropdown a');
+        menuItems.forEach(function(item) {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 480) {
+                    menubar.classList.remove('open');
+                    hamburgerBtn.classList.remove('active');
+                }
+            });
+        });
+        
+        // Пересчёт при изменении размера окна
+        window.addEventListener('resize', updateHamburgerVisibility);
+    });
+    </script>
+    
     <script src="{{ url_for('static', filename='js/undo.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
 </body>
