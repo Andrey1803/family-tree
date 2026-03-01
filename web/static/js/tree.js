@@ -29,14 +29,23 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 
 async function loadTree() {
+    console.log('[LOAD_TREE] Starting to load tree...');
     const r = await fetch("/api/tree");
+    console.log('[LOAD_TREE] Fetch response status:', r.status);
     if (r.status === 401) {
+        console.log('[LOAD_TREE] 401 Unauthorized, redirecting to login');
         window.location.href = "/login";
         return;
     }
-    if (!r.ok) return;
+    if (!r.ok) {
+        console.error('[LOAD_TREE] Response not ok:', r.status);
+        return;
+    }
     treeData = await r.json();
+    console.log('[LOAD_TREE] Loaded treeData:', treeData);
+    console.log('[LOAD_TREE] Persons count:', Object.keys(treeData.persons || {}).length);
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
+    console.log('[LOAD_TREE] centerId:', centerId);
     render();
 }
 
@@ -47,13 +56,20 @@ function render() {
 
     const persons = treeData.persons || {};
     const ids = Object.keys(persons);
+    
+    console.log('[RENDER] persons count:', ids.length);
+    console.log('[RENDER] centerId:', centerId);
+    console.log('[RENDER] treeData:', treeData);
+    
     if (ids.length === 0) {
+        console.log('[RENDER] No persons, showing empty message');
         emptyMsg.style.display = "block";
         const btn = document.getElementById("btn-add-first");
         if (btn) btn.onclick = () => addFirstPerson();
         updateStatusBar();
         return;
     }
+    console.log('[RENDER] Rendering tree with', ids.length, 'persons');
     emptyMsg.style.display = "none";
 
     const relatedRaw = new Set();
