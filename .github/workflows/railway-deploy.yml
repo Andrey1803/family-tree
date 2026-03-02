@@ -1,0 +1,17 @@
+# Railway Deploy Trigger
+# Этот workflow триггерит деплой на Railway при пуше в main
+
+name: Trigger Railway Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify-railway:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway Deploy
+        run: |
+          echo "Pushed to main branch. Railway should auto-deploy."
+          echo "Current commit: ${{ github.sha }}"
