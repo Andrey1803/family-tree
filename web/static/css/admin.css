@@ -6,9 +6,10 @@
     color: white;
     padding: 20px 30px;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: relative;
 }
 
 .admin-header h1 {
@@ -21,6 +22,8 @@
     display: flex;
     gap: 15px;
     align-items: center;
+    position: absolute;
+    right: 30px;
 }
 
 .admin-user {

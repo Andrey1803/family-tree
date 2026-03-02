@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 </head>
-<body data-is-admin="{{ 'true' if username == 'admin' else 'false' }}">
+<body data-is-admin="{{ 'true' if (username == 'admin' or username == 'Андрей Емельянов') else 'false' }}">
     <header class="tree-header">
         <h1>Семейное древо</h1>
         <button class="hamburger-btn" id="hamburger-btn" aria-label="Меню" style="display:none">

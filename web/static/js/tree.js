@@ -1284,7 +1284,7 @@ function addRelative(pid, relation) {
     if (window.undoManager) window.undoManager.beforeAddRelative(treeData);
     
     if ((relation === "brother" || relation === "sister") && (!p.parents || p.parents.length === 0)) {
-        alert("Для добавления брата/сестры у персоны должны бы��ь родители.");
+        alert("Для добавления брата/сестры у персоны должны бы����ь родители.");
         return;
     }
     const labels = { father: "Отец", mother: "Мать", son: "Сын", daughter: "Дочь", brother: "Брат", sister: "Сестра", spouse: "Супруг(а)" };
@@ -2503,10 +2503,10 @@ function setupDesktopAppButtons() {
 function setupAdminButton() {
     const btnAdmin = document.getElementById("btn-admin");
     if (!btnAdmin) return;
-    
-    // Показываем кнопку для пользователя admin, только если он НЕ на админ-панели
-    // Но так как admin теперь сразу попадает на /admin, кнопка ему не нужна
-    // Показываем кнопку только для других пользователей с правами админа
+
+    // Показываем кнопку для администраторов
+    // Супер-админ "admin" перенаправляется на /admin сразу, поэтому кнопка ему не нужна
+    // Другие админы (например, "Андрей Емельянов") видят кнопку
     const username = "{{ username }}";
     if (username === "admin") {
         // Админу кнопка не нужна - он уже в админ-панели
@@ -2621,7 +2621,7 @@ function finalizeAdminView(treeDataFromStorage) {
         header.textContent = `🌳 ${treeDataFromStorage.treeName} (владелец: ${treeDataFromStorage.treeOwner})`;
     }
     
-    // Нормализуем браки (преобразуем из {persons: [a,b]} в [a,b])
+    // Нормализуем браки (п��еобразуем из {persons: [a,b]} в [a,b])
     if (treeData.marriages && treeData.marriages.length) {
         treeData.marriages = treeData.marriages.map(m => {
             if (Array.isArray(m)) return m;

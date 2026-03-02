@@ -86,6 +86,21 @@ def _save_users(users):
         return False
 
 
+def is_admin(username: str) -> bool:
+    """Проверяет, является ли пользователь администратором."""
+    if not username:
+        return False
+    # Супер-админ
+    if username == "admin":
+        return True
+    # Проверяем флаг is_admin в локальных пользователях
+    users = _load_users()
+    user_data = users.get(username, {})
+    if isinstance(user_data, dict) and user_data.get("is_admin"):
+        return True
+    return False
+
+
 def _password_hash(login: str, password: str) -> str:
     """
     Хеширует пароль.
@@ -103,12 +118,23 @@ def _password_hash(login: str, password: str) -> str:
         return hashlib.sha256(raw).hexdigest()
 
 
-def _verify_password(login: str, password: str, stored_hash: str) -> bool:
+def _get_user_password_hash(user_data):
+    """Извлекает хеш пароля из данных пользователя."""
+    if isinstance(user_data, dict):
+        return user_data.get("password", "")
+    return user_data  # Старый формат - просто строка с хешем
+
+
+def _verify_password(login: str, password: str, stored_data) -> bool:
     """
     Проверяет пароль против хеша.
-    
+
     Автоматически определяет тип хеша (bcrypt или legacy SHA256).
+    stored_data может быть строкой (старый формат) или словарём (новый формат).
     """
+    # Извлекаем хеш из данных пользователя
+    stored_hash = _get_user_password_hash(stored_data)
+    
     if stored_hash.startswith("$2"):
         # bcrypt хеш
         if BCRYPT_AVAILABLE:
@@ -281,7 +307,7 @@ def login():
     if request.method == "GET":
         if "username" in session:
             # Админу сразу перенаправляем на админ-панель
-            if session["username"] == "admin":
+            if is_admin(session["username"]):
                 return redirect(url_for("admin_panel"))
             return redirect(url_for("index"))
         return render_template("login.html")
@@ -298,7 +324,7 @@ def login():
     if auth_check(login_val, password_val):
         session["username"] = login_val
         # Админу сразу перенаправляем на админ-панель
-        if login_val == "admin":
+        if is_admin(login_val):
             return redirect(url_for("admin_panel"))
         return redirect(url_for("index"))
     return render_template("login.html", error="Неверный логин или пароль.", login=login_val)
@@ -491,19 +517,13 @@ def admin_panel():
     """Панель администратора — только статистика и просмотр чужих деревьев."""
     if "username" not in session:
         return redirect(url_for("login"))
-    
+
     username = session["username"]
-    
-    # Администратором считается пользователь с логином "admin"
-    if username == "admin":
+
+    # Проверяем права администратора
+    if is_admin(username):
         return render_template("admin.html", username=username)
-    
-    # Проверяем флаг is_admin в локальных пользователях
-    users = _load_users()
-    user_data = users.get(username, {})
-    if isinstance(user_data, dict) and user_data.get("is_admin"):
-        return render_template("admin.html", username=username)
-    
+
     # Проверяем через сервер синхронизации (если есть токен)
     server_token = session.get('server_token')
     if server_token:
@@ -518,7 +538,7 @@ def admin_panel():
                 return render_template("admin.html", username=username)
         except Exception as e:
             print(f"[ADMIN] Access denied for {username}: {e}")
-    
+
     # Доступ запрещён
     return render_template("admin.html", username=username), 403
 
@@ -528,34 +548,17 @@ def api_admin_stats():
     """Статистика для админ-панели (прокси на сервер синхронизации)."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
-    # Администратор = пользователь с логином "admin"
-    if username != "admin":
-        # Проверяем флаг is_admin локально
-        users = _load_users()
-        user_data = users.get(username, {})
-        if not (isinstance(user_data, dict) and user_data.get("is_admin")):
-            return jsonify({"error": "Требуется права администратора"}), 403
-    
+    # Проверяем права администратора
+    if not is_admin(username):
+        return jsonify({"error": "Требуется права администратора"}), 403
+
     server_token = session.get('server_token')
     if not server_token:
         # Возвращаем локальную статистику
         return _get_local_stats()
-    
-    try:
-        req = urllib.request.Request(
-            f"{SYNC_SERVER_URL}/api/admin/stats",
-            headers={'Authorization': f'Bearer {server_token}'},
-            method='GET'
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode())
-            return jsonify(data)
-    except Exception as e:
-        print(f"[ADMIN] Stats from sync server failed: {e}")
-        return _get_local_stats()
-    
+
     try:
         req = urllib.request.Request(
             f"{SYNC_SERVER_URL}/api/admin/stats",
@@ -602,7 +605,7 @@ def api_admin_users():
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if username != "admin":
+    if not is_admin(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Пробуем загрузить с сервера синхронизации
@@ -635,7 +638,7 @@ def api_admin_users():
             "created_at": datetime.now().isoformat(),
             "last_login": None,
             "is_active": True,
-            "is_admin": (login == "admin") or (isinstance(data, dict) and data.get("is_admin"))
+            "is_admin": is_admin(login)
         }
         users_list.append(user_info)
 
@@ -649,7 +652,7 @@ def api_admin_toggle_user(user_id):
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if username != "admin":
+    if not is_admin(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Для локальных пользователей просто возвращаем успех
@@ -728,11 +731,11 @@ def api_admin_get_user_trees(user_id):
     """Получить деревья пользователя."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
-    
+
     username = session["username"]
-    if username != "admin":
+    if not is_admin(username):
         return jsonify({"error": "Требуется права администратора"}), 403
-    
+
     server_token = session.get('server_token')
     if server_token:
         try:
@@ -746,7 +749,7 @@ def api_admin_get_user_trees(user_id):
                 return jsonify(data)
         except Exception as e:
             print(f"[ADMIN] Get trees failed: {e}")
-    
+
     # Fallback: возвращаем локальное дерево
     return jsonify({"trees": []})
 
@@ -758,7 +761,7 @@ def api_admin_all_trees():
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if username != "admin":
+    if not is_admin(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Пробуем получить деревья с сервера синхронизации
@@ -862,7 +865,7 @@ def api_tree():
     if request.method == "GET":
         # Для админа: проверяем, запрашивает ли он дерево конкретного пользователя
         tree_owner = request.args.get('tree_owner')
-        if username == 'admin' and tree_owner:
+        if is_admin(username) and tree_owner:
             print(f"[API_TREE] Admin requesting tree for: {tree_owner}")
             # Админ запрашивает дерево другого пользователя
             # Загружаем с сервера синхронизации
@@ -1450,7 +1453,7 @@ def api_welcome_complete():
         "surname": data.get("surname", ""),
         "patronymic": data.get("patronymic", ""),
         "birth_date": data.get("birth_date", ""),
-        "birth_place": data.get("birth_place", "Минск, Беларусь"),
+        "birth_place": data.get("birth_place", "Ми��ск, Беларусь"),
         "gender": data.get("gender", "Мужской"),
         "is_deceased": False,
         "death_date": "",
