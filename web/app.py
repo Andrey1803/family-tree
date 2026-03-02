@@ -325,6 +325,23 @@ def login():
         session["username"] = login_val
         # Админу сразу перенаправляем на админ-панель
         if is_admin(login_val):
+            # Для локальных администраторов пробуем получить токен сервера
+            if not session.get('server_token'):
+                try:
+                    req = urllib.request.Request(
+                        f"{SYNC_SERVER_URL}/api/auth/login",
+                        data=json.dumps({"login": login_val, "password": password_val}).encode(),
+                        headers={'Content-Type': 'application/json'},
+                        method='POST'
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        data = json.loads(response.read().decode())
+                        if data.get('token'):
+                            session['server_token'] = data['token']
+                            session['server_user_id'] = data.get('user_id')
+                            print(f"[LOGIN] Admin {login_val} got server token")
+                except Exception as e:
+                    print(f"[LOGIN] Admin {login_val} local only: {e}")
             return redirect(url_for("admin_panel"))
         return redirect(url_for("index"))
     return render_template("login.html", error="Неверный логин или пароль.", login=login_val)
