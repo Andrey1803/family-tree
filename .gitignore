@@ -25,6 +25,7 @@ build/
 
 # Данные пользователя (создаются при работе, см. docs/DATA.md)
 data/
+!data/users.json
 users.json
 family_tree*.json
 user_settings*.json
