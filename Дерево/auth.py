@@ -17,7 +17,11 @@ try:
 except ImportError:
     BCRYPT_AVAILABLE = False
 
-USERS_FILE = "users.json"
+# Путь к файлу пользователей: в папке data/ (как указано в main.py)
+# При запуске из .exe: data/ рядом с exe
+# При запуске из исходников: data/ в корне проекта
+# На сервере Railway: /app/data/users.json
+USERS_FILE = "data/users.json"
 # Используем правильный путь для файла запоминания (в той же директории, где и auth.py)
 REMEMBER_FILE = Path(__file__).parent / "login_remember.json"
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
@@ -28,8 +32,19 @@ def _password_hash(login: str, password: str) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _verify_password(login: str, password: str, stored_hash: str) -> bool:
-    """Проверить пароль с поддержкой bcrypt и SHA256."""
+def _verify_password(login: str, password: str, stored_hash) -> bool:
+    """Проверить пароль с поддержкой bcrypt и SHA256.
+    
+    stored_hash может быть:
+    - строкой (bcrypt или SHA256 хеш)
+    - словарём {"password": "...", "is_admin": true} (расширенный формат)
+    """
+    # Поддержка расширенного формата (словарь)
+    if isinstance(stored_hash, dict):
+        stored_hash = stored_hash.get("password", "")
+        if not stored_hash:
+            return False
+    
     if stored_hash.startswith("$2"):
         # bcrypt хеш
         if BCRYPT_AVAILABLE:

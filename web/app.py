@@ -134,12 +134,35 @@ def _save_users(users):
 
 
 def is_admin(username: str) -> bool:
-    """Проверяет, является ли пользователь администратором."""
+    """Проверяет, является ли пользователь администратором.
+    
+    Сначала проверяем через сервер синхронизации (если есть токен),
+    затем локально через файл users.json.
+    """
     if not username:
         return False
     # Супер-админ
     if username == "admin":
         return True
+    
+    # Проверяем через сервер синхронизации (если вызывается из контекста с сессией)
+    # Это нужно для случаев, когда файл users.json не существует на сервере
+    try:
+        from flask import session as flask_session
+        server_token = flask_session.get('server_token')
+        if server_token:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/stats",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                print(f"[IS_ADMIN] {username} is admin via server")
+                return True
+    except Exception as e:
+        print(f"[IS_ADMIN] Server check failed: {e} — trying local")
+        pass
+    
     # Проверяем флаг is_admin в локальных пользователях
     users = _load_users()
     print(f"[IS_ADMIN] username='{username}', users_file={USERS_FILE}, exists={os.path.exists(USERS_FILE)}")
@@ -776,28 +799,13 @@ def api_check_session():
     """Проверка сессии."""
     username = session.get("username")
     server_token = session.get('server_token')
-    
+
     print(f"[CHECK_SESSION] username={username}, repr={repr(username)}")
     print(f"[CHECK_SESSION] server_token={server_token is not None}")
-    
-    # Проверяем админа через сервер синхронизации, если есть токен
-    is_admin_result = False
-    if server_token and username:
-        try:
-            req = urllib.request.Request(
-                f"{SYNC_SERVER_URL}/api/admin/stats",
-                headers={'Authorization': f'Bearer {server_token}'},
-                method='GET'
-            )
-            with urllib.request.urlopen(req, timeout=5) as response:
-                is_admin_result = True
-                print(f"[CHECK_SESSION] Admin via server: YES")
-        except Exception as e:
-            print(f"[CHECK_SESSION] Admin via server: NO - {e}")
-    
-    if not is_admin_result:
-        is_admin_result = is_admin(username) if username else False
-    
+
+    # Используем функцию is_admin, которая теперь проверяет через сервер
+    is_admin_result = is_admin(username) if username else False
+
     return jsonify({
         "username": username,
         "username_type": str(type(username)),
