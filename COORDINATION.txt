@@ -10,28 +10,40 @@
 4. ✅ Исправлен путь к users.json для Railway
 5. ✅ Файл data/users.json теперь в репозитории
 6. ✅ users.json копируется в /app/data/users.json при старте
+7. ✅ is_admin() в web/app.py обновлён: сначала проверяет сервер (если есть токен), затем локально
+8. ✅ api_check_session() упрощён до вызова is_admin()
+9. ✅ Добавлен эндпоинт /api/admin/user/<id>/grant-admin на сервере синхронизации
+10. ✅ Добавлен скрипт migrate_andrey_admin.py для выдачи прав админа
 
 ## Текущее состояние
 - users_file_exists: true ✅
 - has_server_token: true ✅
 - username: "Андрей Емельянов" ✅
-- is_admin: false ❌
+- is_admin: false ❌ (сервер не признаёт админом)
 
 ## Причина проблемы
 Сервер синхронизации (ravishing-caring) не признаёт Андрея Емельянова админом.
-Токен сервера есть, но API /api/admin/stats возвращает 403.
+В базе данных сервера у пользователя нет флага is_admin=1.
 
-## Что нужно сделать
-1. Добавить "Андрей Емельянов" как админа в базу данных сервера синхронизации
-2. ИЛИ изменить проверку is_admin() чтобы игнорировать сервер для локальных админов
+## Что нужно сделать (ОБНОВЛЕНО)
+1. ⏳ Дождаться окончания инцидента Railway (Slow build times in EU West)
+2. ⏳ После развёртывания: выполнить миграцию на сервере:
+   ```
+   railway run python sync_server/migrate_andrey_admin.py
+   ```
+   ИЛИ через панель Railway → Settings → Commands
+3. ✅ Альтернатива: использовать локальную админ-панель (без серверной синхронизации)
 
-## Последняя идея
-Изменить check_admin_access() чтобы сначала проверять локальный is_admin(),
-а если не найден - тогда сервер.
-
-## Файлы для изменения
-- web/app.py: check_admin_access()
-- sync_server/: база данных сервера (если есть доступ)
+## Последние изменения
+- sync_server/app.py: добавлен эндпоинт /api/admin/user/<id>/grant-admin
+- sync_server/migrate_andrey_admin.py: скрипт для выдачи прав "Андрей Емельянов"
+- web/app.py: is_admin() проверяет сервер + локально
+- Дерево/auth.py: USERS_FILE = "data/users.json", поддержка dict в _verify_password()
 
 ## Коммиты
-Последний: dbb9993 - Fix: создавать users.json при старте
+- b927a20 - Добавлен эндпоинт /api/admin/user/<id>/grant-admin
+- 4af76d8 - Исправление проверки прав администратора и пути к users.json
+- dbb9993 - Fix: создавать users.json при старте
+
+## Статус
+🕐 Ожидание: Railway чинит сборки (инцидент в EU West)
