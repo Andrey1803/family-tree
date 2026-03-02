@@ -668,6 +668,26 @@ def api_admin_users():
     return jsonify({"users": users_list})
 
 
+@app.route("/api/admin/debug-users")
+def api_admin_debug_users():
+    """Отладка: проверить путь и загрузку пользователей."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+    
+    username = session["username"]
+    if not is_admin(username):
+        return jsonify({"error": "Требуется права администратора"}), 403
+    
+    return jsonify({
+        "users_file": USERS_FILE,
+        "users_file_exists": os.path.exists(USERS_FILE),
+        "data_dir": _data_dir,
+        "project_root": _project_root,
+        "server_token": session.get('server_token') is not None,
+        "loaded_users": _load_users()
+    })
+
+
 @app.route("/api/admin/user/<int:user_id>/toggle", methods=["POST"])
 def api_admin_toggle_user(user_id):
     """Активировать/деактивировать пользователя."""
