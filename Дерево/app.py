@@ -293,6 +293,10 @@ class FamilyTreeApp:
         self.hovered_person_id = None  # ID персоны под курсором
         self.selected_person_id = None  # ID выбранной персоны (центр)
         # УБРАНО: повторная инициализация self.focus_mode_active (была дублирована!)
+        
+        # Применяем цвета из палитры
+        self.apply_ui_colors_from_palette()
+        
         self.refresh_view()
         self.root.protocol("WM_DELETE_WINDOW", self.on_exit)
         # --- /ЗАГРУЗКА ---

@@ -50,10 +50,18 @@ def main():
 def _apply_ui_colors(root):
     """Применяет цвета палитры к интерфейсу."""
     style = ttk.Style()
-    
+
     # Фон окна
     root.configure(bg=constants.WINDOW_BG)
     
+    # Применяем цвета к стилям ttk
+    style.configure('TFrame', background=constants.WINDOW_BG)
+    style.configure('TLabel', background=constants.WINDOW_BG, foreground='#1e293b')
+    style.configure('TButton', background=constants.MENUBAR_BG, foreground='#1e293b')
+    style.configure('TMenubutton', background=constants.MENUBAR_BG, foreground='#1e293b')
+    style.configure('Horizontal.TScale', background=constants.WINDOW_BG)
+    style.configure('Vertical.TScale', background=constants.WINDOW_BG)
+
     # Сохраняем палитру для использования в FamilyTreeApp
     root.ui_palette = {k: getattr(constants, k, v) for k, v in constants.PALETTE_DEFAULTS.items()}
 
