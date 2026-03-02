@@ -121,8 +121,8 @@ PALETTE_LABELS = {
     "CARD_TOGGLE_BTN_TEXT": "Кнопка переключения (текст)",
 }
 
-# Путь к файлу палитры — в корневой директории проекта
-PALETTE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "palette.json")
+# Путь к файлу палитры — в папке data/
+PALETTE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "palette.json")
 
 
 def apply_palette(palette_dict):

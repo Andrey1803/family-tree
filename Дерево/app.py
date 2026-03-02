@@ -4765,6 +4765,8 @@ class FamilyTreeApp:
         def apply_palette():
             constants.apply_palette(current)
             constants.save_palette_to_file()
+            # Применяем цвета ко всему интерфейсу
+            self.apply_ui_colors_from_palette()
             self.canvas.config(bg=constants.CANVAS_BG)
             self.refresh_view()
             dialog.destroy()
