@@ -59,18 +59,19 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
-# Если DATA_DIR не установлен — используем текущую рабочую папку
-_data_dir = os.environ.get("DATA_DIR") or os.getcwd()
-# Файл пользователей — в папке data
+# Если DATA_DIR не установлен — используем папку рядом с web/
+if os.environ.get("DATA_DIR"):
+    _data_dir = os.environ.get("DATA_DIR")
+else:
+    # Локально: ищем data/ рядом с web/
+    _data_dir = os.path.join(_web_dir, "..", "data")
+    
+# Файл пользователей
 USERS_FILE = os.path.join(_data_dir, "users.json")
 
-# Проверяем, есть ли файл в data, если нет — пробуем в корне проекта
+# Проверяем, есть ли файл, если нет — пробуем в корне проекта
 if not os.path.exists(USERS_FILE):
     USERS_FILE = os.path.join(_project_root, "users.json")
-
-# Если всё ещё не найден — пробуем относительно web/
-if not os.path.exists(USERS_FILE):
-    USERS_FILE = os.path.join(_web_dir, "..", "data", "users.json")
 
 # Версия хеширования для миграции
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
@@ -1435,7 +1436,7 @@ def api_backup_restore():
             
             tree_data = json.loads(zf.read(tree_filename))
             
-            # Сохраняем восстановленные данные
+            # Сохраняем восстановленны�� данные
             if save_tree(username, tree_data):
                 return jsonify({"ok": True, "message": "Дерево восстановлено"})
             else:

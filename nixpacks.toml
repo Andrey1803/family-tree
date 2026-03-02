@@ -7,5 +7,5 @@ nixPkgs = ["python312"]
 [phases.install]
 cmds = ["python -m pip install -r web/requirements.txt"]
 
-[phases.build]
-cmds = ["cp -r data /app/data 2>/dev/null || true"]
+[start]
+cmd = "cd web && gunicorn -b 0.0.0.0:$PORT app:app"
