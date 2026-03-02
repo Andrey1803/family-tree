@@ -635,10 +635,21 @@ def admin_panel():
 
 
 def check_admin_access(username):
-    """Проверяет права администратора через сервер или локально."""
+    """Проверяет права администратора.
+    
+    Сначала проверяет локальный users.json (для локальных админов).
+    Если не найден - проверяет через сервер синхронизации.
+    """
     if not username:
         return False
     
+    # 1. Сначала проверяем локальный файл users.json
+    print(f"[CHECK_ADMIN] Checking local is_admin for {username}")
+    if is_admin(username):
+        print(f"[CHECK_ADMIN] {username} is admin via local users.json")
+        return True
+    
+    # 2. Если не локальный админ, проверяем через сервер
     server_token = session.get('server_token')
     if server_token:
         try:
@@ -653,10 +664,8 @@ def check_admin_access(username):
         except Exception as e:
             print(f"[CHECK_ADMIN] Server check failed: {e}")
     
-    # Fallback на локальную проверку
-    result = is_admin(username)
-    print(f"[CHECK_ADMIN] {username} is_admin={result} (local)")
-    return result
+    print(f"[CHECK_ADMIN] {username} is NOT admin")
+    return False
 
 
 @app.route("/api/admin/stats")
