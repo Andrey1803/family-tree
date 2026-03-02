@@ -10,10 +10,11 @@
 4. ✅ Исправлен путь к users.json для Railway
 5. ✅ Файл data/users.json теперь в репозитории
 6. ✅ users.json копируется в /app/data/users.json при старте
-7. ✅ is_admin() в web/app.py обновлён: сначала проверяет сервер (если есть токен), затем локально
-8. ✅ api_check_session() упрощён до вызова is_admin()
-9. ✅ Добавлен эндпоинт /api/admin/user/<id>/grant-admin на сервере синхронизации
-10. ✅ Добавлен скрипт migrate_andrey_admin.py для выдачи прав админа
+7. ✅ Добавлен эндпоинт /api/admin/user/<id>/grant-admin на сервере синхронизации
+8. ✅ Добавлен скрипт migrate_andrey_admin.py для выдачи прав админа
+9. ✅ Другой ИИ добавил: check_admin_access() проверяет локально ПЕРЕД сервером
+10. ✅ is_admin() изменён: проверяет ТОЛЬКО локальный файл (без сервера)
+11. ✅ api_check_session() использует check_admin_access() для полной проверки
 
 ## Текущее состояние
 - users_file_exists: true ✅
@@ -25,25 +26,36 @@
 Сервер синхронизации (ravishing-caring) не признаёт Андрея Емельянова админом.
 В базе данных сервера у пользователя нет флага is_admin=1.
 
-## Что нужно сделать (ОБНОВЛЕНО)
+## Архитектура проверки прав (ОБНОВЛЕНО)
+```
+is_admin(username) → только локальный users.json
+check_admin_access(username) → 1) is_admin() локально
+                               2) сервер через /api/admin/stats
+api_check_session() → использует check_admin_access()
+```
+
+## Что нужно сделать
 1. ⏳ Дождаться окончания инцидента Railway (Slow build times in EU West)
 2. ⏳ После развёртывания: выполнить миграцию на сервере:
    ```
    railway run python sync_server/migrate_andrey_admin.py
    ```
    ИЛИ через панель Railway → Settings → Commands
-3. ✅ Альтернатива: использовать локальную админ-панель (без серверной синхронизации)
+3. ✅ Альтернатива: локальная админ-панель работает через check_admin_access()
 
 ## Последние изменения
 - sync_server/app.py: добавлен эндпоинт /api/admin/user/<id>/grant-admin
 - sync_server/migrate_andrey_admin.py: скрипт для выдачи прав "Андрей Емельянов"
-- web/app.py: is_admin() проверяет сервер + локально
+- web/app.py: is_admin() → только локально, check_admin_access() → локально + сервер
+- web/app.py: api_check_session() использует check_admin_access()
 - Дерево/auth.py: USERS_FILE = "data/users.json", поддержка dict в _verify_password()
 
 ## Коммиты
 - b927a20 - Добавлен эндпоинт /api/admin/user/<id>/grant-admin
 - 4af76d8 - Исправление проверки прав администратора и пути к users.json
+- a8dc697 - Fix: проверять локального админа ПЕРЕД сервером (другой ИИ)
 - dbb9993 - Fix: создавать users.json при старте
 
 ## Статус
 🕐 Ожидание: Railway чинит сборки (инцидент в EU West)
+📝 Изменения готовы к развёртыванию

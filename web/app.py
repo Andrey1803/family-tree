@@ -134,34 +134,16 @@ def _save_users(users):
 
 
 def is_admin(username: str) -> bool:
-    """Проверяет, является ли пользователь администратором.
+    """Проверяет, является ли пользователь администратором локально.
     
-    Сначала проверяем через сервер синхронизации (если есть токен),
-    затем локально через файл users.json.
+    Проверяет только локальный файл users.json.
+    Для проверки через сервер используйте check_admin_access().
     """
     if not username:
         return False
     # Супер-админ
     if username == "admin":
         return True
-    
-    # Проверяем через сервер синхронизации (если вызывается из контекста с сессией)
-    # Это нужно для случаев, когда файл users.json не существует на сервере
-    try:
-        from flask import session as flask_session
-        server_token = flask_session.get('server_token')
-        if server_token:
-            req = urllib.request.Request(
-                f"{SYNC_SERVER_URL}/api/admin/stats",
-                headers={'Authorization': f'Bearer {server_token}'},
-                method='GET'
-            )
-            with urllib.request.urlopen(req, timeout=5) as response:
-                print(f"[IS_ADMIN] {username} is admin via server")
-                return True
-    except Exception as e:
-        print(f"[IS_ADMIN] Server check failed: {e} — trying local")
-        pass
     
     # Проверяем флаг is_admin в локальных пользователях
     users = _load_users()
@@ -170,9 +152,7 @@ def is_admin(username: str) -> bool:
     user_data = users.get(username, {})
     is_admin_result = isinstance(user_data, dict) and user_data.get("is_admin")
     print(f"[IS_ADMIN] user_data={user_data}, is_admin={is_admin_result}")
-    if is_admin_result:
-        return True
-    return False
+    return is_admin_result
 
 
 def _password_hash(login: str, password: str) -> str:
@@ -812,8 +792,8 @@ def api_check_session():
     print(f"[CHECK_SESSION] username={username}, repr={repr(username)}")
     print(f"[CHECK_SESSION] server_token={server_token is not None}")
 
-    # Используем функцию is_admin, которая теперь проверяет через сервер
-    is_admin_result = is_admin(username) if username else False
+    # Используем check_admin_access для полной проверки (локально + сервер)
+    is_admin_result = check_admin_access(username) if username else False
 
     return jsonify({
         "username": username,
