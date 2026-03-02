@@ -86,6 +86,24 @@ if not os.path.exists(USERS_FILE):
     print(f"[CONFIG] File not found, trying /app/data/users.json")
     USERS_FILE = "/app/data/users.json"
 
+# Создаём папку и файл users.json, если их нет (для Railway)
+if not os.path.exists(USERS_FILE):
+    try:
+        os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+        # Пытаемся скопировать из репозитория
+        repo_users = os.path.join(_project_root, "data", "users.json")
+        if os.path.exists(repo_users):
+            import shutil
+            shutil.copy2(repo_users, USERS_FILE)
+            print(f"[CONFIG] Copied users.json from {repo_users}")
+        else:
+            # Создаём пустой файл
+            with open(USERS_FILE, "w", encoding="utf-8") as f:
+                json.dump({"users": {}}, f, ensure_ascii=False, indent=2)
+            print(f"[CONFIG] Created empty users.json at {USERS_FILE}")
+    except Exception as e:
+        print(f"[CONFIG] Error creating users.json: {e}")
+
 # Версия хеширования для миграции
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
