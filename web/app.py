@@ -62,23 +62,29 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Если DATA_DIR не установлен — используем папку рядом с web/
 if os.environ.get("DATA_DIR"):
     _data_dir = os.environ.get("DATA_DIR")
+    print(f"[CONFIG] Using DATA_DIR from env: {_data_dir}")
 else:
     # Railway: рабочая папка /app, data лежит в /app/data
     # Локально: рабочая папка проекта, data лежит в ./data
     cwd = os.getcwd()
+    print(f"[CONFIG] cwd={cwd}, _web_dir={_web_dir}, _project_root={_project_root}")
     if cwd == "/app":
         # Railway
         _data_dir = "/app/data"
+        print(f"[CONFIG] Railway detected, using {_data_dir}")
     else:
         # Локально
         _data_dir = os.path.join(_web_dir, "..", "data")
+        print(f"[CONFIG] Local, using {_data_dir}")
     
 # Файл пользователей
 USERS_FILE = os.path.join(_data_dir, "users.json")
+print(f"[CONFIG] USERS_FILE={USERS_FILE}")
 
 # Проверяем, есть ли файл, если нет — пробуем в корне проекта
 if not os.path.exists(USERS_FILE):
-    USERS_FILE = os.path.join(_project_root, "users.json")
+    print(f"[CONFIG] File not found, trying /app/data/users.json")
+    USERS_FILE = "/app/data/users.json"
 
 # Версия хеширования для миграции
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
