@@ -63,8 +63,15 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 if os.environ.get("DATA_DIR"):
     _data_dir = os.environ.get("DATA_DIR")
 else:
-    # Локально: ищем data/ рядом с web/
-    _data_dir = os.path.join(_web_dir, "..", "data")
+    # Railway: рабочая папка /app, data лежит в /app/data
+    # Локально: рабочая папка проекта, data лежит в ./data
+    cwd = os.getcwd()
+    if cwd == "/app":
+        # Railway
+        _data_dir = "/app/data"
+    else:
+        # Локально
+        _data_dir = os.path.join(_web_dir, "..", "data")
     
 # Файл пользователей
 USERS_FILE = os.path.join(_data_dir, "users.json")
