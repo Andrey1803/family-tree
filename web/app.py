@@ -574,6 +574,31 @@ def admin_panel():
     return render_template("admin.html", username=username), 403
 
 
+def check_admin_access(username):
+    """Проверяет права администратора через сервер или локально."""
+    if not username:
+        return False
+    
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/stats",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                print(f"[CHECK_ADMIN] {username} is admin via server")
+                return True
+        except Exception as e:
+            print(f"[CHECK_ADMIN] Server check failed: {e}")
+    
+    # Fallback на локальную проверку
+    result = is_admin(username)
+    print(f"[CHECK_ADMIN] {username} is_admin={result} (local)")
+    return result
+
+
 @app.route("/api/admin/stats")
 def api_admin_stats():
     """Статистика для админ-панели (прокси на сервер синхронизации)."""
@@ -584,7 +609,7 @@ def api_admin_stats():
     username = session["username"]
     print(f"[API_ADMIN_STATS] username='{username}'")
     # Проверяем права администратора
-    if not is_admin(username):
+    if not check_admin_access(username):
         print(f"[API_ADMIN_STATS] User {username} is not admin")
         return jsonify({"error": "Требуется права администратора"}), 403
     print(f"[API_ADMIN_STATS] User {username} is admin, proceeding...")
@@ -645,7 +670,7 @@ def api_admin_users():
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if not is_admin(username):
+    if not check_admin_access(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Пробуем загрузить с сервера синхронизации
@@ -713,12 +738,36 @@ def api_admin_debug_users():
 def api_check_session():
     """Проверка сессии."""
     username = session.get("username")
+    server_token = session.get('server_token')
+    
     print(f"[CHECK_SESSION] username={username}, repr={repr(username)}")
+    print(f"[CHECK_SESSION] server_token={server_token is not None}")
+    
+    # Проверяем админа через сервер синхронизации, если есть токен
+    is_admin_result = False
+    if server_token and username:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/stats",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                is_admin_result = True
+                print(f"[CHECK_SESSION] Admin via server: YES")
+        except Exception as e:
+            print(f"[CHECK_SESSION] Admin via server: NO - {e}")
+    
+    if not is_admin_result:
+        is_admin_result = is_admin(username) if username else False
+    
     return jsonify({
         "username": username,
         "username_type": str(type(username)),
-        "is_admin": is_admin(username) if username else False,
-        "has_server_token": session.get('server_token') is not None
+        "is_admin": is_admin_result,
+        "has_server_token": server_token is not None,
+        "users_file": USERS_FILE,
+        "users_file_exists": os.path.exists(USERS_FILE) if username else None
     })
 
 
@@ -729,7 +778,7 @@ def api_admin_toggle_user(user_id):
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if not is_admin(username):
+    if not check_admin_access(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Для локальных пользователей просто возвращаем успех
@@ -810,7 +859,7 @@ def api_admin_get_user_trees(user_id):
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if not is_admin(username):
+    if not check_admin_access(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     server_token = session.get('server_token')
@@ -838,7 +887,7 @@ def api_admin_all_trees():
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    if not is_admin(username):
+    if not check_admin_access(username):
         return jsonify({"error": "Требуется права администратора"}), 403
 
     # Пробуем получить деревья с сервера синхронизации
@@ -1385,7 +1434,7 @@ def api_backup_restore():
             if save_tree(username, tree_data):
                 return jsonify({"ok": True, "message": "Дерево восстановлено"})
             else:
-                return jsonify({"error": "Ошибка сохранения восстановленных данных"}), 500
+                return jsonify({"error": "Ошибка сохране��ия восстановленных данных"}), 500
     except Exception as e:
         return jsonify({"error": f"Ошибка восстановления: {str(e)}"}), 500
 
@@ -1407,7 +1456,7 @@ def api_stats():
     female_count = sum(1 for p in persons.values() if p.get('gender') == 'Женский')
     deceased_count = sum(1 for p in persons.values() if p.get('is_deceased'))
     
-    # Подсчёт поколений (упрощённо)
+    # Подсчёт поколе��ий (упрощённо)
     def get_generation(pid, visited=None):
         if visited is None:
             visited = set()
