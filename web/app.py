@@ -99,8 +99,12 @@ def is_admin(username: str) -> bool:
         return True
     # Проверяем флаг is_admin в локальных пользователях
     users = _load_users()
+    print(f"[IS_ADMIN] username='{username}', users_file={USERS_FILE}, exists={os.path.exists(USERS_FILE)}")
+    print(f"[IS_ADMIN] loaded users: {list(users.keys())}")
     user_data = users.get(username, {})
-    if isinstance(user_data, dict) and user_data.get("is_admin"):
+    is_admin_result = isinstance(user_data, dict) and user_data.get("is_admin")
+    print(f"[IS_ADMIN] user_data={user_data}, is_admin={is_admin_result}")
+    if is_admin_result:
         return True
     return False
 
@@ -568,12 +572,16 @@ def admin_panel():
 def api_admin_stats():
     """Статистика для админ-панели (прокси на сервер синхронизации)."""
     if "username" not in session:
+        print(f"[API_ADMIN_STATS] No username in session")
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
+    print(f"[API_ADMIN_STATS] username='{username}'")
     # Проверяем права администратора
     if not is_admin(username):
+        print(f"[API_ADMIN_STATS] User {username} is not admin")
         return jsonify({"error": "Требуется права администратора"}), 403
+    print(f"[API_ADMIN_STATS] User {username} is admin, proceeding...")
 
     server_token = session.get('server_token')
     if not server_token:
