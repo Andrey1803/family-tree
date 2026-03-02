@@ -3,6 +3,7 @@
 Точка входа приложения «Семейное древо».
 Запуск: python main.py (из папки Дерево)
 """
+import os
 import sys
 from pathlib import Path
 
@@ -33,14 +34,15 @@ def main():
         # Применяем цвета из загруженной палитры
         _apply_ui_colors(root)
 
-        data_file = f"family_tree_{username}.json"
+        # Файл данных в папке data/
+        data_file = os.path.join("data", f"family_tree_{username}.json")
         app = FamilyTreeApp(root, data_file=data_file, username=username)
-        
+
         # Принудительно применяем цвета ПОСЛЕ создания FamilyTreeApp
         _apply_ui_colors(root)
         if hasattr(app, 'canvas'):
             app.canvas.config(bg=constants.CANVAS_BG)
-        
+
         root.protocol("WM_DELETE_WINDOW", app.on_exit)
         root.mainloop()
 

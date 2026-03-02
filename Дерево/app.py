@@ -4695,11 +4695,25 @@ class FamilyTreeApp:
             self.view_menu.configure(bg=constants.MENUBAR_BG)
             self.edit_menu.configure(bg=constants.MENUBAR_BG)
             self.help_menu.configure(bg=constants.MENUBAR_BG)
+            # Сервисное меню (если есть)
+            if hasattr(self, 'service_menu'):
+                self.service_menu.configure(bg=constants.MENUBAR_BG)
         except Exception:
             pass
         self.canvas.config(bg=constants.CANVAS_BG)
-        style.configure('TButton', background=constants.WINDOW_BG)
+        style.configure('TFrame', background=constants.WINDOW_BG)
+        style.configure('TLabel', background=constants.WINDOW_BG, foreground='#1e293b')
+        style.configure('TButton', background=constants.MENUBAR_BG, foreground='#1e293b')
+        style.configure('TMenubutton', background=constants.MENUBAR_BG, foreground='#1e293b')
         style.configure('Accent.TButton', background='#e74c3c', foreground='black')
+        
+        # Применяем цвета к статусбару и center_label
+        if hasattr(self, 'statusbar'):
+            self.statusbar.configure(bg=constants.WINDOW_BG, fg='#334155')
+        if hasattr(self, 'center_label'):
+            self.center_label.configure(bg=constants.MENUBAR_BG, fg='#1e293b')
+        if hasattr(self, 'counter_label'):
+            self.counter_label.configure(bg=constants.MENUBAR_BG, fg='#1e293b')
 
     def open_color_palette_dialog(self):
         """Диалог выбора цветов интерфейса: иконки персон, линии, фон холста и т.д."""
