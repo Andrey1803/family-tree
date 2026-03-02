@@ -122,7 +122,8 @@ PALETTE_LABELS = {
 }
 
 # Путь к файлу палитры — в папке data/
-PALETTE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "palette.json")
+# Использует рабочую директорию (которая устанавливается в main.py)
+PALETTE_FILE = os.path.join("data", "palette.json")
 
 
 def apply_palette(palette_dict):
