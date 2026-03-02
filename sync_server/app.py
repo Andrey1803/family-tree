@@ -589,6 +589,28 @@ def admin_toggle_user(user_id):
     return jsonify({'message': 'Статус пользователя изменён'})
 
 
+@app.route('/api/admin/user/<int:user_id>/grant-admin', methods=['POST'])
+@require_admin
+def admin_grant_admin(user_id):
+    """Предоставить права администратора пользователю (только супер-админ)."""
+    db = get_db()
+
+    # Проверяем существование пользователя
+    user = db.execute('SELECT id, login FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+
+    # Нельзя предоставить права супер-админу (он уже админ)
+    if user['login'] == 'admin':
+        return jsonify({'message': 'Пользователь уже является администратором'})
+
+    # Предоставляем права администратора
+    db.execute('UPDATE users SET is_admin = 1 WHERE id = ?', (user_id,))
+    db.commit()
+
+    return jsonify({'message': 'Права администратора предоставлены', 'user_id': user_id})
+
+
 @app.route('/api/admin/user/<int:user_id>/delete', methods=['POST'])
 @require_admin
 def admin_delete_user(user_id):
