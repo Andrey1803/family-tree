@@ -685,11 +685,11 @@ def api_admin_users():
 def api_admin_debug_users():
     """Отладка: проверить путь и загрузку пользователей."""
     if "username" not in session:
-        return jsonify({"error": "Не авторизован"}), 401
+        return jsonify({"error": "Не авторизован", "session_username": None}), 401
     
     username = session["username"]
     if not is_admin(username):
-        return jsonify({"error": "Требуется права администратора"}), 403
+        return jsonify({"error": "Не админ", "session_username": username}), 403
     
     return jsonify({
         "users_file": USERS_FILE,
@@ -697,7 +697,22 @@ def api_admin_debug_users():
         "data_dir": _data_dir,
         "project_root": _project_root,
         "server_token": session.get('server_token') is not None,
+        "session_username": username,
+        "session_username_repr": repr(username),
         "loaded_users": _load_users()
+    })
+
+
+@app.route("/api/check-session")
+def api_check_session():
+    """Проверка сессии."""
+    username = session.get("username")
+    print(f"[CHECK_SESSION] username={username}, repr={repr(username)}")
+    return jsonify({
+        "username": username,
+        "username_type": str(type(username)),
+        "is_admin": is_admin(username) if username else False,
+        "has_server_token": session.get('server_token') is not None
     })
 
 
@@ -1421,7 +1436,7 @@ def api_stats():
     
     avg_age = round(sum(ages) / len(ages)) if ages else None
     
-    # Статистика по местам рождения
+    # Статистика по местам рожден��я
     birth_places = {}
     for p in persons.values():
         place = p.get('birth_place', '')
