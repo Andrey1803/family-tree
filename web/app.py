@@ -60,8 +60,12 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
 _data_dir = os.environ.get("DATA_DIR") or _project_root
-# Файл пользователей — в корневой папке проекта
-USERS_FILE = os.path.join(_project_root, "users.json")
+# Файл пользователей — в папке data
+USERS_FILE = os.path.join(_data_dir, "users.json")
+
+# Проверяем, есть ли файл в data, если нет — пробуем в корне проекта
+if not os.path.exists(USERS_FILE):
+    USERS_FILE = os.path.join(_project_root, "users.json")
 
 # Версия хеширования для миграции
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
@@ -636,6 +640,7 @@ def api_admin_users():
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 server_data = json.loads(response.read().decode())
+                print(f"[ADMIN] Loaded users from sync server: {len(server_data.get('users', []))}")
                 # Возвращаем данные с сервера
                 return jsonify(server_data)
         except Exception as e:
@@ -643,11 +648,11 @@ def api_admin_users():
             # Fallback на локальные данные
 
     # Локальные данные (fallback)
+    print("[ADMIN] Loading users from local file")
     users = _load_users()
     users_list = []
 
     for login, data in users.items():
-        # Пытаемся получить дополнительную информацию с сервера
         user_info = {
             "id": hash(login) % 10000,
             "login": login,
@@ -659,6 +664,7 @@ def api_admin_users():
         }
         users_list.append(user_info)
 
+    print(f"[ADMIN] Loaded {len(users_list)} local users")
     return jsonify({"users": users_list})
 
 
@@ -1443,7 +1449,7 @@ def api_version_check():
             "current_version": current_version,
             "latest_version": current_version,
             "has_update": False,
-            "error": "Не удалось проверить обновления",
+            "error": "Не удалось проверить ��бновления",
         })
 
 
