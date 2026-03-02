@@ -4,8 +4,14 @@
 import json
 import os
 
-# Корень проекта. На Railway: DATA_DIR=/data (volume для хранения)
-DATA_DIR = os.environ.get("DATA_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Корень проекта
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Папка данных. На Railway: DATA_DIR=/data (volume)
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(_project_root, "data")
+
+# Создаём папку данных, если её нет
+os.makedirs(DATA_DIR, exist_ok=True)
 
 
 def get_data_path(username):

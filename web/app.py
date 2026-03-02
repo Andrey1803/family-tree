@@ -596,15 +596,20 @@ def api_admin_stats():
 
 def _get_local_stats():
     """Локальная статистика (fallback)."""
+    print("[STATS] Loading local stats...")
     users = _load_users()
+    print(f"[STATS] Loaded {len(users)} users from {USERS_FILE}")
     total_persons = 0
     total_trees = 0
-    
+
     for username in users.keys():
         tree_data = load_tree(username)
+        persons_count = len(tree_data.get("persons", {}))
+        print(f"[STATS] User {username}: {persons_count} persons")
         total_trees += 1
-        total_persons += len(tree_data.get("persons", {}))
-    
+        total_persons += persons_count
+
+    print(f"[STATS] Total: {total_trees} trees, {total_persons} persons")
     return jsonify({
         "overview": {
             "total_users": len(users),
