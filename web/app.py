@@ -73,11 +73,17 @@ AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
 def _load_users():
     if not os.path.exists(USERS_FILE):
+        print(f"[LOAD_USERS] File not found: {USERS_FILE}")
         return {}
     try:
         with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f).get("users", {})
-    except Exception:
+            data = json.load(f)
+            users = data.get("users", {})
+            print(f"[LOAD_USERS] Loaded {len(users)} users from {USERS_FILE}")
+            print(f"[LOAD_USERS] Keys: {list(users.keys())}")
+            return users
+    except Exception as e:
+        print(f"[LOAD_USERS] Error: {e}")
         return {}
 
 
