@@ -135,7 +135,7 @@ def _save_users(users):
 
 def is_admin(username: str) -> bool:
     """Проверяет, является ли пользователь администратором локально.
-    
+
     Проверяет только локальный файл users.json.
     Для проверки через сервер используйте check_admin_access().
     """
@@ -144,14 +144,16 @@ def is_admin(username: str) -> bool:
     # Супер-админ
     if username == "admin":
         return True
-    
+
     # Проверяем флаг is_admin в локальных пользователях
     users = _load_users()
     print(f"[IS_ADMIN] username='{username}', users_file={USERS_FILE}, exists={os.path.exists(USERS_FILE)}")
     print(f"[IS_ADMIN] loaded users: {list(users.keys())}")
+    print(f"[IS_ADMIN] username repr={repr(username)}")
     user_data = users.get(username, {})
+    print(f"[IS_ADMIN] user_data={user_data}, type={type(user_data)}")
     is_admin_result = isinstance(user_data, dict) and user_data.get("is_admin")
-    print(f"[IS_ADMIN] user_data={user_data}, is_admin={is_admin_result}")
+    print(f"[IS_ADMIN] is_admin_result={is_admin_result}")
     return is_admin_result
 
 
