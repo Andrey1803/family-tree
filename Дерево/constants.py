@@ -136,15 +136,20 @@ def apply_palette(palette_dict):
 
 def load_palette_from_file():
     """Загружает палитру из palette.json; возвращает dict или None."""
-    if not os.path.exists(PALETTE_FILE):
+    abs_path = os.path.abspath(PALETTE_FILE)
+    print(f"[PALETTE] Loading from: {abs_path}")
+    if not os.path.exists(abs_path):
+        print(f"[PALETTE] File not found")
         return None
     try:
-        with open(PALETTE_FILE, "r", encoding="utf-8") as f:
+        with open(abs_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            if isinstance(data, dict):
-                return {k: v for k, v in data.items()
-                        if k in PALETTE_DEFAULTS and isinstance(v, str)}
-    except Exception:
+            result = {k: v for k, v in data.items()
+                    if k in PALETTE_DEFAULTS and isinstance(v, str)}
+            print(f"[PALETTE] Loaded {len(result)} colors")
+            return result
+    except Exception as e:
+        print(f"[PALETTE] Error loading: {e}")
         pass
     return None
 
@@ -154,10 +159,16 @@ def save_palette_to_file():
     mod = sys.modules[__name__]
     data = {k: getattr(mod, k, v) for k, v in PALETTE_DEFAULTS.items()}
     try:
-        with open(PALETTE_FILE, "w", encoding="utf-8") as f:
+        # Используем абсолютный путь для отладки
+        abs_path = os.path.abspath(PALETTE_FILE)
+        print(f"[PALETTE] Saving to: {abs_path}")
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[PALETTE] Saved successfully!")
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[PALETTE] Error saving: {e}")
         return False
 
 
