@@ -3878,9 +3878,12 @@ class FamilyTreeApp:
 
         # Кнопки
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=20)
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
         ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        
+        # Закрепляем кнопки внизу окна (чтобы были видны всегда)
+        button_frame.update_idletasks()
 
     def add_child_dialog(self, parent_id, child_gender):
         # Если parent_id не передан, спрашиваем
@@ -4054,9 +4057,10 @@ class FamilyTreeApp:
             self.refresh_view()
 
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=20)
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
         ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        button_frame.update_idletasks()
 
     def add_sibling_dialog(self, person_id, sibling_gender):
         """Диалог добавления брата/сестры с автозаполнением отчества от имени отца.
@@ -4245,10 +4249,11 @@ class FamilyTreeApp:
 
         # --- Кнопки ---
         btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=20)
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
 
         ttk.Button(btn_frame, text="Создать", command=submit).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        btn_frame.update_idletasks()
 
         # Фокус на поле имени
         try:
@@ -4426,7 +4431,7 @@ class FamilyTreeApp:
 
         # Кнопки OK/Cancel
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=20)
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
 
         def on_ok():
             if mode_var.get() == "Select":
@@ -4448,6 +4453,7 @@ class FamilyTreeApp:
 
         ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        button_frame.update_idletasks()
 
     def remove_marriage_from_edit(self, pid, dialog_window):
         """Удаляет один из браков персоны. При нескольких супругах — выбор, какой брак удалить."""
