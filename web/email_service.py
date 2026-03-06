@@ -9,7 +9,7 @@ import logging
 import os
 import urllib.request
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict
 
 # Настройка логирования для Railway
@@ -65,6 +65,7 @@ def generate_code(length: int = 6) -> str:
 def create_verification_code(email: str) -> str:
     """
     Создать код подтверждения для email.
+    Использует UTC время для консистентности.
 
     Args:
         email: Email пользователя
@@ -73,7 +74,8 @@ def create_verification_code(email: str) -> str:
         Сгенерированный код
     """
     code = generate_code()
-    expiry = datetime.now() + timedelta(seconds=CODE_EXPIRY_SECONDS)
+    now = datetime.now(timezone.utc)  # Используем UTC
+    expiry = now + timedelta(seconds=CODE_EXPIRY_SECONDS)
 
     # Проверяем есть ли уже код для этого email
     if email in _verification_codes:
@@ -82,16 +84,18 @@ def create_verification_code(email: str) -> str:
     _verification_codes[email] = {
         'code': code,
         'expiry': expiry,
-        'created_at': datetime.now()
+        'created_at': now
     }
 
     logger.info(f"[VERIFY] Код создан для {email}: {code[:2]}*** (истекает через {CODE_EXPIRY_SECONDS}с)")
+    logger.info(f"[VERIFY] Время создания: {now}, истечения: {expiry}")
     return code
 
 
 def verify_code(email: str, code: str) -> bool:
     """
     Проверить код подтверждения.
+    Использует UTC время для консистентности.
 
     Args:
         email: Email пользователя
@@ -110,9 +114,17 @@ def verify_code(email: str, code: str) -> bool:
     stored = _verification_codes[email]
     logger.info(f"[VERIFY] Найден код для {email}: {stored['code'][:2]}*** (введён: {code})")
 
-    # Проверяем не истёк ли код
-    if datetime.now() > stored['expiry']:
-        logger.warning(f"[VERIFY] ❌ Код истёк (создан: {stored['created_at']}, истёк: {stored['expiry']})")
+    # Проверяем не истёк ли код (используем UTC)
+    now = datetime.now(timezone.utc)
+    expiry = stored['expiry']
+    created = stored['created_at']
+    
+    logger.info(f"[VERIFY] Текущее время: {now}")
+    logger.info(f"[VERIFY] Код создан: {created}, истекает: {expiry}")
+
+    if now > expiry:
+        time_diff = now - created
+        logger.warning(f"[VERIFY] ❌ Код истёк! Прошло {time_diff.total_seconds():.1f}с (лимит: {CODE_EXPIRY_SECONDS}с)")
         del _verification_codes[email]
         return False
 
