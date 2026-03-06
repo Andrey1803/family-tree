@@ -319,6 +319,8 @@ def send_verification_code(email: str) -> Optional[str]:
         # Генерируем код
         code = create_verification_code(email)
         logger.info(f"[VERIFY] Код сгенерирован: {code[:2]}*** (полный: {code})")
+        # Выводим полный код для отладки (будет видно в логах Railway)
+        logger.info(f"[VERIFY] 🔑 КОД ДЛЯ ВВОДА: {code}")
 
         # Формируем письмо
         body = EMAIL_TEMPLATE.format(code=code)
@@ -343,7 +345,7 @@ def send_verification_code(email: str) -> Optional[str]:
             return code
         else:
             logger.error(f"[VERIFY] ❌ Не удалось отправить код на {email}")
-            logger.warning(f"[VERIFY] Возвращаем код для отладки (SMTP ошибка)")
+            logger.warning(f"[VERIFY] 🔑 ВВЕДИТЕ КОД ИЗ ЛОГОВ: {code}")
             # Для отладки возвращаем код даже если SMTP ошибка
             # Пользователь сможет проверить код в логах Railway
             return code
