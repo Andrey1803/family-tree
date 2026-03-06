@@ -39,6 +39,11 @@ if not EMAIL_FROM:
     elif SMTP_LOGIN:
         EMAIL_FROM = SMTP_LOGIN
 
+# Для SendGrid важно использовать только email без имени
+if EMAIL_FROM and '<' in EMAIL_FROM:
+    # Извлекаем email из "Name <email@example.com>"
+    EMAIL_FROM = EMAIL_FROM.split('<')[1].split('>')[0].strip()
+
 # Остальные настройки
 EMAIL_SUBJECT = "Код подтверждения регистрации"
 CODE_EXPIRY_SECONDS = 600
