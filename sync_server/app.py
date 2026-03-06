@@ -183,6 +183,12 @@ def init_db():
         db.execute('DELETE FROM users WHERE login = "admin"')
         print("✅ Пользователь 'admin' удалён")
 
+    # Проверяем нужно ли сделать Андрея Емельянова супер-админом
+    if os.environ.get("ANDREY_SUPER_ADMIN") == "true":
+        print("⚙️ ANDREY_SUPER_ADMIN=true, предоставляю права Андрею Емельянову...")
+        db.execute('UPDATE users SET is_admin = 1 WHERE login = "Андрей Емельянов"')
+        print("✅ Андрей Емельянов теперь супер-админ")
+
     db.commit()
     db.close()
 
