@@ -1123,9 +1123,12 @@ def api_tree():
                                     if k in p and isinstance(p[k], list):
                                         p[k] = [str(x) for x in p[k]]
                         cc = tree_data.get("current_center")
+                        marriages = tree_data.get("marriages", [])
+                        print(f"[API_TREE] Marriages from server: {len(marriages)}")
+                        print(f"[API_TREE] Marriages data: {marriages}")
                         return jsonify({
                             "persons": persons,
-                            "marriages": tree_data.get("marriages", []),
+                            "marriages": marriages,
                             "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
                         })
             except Exception as e:
@@ -1136,6 +1139,9 @@ def api_tree():
         data = load_tree(username)
         persons_count = len(data.get("persons", {}))
         print(f"[API_TREE] Local file loaded {persons_count} persons for '{username}'")
+        marriages = data.get("marriages", [])
+        print(f"[API_TREE] Local marriages: {len(marriages)}")
+        print(f"[API_TREE] Local marriages data: {marriages}")
         persons = {str(k): v for k, v in data.get("persons", {}).items()}
         for p in persons.values():
             if isinstance(p, dict):
@@ -1143,9 +1149,11 @@ def api_tree():
                     if k in p and isinstance(p[k], list):
                         p[k] = [str(x) for x in p[k]]
         cc = data.get("current_center")
+        local_marriages = data.get("marriages", [])
+        print(f"[API_TREE] Returning local marriages: {len(local_marriages)}")
         return jsonify({
             "persons": persons,
-            "marriages": data.get("marriages", []),
+            "marriages": local_marriages,
             "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
         })
     
