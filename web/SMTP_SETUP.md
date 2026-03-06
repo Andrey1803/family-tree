@@ -14,6 +14,13 @@
 3. Перейдите во вкладку **Variables**
 4. Добавьте следующие переменные:
 
+#### Вариант A: SendGrid (рекомендуется)
+```
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
+SENDGRID_FROM_EMAIL=familyroots010326@gmail.com
+```
+
+#### Вариант B: Gmail SMTP
 ```
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
@@ -45,18 +52,28 @@ EMAIL_FROM=Family Tree <familyroots010326@gmail.com>
 4. В логах должны появиться сообщения:
 
 ```
-[AUTH] Запрос кода подтверждения для email: user@example.com
-[AUTH] Вызов send_verification_code для user@example.com
+[VERIFY] Запрос кода для email: user@gmail.com
+[VERIFY] Код сгенерирован: ab*** (полный: 123456)
+[VERIFY] Тело письма: Здравствуйте!...
+[VERIFY] Вызов send_email...
 [EMAIL] === Начало отправки письма ===
-[EMAIL] Получатель: user@example.com
+[EMAIL] Получатель: user@gmail.com
+[EMAIL] Тема: Код подтверждения регистрации
+[EMAIL] SendGrid API ключ не задан, пробуем SMTP...
+[EMAIL] === Попытка отправки через SMTP ===
+[EMAIL] Получатель: user@gmail.com
 [EMAIL] SMTP_SERVER: smtp.gmail.com
 [EMAIL] SMTP_PORT: 587
+[EMAIL] SMTP_LOGIN: familyroots010326@gmail.com
+[EMAIL] SMTP_PASSWORD задан: true
 [EMAIL] SMTP_USE_TLS: true
 [EMAIL] 📤 Подключение к smtp.gmail.com:587 ...
 [EMAIL] 🔐 Используем SMTP + STARTTLS
 [EMAIL] 🔑 Выполняем вход...
 [EMAIL] 📨 Отправляем письмо...
-[EMAIL] ✅ Письмо успешно отправлено на user@example.com
+[EMAIL] ✅ Письмо успешно отправлено на user@gmail.com
+[VERIFY] Результат отправки: ✅ Успешно
+[VERIFY] Код успешно отправлен на user@gmail.com
 ```
 
 ### Шаг 4: Диагностика проблем
@@ -67,6 +84,16 @@ EMAIL_FROM=Family Tree <familyroots010326@gmail.com>
 **Решение:**
 - Проверьте, что файл `email_service.py` загружен на GitHub
 - Проверьте логи импорта в начале запуска
+
+#### ❌ Ошибка: "Email не настроен: нет SENDGRID_API_KEY и SMTP_LOGIN"
+```
+[VERIFY] ❌ Email не настроен: нет SENDGRID_API_KEY и SMTP_LOGIN
+```
+**Причина:** Переменные окружения не добавлены на Railway
+
+**Решение:**
+- Добавьте переменные окружения (см. Шаг 1)
+- Перезапустите сервис на Railway
 
 #### ❌ Ошибка аутентификации SMTP
 ```
@@ -128,8 +155,28 @@ cd web
 python -c "from email_service import send_email; send_email('test@example.com', 'Test', 'Hello')"
 ```
 
+Или запустите тестовый скрипт:
+
+```bash
+python test_email.py
+```
+
+## 📊 Endpoint для проверки настроек
+
+На Railway доступен endpoint для проверки email настроек:
+
+```
+GET /api/email/check
+```
+
+Он покажет:
+- Настроен ли SendGrid
+- Настроен ли SMTP
+- Последнюю ошибку отправки
+
 ## 📝 Примечания
 
 - **Никогда не коммитьте реальные пароли в Git!** Используйте переменные окружения
 - Для production уберите `test_code` из API ответа
 - Рассмотрите использование специализированных сервисов: SendGrid, Mailgun, Amazon SES
+- Gmail может блокировать письма на mail.ru и yandex.ru — используйте SendGrid для надёжности

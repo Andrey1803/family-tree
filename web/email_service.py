@@ -118,16 +118,23 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     Returns:
         True если отправлено успешно
     """
-    logger.info(f"Отправка письма на {to_email}")
-    
+    logger.info(f"[EMAIL] === Начало отправки письма ===")
+    logger.info(f"[EMAIL] Получатель: {to_email}")
+    logger.info(f"[EMAIL] Тема: {subject}")
+
     if not SENDGRID_API_KEY:
-        logger.warning("SendGrid API ключ не задан, пробуем SMTP...")
+        logger.warning("[EMAIL] SendGrid API ключ не задан, пробуем SMTP...")
         return _send_email_smtp(to_email, subject, body)
 
     try:
         # SendGrid API endpoint
         url = "https://api.sendgrid.com/v3/mail/send"
         
+        # Проверяем FROM_EMAIL
+        if not SENDGRID_FROM_EMAIL:
+            logger.error("[EMAIL] SENDGRID_FROM_EMAIL не задан!")
+            return False
+
         # Формируем запрос
         data = {
             "personalizations": [
@@ -144,9 +151,11 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
                 }
             ]
         }
-        
-        logger.info(f"Отправка через SendGrid API...")
-        
+
+        logger.info(f"[EMAIL] Отправка через SendGrid API...")
+        logger.info(f"[EMAIL] FROM: {SENDGRID_FROM_EMAIL}")
+        logger.info(f"[EMAIL] API ключ задан: {bool(SENDGRID_API_KEY)}")
+
         # Создаём запрос
         req = urllib.request.Request(
             url,
@@ -157,25 +166,27 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
             },
             method='POST'
         )
-        
+
         # Отправляем
+        logger.info(f"[EMAIL] 📤 Отправка запроса к SendGrid...")
         with urllib.request.urlopen(req, timeout=30) as resp:
             if resp.status == 202:
-                logger.info(f"Письмо успешно отправлено на {to_email}")
+                logger.info(f"[EMAIL] ✅ Письмо успешно отправлено на {to_email}")
                 return True
             else:
-                logger.error(f"SendGrid вернул статус: {resp.status}")
+                logger.error(f"[EMAIL] ❌ SendGrid вернул статус: {resp.status}")
                 return False
-                
+
     except urllib.error.HTTPError as e:
         error_body = e.read().decode() if e.fp else ""
-        logger.error(f"SendGrid HTTP ошибка: {e.code} - {error_body}")
+        logger.error(f"[EMAIL] ❌ SendGrid HTTP ошибка: {e.code}")
+        logger.error(f"[EMAIL] Детали: {error_body}")
         return False
     except urllib.error.URLError as e:
-        logger.error(f"SendGrid URL ошибка: {e.reason}")
+        logger.error(f"[EMAIL] ❌ SendGrid URL ошибка: {e.reason}")
         return False
     except Exception as e:
-        logger.error(f"SendGrid ошибка: {type(e).__name__}: {e}")
+        logger.error(f"[EMAIL] ❌ SendGrid ошибка: {type(e).__name__}: {e}")
         return False
 
 
@@ -186,53 +197,66 @@ def _send_email_smtp(to_email: str, subject: str, body: str) -> bool:
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-    
-    logger.info("Попытка отправки через SMTP...")
-    
+
+    logger.info(f"[EMAIL] === Попытка отправки через SMTP ===")
+    logger.info(f"[EMAIL] Получатель: {to_email}")
+    logger.info(f"[EMAIL] SMTP_SERVER: {SMTP_SERVER}")
+    logger.info(f"[EMAIL] SMTP_PORT: {SMTP_PORT}")
+    logger.info(f"[EMAIL] SMTP_LOGIN: {SMTP_LOGIN}")
+    logger.info(f"[EMAIL] SMTP_PASSWORD задан: {bool(SMTP_PASSWORD)}")
+    logger.info(f"[EMAIL] SMTP_USE_TLS: {SMTP_USE_TLS}")
+
     if not SMTP_LOGIN or not SMTP_PASSWORD:
-        logger.error("SMTP не настроен (пустой логин или пароль)")
+        logger.error("[EMAIL] ❌ SMTP не настроен (пустой логин или пароль)")
+        logger.error("[EMAIL] Для настройки добавьте переменные окружения:")
+        logger.error("[EMAIL] - SMTP_SERVER=smtp.gmail.com")
+        logger.error("[EMAIL] - SMTP_PORT=587")
+        logger.error("[EMAIL] - SMTP_LOGIN=ваш_email@gmail.com")
+        logger.error("[EMAIL] - SMTP_PASSWORD=пароль_приложения")
         return False
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SENDGRID_FROM_EMAIL
+        msg['From'] = SENDGRID_FROM_EMAIL or SMTP_LOGIN
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-        logger.info(f"Подключение к {SMTP_SERVER}:{SMTP_PORT} ...")
-        
+        logger.info(f"[EMAIL] 📤 Подключение к {SMTP_SERVER}:{SMTP_PORT} ...")
+
         if SMTP_USE_TLS:
-            logger.info("Используем SMTP + STARTTLS")
+            logger.info("[EMAIL] 🔐 Используем SMTP + STARTTLS")
             server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
             server.set_debuglevel(1)
             server.starttls()
         else:
-            logger.info("Используем SMTP_SSL")
+            logger.info("[EMAIL] 🔐 Используем SMTP_SSL")
             server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
             server.set_debuglevel(1)
 
-        logger.info("Выполняем вход...")
+        logger.info("[EMAIL] 🔑 Выполняем вход...")
         server.login(SMTP_LOGIN, SMTP_PASSWORD)
-        
-        logger.info("Отправляем письмо...")
+
+        logger.info("[EMAIL] 📨 Отправляем письмо...")
         server.send_message(msg)
-        
-        logger.info(f"Письмо успешно отправлено на {to_email}")
+
+        logger.info(f"[EMAIL] ✅ Письмо успешно отправлено на {to_email}")
         server.quit()
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"Ошибка аутентификации SMTP: {e}")
+        logger.error(f"[EMAIL] ❌ Ошибка аутентификации SMTP: {e}")
+        logger.error("[EMAIL] Проверьте логин/пароль (для Gmail используйте App Password)")
         return False
     except smtplib.SMTPConnectError as e:
-        logger.error(f"Ошибка подключения к SMTP серверу: {e}")
+        logger.error(f"[EMAIL] ❌ Ошибка подключения к SMTP серверу: {e}")
+        logger.error("[EMAIL] Проверьте сервер/порт или попробуйте порт 465 с SMTP_USE_TLS=false")
         return False
     except smtplib.SMTPException as e:
-        logger.error(f"SMTP ошибка: {e}")
+        logger.error(f"[EMAIL] ❌ SMTP ошибка: {e}")
         return False
     except Exception as e:
-        logger.error(f"Неизвестная ошибка SMTP: {type(e).__name__}: {e}")
+        logger.error(f"[EMAIL] ❌ Неизвестная ошибка SMTP: {type(e).__name__}: {e}")
         return False
 
 
@@ -244,22 +268,38 @@ def send_verification_code(email: str) -> Optional[str]:
         email: Email пользователя
 
     Returns:
-        Код если успешно (для тестирования), None если ошибка
+        Код если успешно, None если ошибка
     """
+    logger.info(f"[VERIFY] Запрос кода для email: {email}")
+    
     # Генерируем код
     code = create_verification_code(email)
+    logger.info(f"[VERIFY] Код сгенерирован: {code[:2]}*** (полный: {code})")
 
     # Формируем письмо
     body = EMAIL_TEMPLATE.format(code=code)
+    logger.info(f"[VERIFY] Тело письма: {body[:100]}...")
+
+    # Проверяем настройки перед отправкой
+    if not SENDGRID_API_KEY and not SMTP_LOGIN:
+        logger.error("[VERIFY] ❌ Email не настроен: нет SENDGRID_API_KEY и SMTP_LOGIN")
+        logger.error("[VERIFY] Для настройки добавьте переменные окружения:")
+        logger.error("[VERIFY] - SENDGRID_API_KEY=ваш_ключ (SendGrid)")
+        logger.error("[VERIFY] - или SMTP_SERVER, SMTP_LOGIN, SMTP_PASSWORD (SMTP)")
+        # Возвращаем None чтобы показать ошибку пользователю
+        return None
 
     # Отправляем
+    logger.info(f"[VERIFY] Вызов send_email...")
     success = send_email(email, EMAIL_SUBJECT, body)
+    logger.info(f"[VERIFY] Результат отправки: {'✅ Успешно' if success else '❌ Ошибка'}")
 
     if success:
+        logger.info(f"[VERIFY] Код успешно отправлен на {email}")
         return code
     else:
-        # Для тестирования возвращаем код даже если SMTP не настроен
-        return code
+        logger.error(f"[VERIFY] Не удалось отправить код на {email}")
+        return None
 
 
 def cleanup_expired_codes():

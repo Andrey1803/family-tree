@@ -63,10 +63,26 @@
     <script>
     // URL сервера синхронизации
     const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
-    
+
     const registerForm = document.getElementById('registerForm');
     const verifyForm = document.getElementById('verifyForm');
     const errorDiv = document.getElementById('error');
+
+    // Проверяем настройки email при загрузке страницы
+    window.addEventListener('DOMContentLoaded', async function() {
+        try {
+            const response = await fetch('/api/email/check');
+            const config = await response.json();
+            
+            if (config.method === 'none') {
+                // Email не настроен - показываем предупреждение
+                errorDiv.innerHTML = '⚠️ <strong>Внимание!</strong> Отправка email временно недоступна. Обратитесь к администратору.';
+                errorDiv.style.color = '#f59e0b';
+            }
+        } catch (err) {
+            console.error('Ошибка проверки настроек email:', err);
+        }
+    });
 
     // Шаг 1: Отправка данных и кода
     registerForm.addEventListener('submit', async function(e) {

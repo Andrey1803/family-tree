@@ -564,14 +564,41 @@ def api_verify_code():
     data = request.get_json() or {}
     email = data.get('email', '').strip()
     code = data.get('code', '').strip()
-    
+
     if not email or not code:
         return jsonify({"error": "Введите email и код"}), 400
-    
+
     if verify_code(email, code):
         return jsonify({"message": "Код подтверждён"}), 200
     else:
         return jsonify({"error": "Неверный код или истёк срок действия"}), 400
+
+
+@app.route("/api/email/check", methods=["GET"])
+def api_email_check():
+    """Проверка настроек email."""
+    from email_service import (
+        SENDGRID_API_KEY, SENDGRID_FROM_EMAIL,
+        SMTP_SERVER, SMTP_PORT, SMTP_LOGIN, SMTP_PASSWORD, SMTP_USE_TLS
+    )
+    
+    sendgrid_configured = bool(SENDGRID_API_KEY)
+    smtp_configured = bool(SMTP_LOGIN and SMTP_PASSWORD)
+    
+    return jsonify({
+        "sendgrid": {
+            "configured": sendgrid_configured,
+            "from_email": SENDGRID_FROM_EMAIL if sendgrid_configured else None
+        },
+        "smtp": {
+            "configured": smtp_configured,
+            "server": SMTP_SERVER if smtp_configured else None,
+            "port": SMTP_PORT if smtp_configured else None,
+            "login": SMTP_LOGIN if smtp_configured else None,
+            "use_tls": SMTP_USE_TLS if smtp_configured else None
+        },
+        "method": "sendgrid" if sendgrid_configured else ("smtp" if smtp_configured else "none")
+    }), 200
 
 
 @app.route("/sw.js")
