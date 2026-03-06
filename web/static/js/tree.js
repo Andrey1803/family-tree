@@ -115,6 +115,29 @@ function render() {
     }
     if (centerId) collect(centerId, !focusModeActive);
     else ids.forEach(id => collect(id, true));
+    
+    // Добавляем супругов из marriages в relatedRaw
+    console.log('[RENDER] Processing marriages for related:', treeData.marriages);
+    (treeData.marriages || []).forEach(m => {
+        let a, b;
+        if (Array.isArray(m)) {
+            [a, b] = m;
+        } else if (m.persons && Array.isArray(m.persons)) {
+            [a, b] = m.persons;
+        } else {
+            return;
+        }
+        // Добавляем обоих супругов, если они есть в persons
+        if (persons[String(a)]) {
+            relatedRaw.add(String(a));
+            collect(String(a), !focusModeActive);
+        }
+        if (persons[String(b)]) {
+            relatedRaw.add(String(b));
+            collect(String(b), !focusModeActive);
+        }
+        console.log('[RENDER] Added spouses from marriage:', a, b);
+    });
 
     const related = new Set();
     for (const pid of relatedRaw) {
@@ -248,119 +271,7 @@ function render() {
     wrap.style.cssText = `position:relative; width:${totalW}px; height:${totalH}px; transform:scale(${treeZoom}); transform-origin:0 0;`;
     zoomContainer.appendChild(wrap);
 
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", totalW);
-    svg.setAttribute("height", totalH);
-    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none;";
-    wrap.appendChild(svg);
-
-    // Линии родитель–ребёнок (ортогональные, как в desktop: вертикаль → горизонтальная планка → вертикали к детям)
-    const parentSetToChildren = {};
-    Object.keys(coords).forEach(pid => {
-        const p = persons[pid];
-        if (!p || !p.parents) return;
-        const visibleParents = (p.parents || []).filter(pid2 => coords[pid2] && related.has(pid2));
-        if (!visibleParents.length) return;
-        const key = visibleParents.map(String).sort().join("|");
-        parentSetToChildren[key] = parentSetToChildren[key] || [];
-        parentSetToChildren[key].push(pid);
-    });
-    const childTopOffset = CARD_H / 2;
-    Object.values(parentSetToChildren).forEach(childPids => {
-        const first = persons[childPids[0]];
-        if (!first || !first.parents) return;
-        const parentPids = (first.parents || []).filter(pid => coords[pid]);
-        if (!parentPids.length) return;
-        let midX, midY;
-        if (parentPids.length >= 2) {
-            const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
-            midX = (p1.x + p2.x) / 2;
-            midY = (p1.y + p2.y) / 2;
-        } else {
-            midX = coords[parentPids[0]].x;
-            midY = coords[parentPids[0]].y;
-        }
-        const childrenCoords = childPids
-            .filter(cid => coords[cid])
-            .map(cid => {
-                const c = coords[cid];
-                return { cx: c.x, cy: c.y, topY: c.y - childTopOffset };
-            })
-            .sort((a, b) => a.cx - b.cx);
-        if (!childrenCoords.length) return;
-        const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-        const lineY = (midY + minTopY) / 2;
-        const pts = [
-            [midX + offsetX, midY + offsetY],
-            [midX + offsetX, lineY + offsetY],
-        ];
-        childrenCoords.forEach(({ cx, topY }) => {
-            pts.push([cx + offsetX, lineY + offsetY]);
-            pts.push([cx + offsetX, topY + offsetY]);
-            pts.push([cx + offsetX, lineY + offsetY]);
-        });
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-        path.setAttribute("points", pts.map(p => p.join(",")).join(" "));
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", "#475569");
-        path.setAttribute("stroke-width", 2);
-        path.setAttribute("stroke-linecap", "round");
-        path.setAttribute("stroke-linejoin", "round");
-        svg.appendChild(path);
-    });
-    // Линии между супругами
-    (treeData.marriages || []).forEach(m => {
-        // Поддерживаем форматы: [a, b] или {persons: [a, b]} или {persons: [a, b], date: ...}
-        let a, b;
-        if (Array.isArray(m)) {
-            [a, b] = m;
-        } else if (m.persons && Array.isArray(m.persons)) {
-            [a, b] = m.persons;
-        } else {
-            console.log('[MARRIAGE_LINE] Skipping invalid marriage format:', m);
-            return; // Неверный формат
-        }
-
-        const idA = String(a), idB = String(b);
-        if (!coords[idA] || !coords[idB]) {
-            console.log('[MARRIAGE_LINE] Missing coords for:', idA, idB);
-            return;
-        }
-        if (!related.has(idA) || !related.has(idB)) {
-            console.log('[MARRIAGE_LINE] Not related:', idA, idB);
-            return;
-        }
-        
-        // Рисуем линию между карточками (горизонтально)
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        
-        // Вычисляем координаты для горизонтальной линии между супругами
-        // Супруги располагаются рядом горизонтально, соединяем их по центру высоты карточки
-        const yCenter = coords[idA].y + offsetY;  // Центр по Y
-        const xA = coords[idA].x + offsetX;
-        const xB = coords[idB].x + offsetX;
-        
-        // Определяем, кто слева, кто справа
-        const xLeft = Math.min(xA, xB);
-        const xRight = Math.max(xA, xB);
-        
-        // Вычисляем края карточек (ширина карточки = CARD_W)
-        const cardHalfWidth = CARD_W / 2;
-        const xLeftEdge = xLeft + cardHalfWidth;  // Правый край левой карточки
-        const xRightEdge = xRight - cardHalfWidth;  // Левый край правой карточки
-        
-        line.setAttribute("x1", xLeftEdge);
-        line.setAttribute("y1", yCenter);
-        line.setAttribute("x2", xRightEdge);
-        line.setAttribute("y2", yCenter);
-        line.setAttribute("stroke", "#b45309");  // Оранжево-коричневый
-        line.setAttribute("stroke-width", 2);
-        line.setAttribute("stroke-dasharray", "4 4");  // Пунктирная линия
-        line.setAttribute("stroke-linecap", "round");
-        console.log('[MARRIAGE_LINE] Drawn between', idA, 'and', idB, ':', xLeftEdge, yCenter, 'to', xRightEdge, yCenter);
-        svg.appendChild(line);
-    });
-
+    // Сначала рисуем карточки
     Object.entries(coords).forEach(([pid, pos]) => {
         const p = persons[pid];
         if (!p) return;
@@ -421,6 +332,104 @@ function render() {
         card.addEventListener("touchend", () => clearTimeout(longPressTimer));
         card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
         wrap.appendChild(card);
+    });
+
+    // Рисуем линии ПОСЛЕ карточек (чтобы они были поверх)
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", totalW);
+    svg.setAttribute("height", totalH);
+    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none; z-index:10;";
+    wrap.appendChild(svg);
+
+    // Линии родитель–ребёнок
+    const parentSetToChildren = {};
+    Object.keys(coords).forEach(pid => {
+        const p = persons[pid];
+        if (!p || !p.parents) return;
+        const visibleParents = (p.parents || []).filter(pid2 => coords[pid2] && related.has(pid2));
+        if (!visibleParents.length) return;
+        const key = visibleParents.map(String).sort().join("|");
+        parentSetToChildren[key] = parentSetToChildren[key] || [];
+        parentSetToChildren[key].push(pid);
+    });
+    const childTopOffset = CARD_H / 2;
+    Object.values(parentSetToChildren).forEach(childPids => {
+        const first = persons[childPids[0]];
+        if (!first || !first.parents) return;
+        const parentPids = (first.parents || []).filter(pid => coords[pid]);
+        if (!parentPids.length) return;
+        let midX, midY;
+        if (parentPids.length >= 2) {
+            const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
+            midX = (p1.x + p2.x) / 2;
+            midY = (p1.y + p2.y) / 2;
+        } else {
+            midX = coords[parentPids[0]].x;
+            midY = coords[parentPids[0]].y;
+        }
+        const childrenCoords = childPids
+            .filter(cid => coords[cid])
+            .map(cid => {
+                const c = coords[cid];
+                return { cx: c.x, cy: c.y, topY: c.y - childTopOffset };
+            })
+            .sort((a, b) => a.cx - b.cx);
+        if (!childrenCoords.length) return;
+        const minTopY = Math.min(...childrenCoords.map(t => t.topY));
+        const lineY = (midY + minTopY) / 2;
+        const pts = [
+            [midX + offsetX, midY + offsetY],
+            [midX + offsetX, lineY + offsetY],
+        ];
+        childrenCoords.forEach(({ cx, topY }) => {
+            pts.push([cx + offsetX, lineY + offsetY]);
+            pts.push([cx + offsetX, topY + offsetY]);
+            pts.push([cx + offsetX, lineY + offsetY]);
+        });
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        path.setAttribute("points", pts.map(p => p.join(",")).join(" "));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#475569");
+        path.setAttribute("stroke-width", 2);
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+    });
+    
+    // Линии между супругами
+    (treeData.marriages || []).forEach(m => {
+        let a, b;
+        if (Array.isArray(m)) {
+            [a, b] = m;
+        } else if (m.persons && Array.isArray(m.persons)) {
+            [a, b] = m.persons;
+        } else {
+            return;
+        }
+
+        const idA = String(a), idB = String(b);
+        if (!coords[idA] || !coords[idB]) return;
+        if (!related.has(idA) || !related.has(idB)) return;
+        
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        const yCenter = coords[idA].y + offsetY;
+        const xA = coords[idA].x + offsetX;
+        const xB = coords[idB].x + offsetX;
+        const xLeft = Math.min(xA, xB);
+        const xRight = Math.max(xA, xB);
+        const cardHalfWidth = CARD_W / 2;
+        const xLeftEdge = xLeft + cardHalfWidth;
+        const xRightEdge = xRight - cardHalfWidth;
+        
+        line.setAttribute("x1", xLeftEdge);
+        line.setAttribute("y1", yCenter);
+        line.setAttribute("x2", xRightEdge);
+        line.setAttribute("y2", yCenter);
+        line.setAttribute("stroke", "#b45309");
+        line.setAttribute("stroke-width", 2);
+        line.setAttribute("stroke-dasharray", "4 4");
+        line.setAttribute("stroke-linecap", "round");
+        svg.appendChild(line);
     });
 
     setupPan(wrap, panZoomWrapper);
