@@ -868,6 +868,34 @@ def initialize_database():
 # Авто-инициализация при импорте
 initialize_database()
 
+# Удаляем admin и предоставляем права Андрею при каждом старте
+def apply_admin_settings():
+    """Применить настройки администратора при старте."""
+    try:
+        import sqlite3
+        DB_FILE = os.environ.get('DATA_DIR', '/data') + '/family_tree.db'
+        if os.path.exists(DB_FILE):
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            # Удаляем admin
+            if os.environ.get("REMOVE_ADMIN") == "true":
+                cursor.execute('DELETE FROM users WHERE login = "admin"')
+                conn.commit()
+                print("✅ Пользователь 'admin' удалён")
+            
+            # Делаем Андрея админом
+            if os.environ.get("ANDREY_SUPER_ADMIN") == "true":
+                cursor.execute('UPDATE users SET is_admin = 1 WHERE login = "Андрей Емельянов"')
+                conn.commit()
+                print("✅ Андрей Емельянов теперь супер-админ")
+            
+            conn.close()
+    except Exception as e:
+        print(f"⚠️ Ошибка apply_admin_settings: {e}")
+
+apply_admin_settings()
+
 if __name__ == '__main__':
     # Инициализация БД
     initialize_database()
