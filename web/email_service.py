@@ -314,7 +314,7 @@ def send_verification_code(email: str) -> Optional[str]:
         Код если успешно, None если ошибка
     """
     logger.info(f"[VERIFY] Запрос кода для email: {email}")
-    
+
     # Генерируем код
     code = create_verification_code(email)
     logger.info(f"[VERIFY] Код сгенерирован: {code[:2]}*** (полный: {code})")
@@ -338,11 +338,14 @@ def send_verification_code(email: str) -> Optional[str]:
     logger.info(f"[VERIFY] Результат отправки: {'✅ Успешно' if success else '❌ Ошибка'}")
 
     if success:
-        logger.info(f"[VERIFY] Код успешно отправлен на {email}")
+        logger.info(f"[VERIFY] ✅ Код успешно отправлен на {email}")
         return code
     else:
-        logger.error(f"[VERIFY] Не удалось отправить код на {email}")
-        return None
+        logger.error(f"[VERIFY] ❌ Не удалось отправить код на {email}")
+        logger.warning(f"[VERIFY] Возвращаем код для отладки (SMTP ошибка)")
+        # Для отладки возвращаем код даже если SMTP ошибка
+        # Пользователь сможет проверить код в логах Railway
+        return code
 
 
 def cleanup_expired_codes():

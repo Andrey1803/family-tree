@@ -139,6 +139,8 @@
         } catch (err) {
             errorDiv.textContent = 'Ошибка подключения к серверу';
             console.error(err);
+            // Показываем инструкцию для отладки
+            errorDiv.innerHTML += '<br><br>🔧 <strong>Для отладки:</strong> Проверьте код в логах Railway Deploy Logs';
         }
     });
 
