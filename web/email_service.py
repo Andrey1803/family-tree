@@ -20,6 +20,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Папка данных для хранения кодов подтверждения
+_data_dir = os.environ.get("DATA_DIR", "/app/data")
+
 # SendGrid настройки
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
 # SendGrid FROM - используем verified sender
@@ -59,8 +62,29 @@ EMAIL_TEMPLATE = """Здравствуйте!
 ---
 Семейное древо (Family Tree)"""
 
-# Хранилище кодов (в памяти, для production нужна БД)
-_verification_codes: Dict[str, dict] = {}
+# Хранилище кодов (в файле для работы с несколькими workers)
+_verification_codes_file = os.path.join(_data_dir, "verification_codes.json")
+
+
+def _load_verification_codes() -> Dict[str, dict]:
+    """Загрузить коды из файла."""
+    if not os.path.exists(_verification_codes_file):
+        return {}
+    try:
+        with open(_verification_codes_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_verification_codes(codes: Dict[str, dict]):
+    """Сохранить коды в файл."""
+    try:
+        os.makedirs(os.path.dirname(_verification_codes_file), exist_ok=True)
+        with open(_verification_codes_file, "w", encoding="utf-8") as f:
+            json.dump(codes, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"[VERIFY] Ошибка сохранения кодов: {e}")
 
 
 def generate_code(length: int = 6) -> str:
@@ -83,15 +107,21 @@ def create_verification_code(email: str) -> str:
     now = datetime.now(timezone.utc)  # Используем UTC
     expiry = now + timedelta(seconds=CODE_EXPIRY_SECONDS)
 
+    # Загружаем существующие коды
+    codes = _load_verification_codes()
+    
     # Проверяем есть ли уже код для этого email
-    if email in _verification_codes:
-        logger.warning(f"[VERIFY] ⚠️ Для {email} уже есть код ({_verification_codes[email]['code'][:2]}***), перезаписываем")
+    if email in codes:
+        logger.warning(f"[VERIFY] ⚠️ Для {email} уже есть код ({codes[email]['code'][:2]}***), перезаписываем")
 
-    _verification_codes[email] = {
+    codes[email] = {
         'code': code,
-        'expiry': expiry,
-        'created_at': now
+        'expiry': expiry.isoformat(),
+        'created_at': now.isoformat()
     }
+    
+    # Сохраняем в файл
+    _save_verification_codes(codes)
 
     logger.info(f"[VERIFY] Код создан для {email}: {code[:2]}*** (истекает через {CODE_EXPIRY_SECONDS}с)")
     logger.info(f"[VERIFY] Время создания: {now}, истечения: {expiry}")
@@ -112,18 +142,21 @@ def verify_code(email: str, code: str) -> bool:
     """
     logger.info(f"[VERIFY] Проверка кода для email: {email}, введён код: {code}")
 
-    if email not in _verification_codes:
+    # Загружаем коды из файла
+    codes = _load_verification_codes()
+    
+    if email not in codes:
         logger.warning(f"[VERIFY] ❌ Email '{email}' не найден в хранилище")
-        logger.warning(f"[VERIFY] Доступные emails: {list(_verification_codes.keys())}")
+        logger.warning(f"[VERIFY] Доступные emails: {list(codes.keys())}")
         return False
 
-    stored = _verification_codes[email]
+    stored = codes[email]
     logger.info(f"[VERIFY] Найден код: хранится={stored['code']}, введён={code}")
 
     # Проверяем не истёк ли код (используем UTC)
     now = datetime.now(timezone.utc)
-    expiry = stored['expiry']
-    created = stored['created_at']
+    expiry = datetime.fromisoformat(stored['expiry'])
+    created = datetime.fromisoformat(stored['created_at'])
 
     logger.info(f"[VERIFY] Текущее время: {now}")
     logger.info(f"[VERIFY] Код создан: {created}, истекает: {expiry}")
@@ -131,7 +164,8 @@ def verify_code(email: str, code: str) -> bool:
     if now > expiry:
         time_diff = now - created
         logger.warning(f"[VERIFY] ❌ Код истёк! Прошло {time_diff.total_seconds():.1f}с (лимит: {CODE_EXPIRY_SECONDS}с)")
-        del _verification_codes[email]
+        del codes[email]
+        _save_verification_codes(codes)
         return False
 
     # Проверяем код
@@ -141,7 +175,8 @@ def verify_code(email: str, code: str) -> bool:
 
     # Код верный - удаляем его
     logger.info(f"[VERIFY] ✅ Код подтверждён для {email}")
-    del _verification_codes[email]
+    del codes[email]
+    _save_verification_codes(codes)
     return True
 
 
