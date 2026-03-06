@@ -45,12 +45,27 @@ try:
     
     # Делаем Андрея админом
     print("\n⚙️ Предоставление прав Андрею Емельянову...")
-    cursor.execute('UPDATE users SET is_admin = 1 WHERE login = "Андрей Емельянов"')
-    updated = cursor.rowcount
-    if updated > 0:
-        print(f"✅ Андрей Емельянов теперь админ ({updated} запись)")
+    
+    # Пробуем разные варианты написания
+    variants = [
+        "Андрей Емельянов",
+        "Андрей",
+        "Андрей Е.",
+        "andrey",
+        "andrey1803"
+    ]
+    
+    for variant in variants:
+        cursor.execute('UPDATE users SET is_admin = 1 WHERE login = ?', (variant,))
+        updated = cursor.rowcount
+        if updated > 0:
+            print(f"✅ {variant} теперь админ ({updated} запись)")
+            break
     else:
-        print("⚠️ Андрей Емельянов не найден")
+        print("⚠️ Андрей Емельянов не найден. Доступные пользователи:")
+        cursor.execute("SELECT login FROM users;")
+        for row in cursor.fetchall():
+            print(f"   - {row[0]}")
     
     conn.commit()
     
