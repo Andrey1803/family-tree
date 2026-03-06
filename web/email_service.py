@@ -313,39 +313,44 @@ def send_verification_code(email: str) -> Optional[str]:
     Returns:
         Код если успешно, None если ошибка
     """
-    logger.info(f"[VERIFY] Запрос кода для email: {email}")
+    try:
+        logger.info(f"[VERIFY] Запрос кода для email: {email}")
 
-    # Генерируем код
-    code = create_verification_code(email)
-    logger.info(f"[VERIFY] Код сгенерирован: {code[:2]}*** (полный: {code})")
+        # Генерируем код
+        code = create_verification_code(email)
+        logger.info(f"[VERIFY] Код сгенерирован: {code[:2]}*** (полный: {code})")
 
-    # Формируем письмо
-    body = EMAIL_TEMPLATE.format(code=code)
-    logger.info(f"[VERIFY] Тело письма: {body[:100]}...")
+        # Формируем письмо
+        body = EMAIL_TEMPLATE.format(code=code)
+        logger.info(f"[VERIFY] Тело письма: {body[:100]}...")
 
-    # Проверяем настройки перед отправкой
-    if not SENDGRID_API_KEY and not SMTP_LOGIN:
-        logger.error("[VERIFY] ❌ Email не настроен: нет SENDGRID_API_KEY и SMTP_LOGIN")
-        logger.error("[VERIFY] Для настройки добавьте переменные окружения:")
-        logger.error("[VERIFY] - SENDGRID_API_KEY=ваш_ключ (SendGrid)")
-        logger.error("[VERIFY] - или SMTP_SERVER, SMTP_LOGIN, SMTP_PASSWORD (SMTP)")
-        # Возвращаем None чтобы показать ошибку пользователю
+        # Проверяем настройки перед отправкой
+        if not SENDGRID_API_KEY and not SMTP_LOGIN:
+            logger.error("[VERIFY] ❌ Email не настроен: нет SENDGRID_API_KEY и SMTP_LOGIN")
+            logger.error("[VERIFY] Для настройки добавьте переменные окружения:")
+            logger.error("[VERIFY] - SENDGRID_API_KEY=ваш_ключ (SendGrid)")
+            logger.error("[VERIFY] - или SMTP_SERVER, SMTP_LOGIN, SMTP_PASSWORD (SMTP)")
+            # Возвращаем None чтобы показать ошибку пользователю
+            return None
+
+        # Отправляем
+        logger.info(f"[VERIFY] Вызов send_email...")
+        success = send_email(email, EMAIL_SUBJECT, body)
+        logger.info(f"[VERIFY] Результат отправки: {'✅ Успешно' if success else '❌ Ошибка'}")
+
+        if success:
+            logger.info(f"[VERIFY] ✅ Код успешно отправлен на {email}")
+            return code
+        else:
+            logger.error(f"[VERIFY] ❌ Не удалось отправить код на {email}")
+            logger.warning(f"[VERIFY] Возвращаем код для отладки (SMTP ошибка)")
+            # Для отладки возвращаем код даже если SMTP ошибка
+            # Пользователь сможет проверить код в логах Railway
+            return code
+    except Exception as e:
+        logger.error(f"[VERIFY] ❌ Исключение в send_verification_code: {type(e).__name__}: {e}")
+        logger.error(f"[VERIFY] Stack trace:", exc_info=True)
         return None
-
-    # Отправляем
-    logger.info(f"[VERIFY] Вызов send_email...")
-    success = send_email(email, EMAIL_SUBJECT, body)
-    logger.info(f"[VERIFY] Результат отправки: {'✅ Успешно' if success else '❌ Ошибка'}")
-
-    if success:
-        logger.info(f"[VERIFY] ✅ Код успешно отправлен на {email}")
-        return code
-    else:
-        logger.error(f"[VERIFY] ❌ Не удалось отправить код на {email}")
-        logger.warning(f"[VERIFY] Возвращаем код для отладки (SMTP ошибка)")
-        # Для отладки возвращаем код даже если SMTP ошибка
-        # Пользователь сможет проверить код в логах Railway
-        return code
 
 
 def cleanup_expired_codes():

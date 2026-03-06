@@ -551,8 +551,12 @@ def api_send_code():
 
     # Отправляем код
     logger.info(f"[API] Вызов send_verification_code для {email}")
-    code = send_verification_code(email)
-    logger.info(f"[API] send_verification_code вернул: {'код' if code else 'None'}")
+    try:
+        code = send_verification_code(email)
+        logger.info(f"[API] send_verification_code вернул: {'код' if code else 'None'}")
+    except Exception as e:
+        logger.error(f"[API] ❌ Исключение в send_verification_code: {type(e).__name__}: {e}")
+        code = None
 
     if code:
         # Код отправлен на email (не показываем код на экране)
