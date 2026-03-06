@@ -10,9 +10,13 @@ _block_cipher = None
 # Корень проекта
 root = Path(SPECPATH)
 tree_dir = root / 'Дерево'
+data_dir = root / 'data'
 
 # Данные для приложения
 datas_list = [(str(tree_dir), 'Дерево')] if tree_dir.is_dir() else []
+# Добавляем папку data в сборку
+if data_dir.is_dir():
+    datas_list.append((str(data_dir), 'data'))
 
 a = Analysis(
     [str(root / 'main.py')],
@@ -30,6 +34,8 @@ a = Analysis(
         'app', 'auth', 'models', 'constants', 'ui_helpers', 'protocol_win',
         'version', 'update_check', 'backup', 'undo', 'kinship', 'theme',
         'timeline', 'sync', 'check_parents', 'data_migrations',
+        'user_dashboard', 'server_admin_dashboard', 'admin_dashboard_full',
+        'admin_dashboard_local',
         # Сервисы
         'services',
         'services.tree_service',

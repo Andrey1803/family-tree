@@ -162,6 +162,13 @@ def _clear_remember():
             pass
 
 
+def _start_main_app(login_root, on_success, login):
+    """Корректно закрывает окно входа и запускает основное приложение."""
+    login_root.destroy()
+    login_root.quit()
+    on_success(login)
+
+
 def auth_register(login: str, password: str) -> Optional[str]:
     login = login.strip()
     if not login:
@@ -250,7 +257,7 @@ def run_login_window(on_success):
         if not password:
             messagebox.showwarning("Вход", "Введите пароль.", parent=login_root)
             return
-        
+
         print(f"[LOGIN] Attempting login for: {login}")
         try:
             auth_result = auth_check(login, password)
@@ -258,15 +265,16 @@ def run_login_window(on_success):
         except Exception as e:
             print(f"[LOGIN] auth_check raised: {type(e).__name__}: {e}")
             auth_result = False
-        
+
         if auth_result:
             print(f"[LOGIN] Success for: {login}")
             if remember_var.get():
                 _save_remember(login, password)
             else:
                 _clear_remember()
-            login_root.destroy()
-            on_success(login)
+            # Сначала скрываем окно, затем завершаем mainloop и только потом создаём новое окно
+            login_root.withdraw()
+            login_root.after(100, lambda: _start_main_app(login_root, on_success, login))
         else:
             print(f"[LOGIN] Failed for: {login}")
             messagebox.showerror("Вход", "Неверный логин или пароль.", parent=login_root)
@@ -310,15 +318,10 @@ def run_login_window(on_success):
         ttk.Button(f, text="Зарегистрироваться", command=submit_register).pack(pady=4)
         ttk.Button(f, text="Отмена", command=reg.destroy).pack(pady=2)
 
-    def do_guest():
-        login_root.destroy()
-        on_success("Гость")
-
     btn_frame = ttk.Frame(frame)
     btn_frame.pack(fill=tk.X, pady=(8, 0))
     ttk.Button(btn_frame, text="Войти", command=do_login).pack(side=tk.LEFT, padx=(0, 8))
     ttk.Button(btn_frame, text="Регистрация", command=do_register).pack(side=tk.LEFT)
-    ttk.Button(btn_frame, text="Войти без регистрации", command=do_guest).pack(side=tk.LEFT, padx=(8, 0))
 
     def on_closing():
         if messagebox.askokcancel("Выход", "Закрыть программу?", parent=login_root):

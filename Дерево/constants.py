@@ -122,16 +122,27 @@ PALETTE_LABELS = {
 }
 
 # Путь к файлу палитры — в папке data/
-# Использует рабочую директорию (которая устанавливается в main.py)
-PALETTE_FILE = os.path.join("data", "palette.json")
+# Вычисляется относительно точки входа (sys.executable для .exe или __file__ для скрипта)
+if getattr(sys, "frozen", False):
+    # Запуск .exe: данные в папке data/ рядом с exe
+    _base_dir = os.path.dirname(sys.executable)
+else:
+    # Запуск из исходников: данные в папке data/ проекта
+    _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PALETTE_FILE = os.path.join(_base_dir, "data", "palette.json")
 
 
 def apply_palette(palette_dict):
     """Применяет словарь цветов к константам модуля (только известные ключи)."""
     mod = sys.modules[__name__]
+    applied_count = 0
     for k, v in palette_dict.items():
         if k in PALETTE_DEFAULTS and isinstance(v, str):
+            old_val = getattr(mod, k, None)
             setattr(mod, k, v)
+            applied_count += 1
+            print(f"[APPLY_PALETTE] {k}: {old_val} -> {v}")
+    print(f"[APPLY_PALETTE] Всего применено: {applied_count} цветов")
 
 
 def load_palette_from_file():
@@ -162,6 +173,7 @@ def save_palette_to_file():
         # Используем абсолютный путь для отладки
         abs_path = os.path.abspath(PALETTE_FILE)
         print(f"[PALETTE] Saving to: {abs_path}")
+        print(f"[PALETTE] Data to save: MARRIAGE_LINE_COLOR={data.get('MARRIAGE_LINE_COLOR')}")
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         with open(abs_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

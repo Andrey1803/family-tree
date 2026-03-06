@@ -99,7 +99,27 @@ class KinshipService:
 
             return self._by_levels(person.gender, p_level, c_level)
 
-        # === 3. СВОЙСТВЕННИКИ (через супруга) ===
+        # === 3. СВОЙСТВЕННИКИ (через супруга center) ===
+        # Проверяем, является ли person родственником супруга center
+        for center_spouse_id in center.spouse_ids:
+            if center_spouse_id == person_id:
+                continue
+            center_spouse = self.model.get_person(center_spouse_id)
+            if not center_spouse:
+                continue
+            
+            # Проверяем, является ли person родителем супруга center
+            if person_id in center_spouse.parents:
+                return "Тесть" if person.gender == "Мужской" else "Теща"
+            
+            # Проверяем, является ли person братом/сестрой супруга center
+            for spouse_parent_id in center_spouse.parents:
+                spouse_parent = self.model.get_person(spouse_parent_id)
+                if spouse_parent and person_id in spouse_parent.children:
+                    if person_id != center_spouse_id:  # Не сам супруг
+                        return "Шурин" if person.gender == "Мужской" else "Золовка"
+        
+        # === 4. СВОЙСТВЕННИКИ (через супруга person) ===
         for spouse_id in person.spouse_ids:
             if spouse_id == center_id:
                 continue
@@ -157,28 +177,88 @@ class KinshipService:
         if person_level == center_level:
             if person_level == 1:
                 return "Брат" if gender == "Мужской" else "Сестра"
+            elif person_level == 2:
+                return "Двоюродный брат" if gender == "Мужской" else "Двоюродная сестра"
+            elif person_level == 3:
+                return "Троюродный брат" if gender == "Мужской" else "Троюродная сестра"
             else:
-                # Двоюродные и т.д.
                 cousin_term = self._cousin_term(person_level - 1)
                 return cousin_term + ("Брат" if gender == "Мужской" else "Сестра")
 
-        # Разные уровни
+        # Разница 1 поколение
+        if diff == 1:
+            if person_level < center_level:
+                # person старше
+                if person_level == 1 and center_level == 2:
+                    return "Дядя" if gender == "Мужской" else "Тётя"
+                elif person_level == 1 and center_level > 2:
+                    if center_level == 3:
+                        return "Двоюродный дядя" if gender == "Мужской" else "Двоюродная тётя"
+                    elif center_level == 4:
+                        return "Троюродный дядя" if gender == "Мужской" else "Троюродная тётя"
+                    else:
+                        prefix = self._cousin_term(center_level - 2)
+                        return prefix + ("дядя" if gender == "Мужской" else "тётя")
+                elif person_level == 2 and center_level == 3:
+                    return "Двоюродный дядя" if gender == "Мужской" else "Двоюродная тётя"
+                elif person_level == 2:
+                    return "Двоюродный дед" if gender == "Мужской" else "Двоюродная бабушка"
+                else:
+                    return f"Дед {person_level}-го колена" if gender == "Мужской" else f"Бабушка {person_level}-го колена"
+            else:
+                # person младше
+                if center_level == 1 and person_level == 2:
+                    return "Племянник" if gender == "Мужской" else "Племянница"
+                elif center_level == 1:
+                    if person_level == 3:
+                        return "Двоюродный племянник" if gender == "Мужской" else "Двоюродная племянница"
+                    elif person_level == 4:
+                        return "Троюродный племянник" if gender == "Мужской" else "Троюродная племянница"
+                    else:
+                        return f"Племянник {person_level - 1}-го колена" if gender == "Мужской" else f"Племянница {person_level - 1}-го колена"
+                elif center_level == 2 and person_level == 3:
+                    return "Двоюродный племянник" if gender == "Мужской" else "Двоюродная племянница"
+                elif center_level == 2:
+                    return "Двоюродный племянник" if gender == "Мужской" else "Двоюродная племянница"
+                else:
+                    return f"Племянник {center_level}-го колена" if gender == "Мужской" else f"Племянница {center_level}-го колена"
+
+        # Разница 2+ поколения
         if person_level < center_level:
-            # Person старше (предок)
-            if diff == 1:
+            # person старше
+            if person_level == 1 and center_level == 2:
                 return "Дед" if gender == "Мужской" else "Бабушка"
-            elif diff == 2:
+            elif person_level == 1 and center_level > 2:
+                if center_level == 3:
+                    return "Двоюродный дед" if gender == "Мужской" else "Двоюродная бабушка"
+                elif center_level == 4:
+                    return "Троюродный дед" if gender == "Мужской" else "Троюродная бабушка"
+                else:
+                    prefix = self._cousin_term(center_level - 2)
+                    return prefix + ("дед" if gender == "Мужской" else "бабушка")
+            elif person_level == 2:
                 return "Прадед" if gender == "Мужской" else "Прабабушка"
             else:
-                return "Прапра" + ("дед" if gender == "Мужской" else "бабушка")
+                return f"Дед {person_level + 1}-го колена" if gender == "Мужской" else f"Бабушка {person_level + 1}-го колена"
         else:
-            # Person младше (потомок)
-            if diff == 1:
-                return "Племянник" if gender == "Мужской" else "Племянница"
-            elif diff == 2:
-                return "Двоюродный внук" if gender == "Мужской" else "Двоюродная внучка"
+            # person младше
+            if center_level == 1 and person_level == 2:
+                return "Внук" if gender == "Мужской" else "Внучка"
+            elif center_level == 1 and person_level > 2:
+                # Боковая линия (племянники)
+                if person_level == 3:
+                    return "Внучатый племянник" if gender == "Мужской" else "Внучатая племянница"
+                elif person_level == 4:
+                    return "Внучатый племянник 2-го колена" if gender == "Мужской" else "Внучатая племянница 2-го колена"
+                else:
+                    return f"Внучатый племянник {person_level - 1}-го колена" if gender == "Мужской" else f"Внучатая племянница {person_level - 1}-го колена"
+            elif center_level == 2:
+                if person_level == 3:
+                    return "Двоюродный племянник" if gender == "Мужской" else "Двоюродная племянница"
+                else:
+                    return "Правнук" if gender == "Мужской" else "Правнучка"
             else:
-                return "Двоюродный правнук" if gender == "Мужской" else "Двоюродная правнучка"
+                return f"Внук {center_level + 1}-го колена" if gender == "Мужской" else f"Внучка {center_level + 1}-го колена"
 
     def _cousin_term(self, level: int) -> str:
         """
@@ -210,13 +290,37 @@ class KinshipService:
         Returns:
             Строка с термином для свойственника.
         """
-        # Упрощённая логика
-        if relationship in ("Брат", "Сын"):
-            return "Свояк" if gender == "Мужской" else "Свояченица"
-        elif relationship in ("Сестра", "Дочь"):
-            return "Золовка" if gender == "Мужской" else "Невестка"
-        else:
-            return "Свойственник" if gender == "Мужской" else "Свойственница"
+        # Прямые термины для свойственников
+        inlaw_terms = {
+            "Отец": "Тесть" if gender == "Мужской" else "Свекровь",
+            "Мать": "Теща" if gender == "Женский" else "Свекор",
+            "Брат": "Шурин" if gender == "Мужской" else "Свояченица",
+            "Сестра": "Золовка" if gender == "Женский" else "Свояк",
+        }
+        
+        if relationship in inlaw_terms:
+            return inlaw_terms[relationship]
+        
+        # Остальные термины
+        terms = {
+            "Сын": "Невестка" if gender == "Женский" else "Зять",
+            "Дочь": "Зять" if gender == "Мужской" else "Невестка",
+            "Дядя": "Тётя" if gender == "Женский" else "Дядя",
+            "Тётя": "Дядя" if gender == "Мужской" else "Тётя",
+            "Племянник": "Невестка" if gender == "Женский" else "Зять",
+            "Племянница": "Зять" if gender == "Мужской" else "Свояченица",
+        }
+
+        if relationship in terms:
+            return terms[relationship]
+
+        base_lower = relationship.lower()
+        if "брат" in base_lower or "дядя" in base_lower:
+            return "Невестка" if gender == "Женский" else "Свояк"
+        if "сестр" in base_lower or "тёт" in base_lower:
+            return "Свояченица" if gender == "Женский" else "Зять"
+
+        return "Свояк"
 
     def get_all_ancestors(self, person_id: str) -> List[str]:
         """
