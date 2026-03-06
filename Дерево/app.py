@@ -248,39 +248,35 @@ class FamilyTreeApp:
         self.context_menu.add_command(label="Редактировать", command=self.edit_person)
         self.context_menu.add_command(label="Удалить", command=self.delete_person)
         self.context_menu.add_separator()
-        self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0, font=("Segoe UI", 12, "bold"))
+        
+        # Создаём подменю "Родственник" с поддержкой цветов
+        self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0)
         
         # Группа 1: Родители
-        self.add_relative_menu.add_command(label="Отец...", foreground="#1e40af",
-                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id,
-                                                                                  "Мужской"))
-        self.add_relative_menu.add_command(label="Мать...", foreground="#dc2626",
-                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id,
-                                                                                  "Женский"))
-        self.add_relative_menu.add_separator()  # Отступ между группами
+        self.add_relative_menu.add_command(label="👨 Отец... (синий)",
+                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id, "Мужской"))
+        self.add_relative_menu.add_command(label="👩 Мать... (красный)",
+                                           command=lambda: self.add_parent_dialog(self.last_selected_person_id, "Женский"))
+        self.add_relative_menu.add_separator()
         
         # Группа 2: Дети
-        self.add_relative_menu.add_command(label="Сын...", foreground="#1e40af",
-                                           command=lambda: self.add_child_dialog(self.last_selected_person_id,
-                                                                                 "Мужской"))
-        self.add_relative_menu.add_command(label="Дочь...", foreground="#dc2626",
-                                           command=lambda: self.add_child_dialog(self.last_selected_person_id,
-                                                                                 "Женский"))
-        self.add_relative_menu.add_separator()  # Отступ между группами
+        self.add_relative_menu.add_command(label="👦 Сын... (синий)",
+                                           command=lambda: self.add_child_dialog(self.last_selected_person_id, "Мужской"))
+        self.add_relative_menu.add_command(label="👧 Дочь... (красный)",
+                                           command=lambda: self.add_child_dialog(self.last_selected_person_id, "Женский"))
+        self.add_relative_menu.add_separator()
         
         # Группа 3: Братья/Сёстры
-        self.add_relative_menu.add_command(label="Брат...", foreground="#1e40af",
-                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
-                                                                                   "Мужской"))
-        self.add_relative_menu.add_command(label="Сестра...", foreground="#dc2626",
-                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
-                                                                                   "Женский"))
-        self.add_relative_menu.add_separator()  # Отступ между группами
+        self.add_relative_menu.add_command(label="👤 Брат... (синий)",
+                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id, "Мужской"))
+        self.add_relative_menu.add_command(label="👤 Сестра... (красный)",
+                                           command=lambda: self.add_sibling_dialog(self.last_selected_person_id, "Женский"))
+        self.add_relative_menu.add_separator()
         
         # Группа 4: Супруги
-        self.add_relative_menu.add_command(label="Супруг(а)...",
+        self.add_relative_menu.add_command(label="💍 Супруг(а)...",
                                            command=lambda: self.add_spouse_dialog(self.last_selected_person_id))
-        self.context_menu.add_cascade(label="Родственник", menu=self.add_relative_menu)
+        self.context_menu.add_cascade(label="➕ Родственник", menu=self.add_relative_menu)
         # --- /КОНТЕКСТНОЕ МЕНЮ ---
         # --- СВЯЗИ КЛАВИШ ---
         self.canvas.bind("<Button-3>", self.show_context_menu)
