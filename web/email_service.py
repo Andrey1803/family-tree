@@ -47,7 +47,7 @@ if EMAIL_FROM and '<' in EMAIL_FROM:
 
 # Остальные настройки
 EMAIL_SUBJECT = "Код подтверждения регистрации"
-CODE_EXPIRY_SECONDS = 600
+CODE_EXPIRY_SECONDS = 3600  # 1 час (увеличено с 600с из-за проблемы с gunicorn workers)
 EMAIL_TEMPLATE = """Здравствуйте!
 
 Ваш код подтверждения для регистрации в Family Tree: {code}
@@ -110,21 +110,21 @@ def verify_code(email: str, code: str) -> bool:
     Returns:
         True если код верный и не истёк
     """
-    logger.info(f"[VERIFY] Проверка кода для email: {email}")
-    
+    logger.info(f"[VERIFY] Проверка кода для email: {email}, введён код: {code}")
+
     if email not in _verification_codes:
-        logger.warning(f"[VERIFY] ❌ Email '{email}' не найден в хранилище кодов")
+        logger.warning(f"[VERIFY] ❌ Email '{email}' не найден в хранилище")
         logger.warning(f"[VERIFY] Доступные emails: {list(_verification_codes.keys())}")
         return False
 
     stored = _verification_codes[email]
-    logger.info(f"[VERIFY] Найден код для {email}: {stored['code'][:2]}*** (введён: {code})")
+    logger.info(f"[VERIFY] Найден код: хранится={stored['code']}, введён={code}")
 
     # Проверяем не истёк ли код (используем UTC)
     now = datetime.now(timezone.utc)
     expiry = stored['expiry']
     created = stored['created_at']
-    
+
     logger.info(f"[VERIFY] Текущее время: {now}")
     logger.info(f"[VERIFY] Код создан: {created}, истекает: {expiry}")
 
@@ -136,7 +136,7 @@ def verify_code(email: str, code: str) -> bool:
 
     # Проверяем код
     if stored['code'] != code:
-        logger.warning(f"[VERIFY] ❌ Код не совпадает")
+        logger.warning(f"[VERIFY] ❌ Код не совпадает: хранится={stored['code']}, введён={code}")
         return False
 
     # Код верный - удаляем его
