@@ -176,7 +176,13 @@ def init_db():
         INSERT OR IGNORE INTO users (login, password_hash, email, is_admin)
         VALUES (?, ?, ?, ?)
     ''', ("admin", admin_password, "admin@familytree.local", 1))
-    
+
+    # Проверяем нужно ли удалить admin (переменная REMOVE_ADMIN)
+    if os.environ.get("REMOVE_ADMIN") == "true":
+        print("🗑️ REMOVE_ADMIN=true, удаляю пользователя 'admin'...")
+        db.execute('DELETE FROM users WHERE login = "admin"')
+        print("✅ Пользователь 'admin' удалён")
+
     db.commit()
     db.close()
 
