@@ -732,13 +732,13 @@ function showContextMenu(pid, x, y, persons) {
     const hasFather = (p.parents || []).some(prId => persons[prId]?.gender === "Мужской");
     const hasMother = (p.parents || []).some(prId => persons[prId]?.gender === "Женский");
     const subItems = [
-        !hasFather && { label: "Отец...", action: () => addRelative(pid, "father") },
-        !hasMother && { label: "Мать...", action: () => addRelative(pid, "mother") },
-        { label: "Сын...", action: () => addRelative(pid, "son") },
-        { label: "Дочь...", action: () => addRelative(pid, "daughter") },
-        { label: "Брат...", action: () => addRelative(pid, "brother") },
-        { label: "Сестра...", action: () => addRelative(pid, "sister") },
-        { label: "Супруг(а)...", action: () => addRelative(pid, "spouse") },
+        !hasFather && { label: "👨 Отец...", color: "#1e40af", action: () => addRelative(pid, "father") },
+        !hasMother && { label: "👩 Мать...", color: "#dc2626", action: () => addRelative(pid, "mother") },
+        { label: "👦 Сын...", color: "#1e40af", action: () => addRelative(pid, "son") },
+        { label: "👧 Дочь...", color: "#dc2626", action: () => addRelative(pid, "daughter") },
+        { label: "👤 Брат...", color: "#1e40af", action: () => addRelative(pid, "brother") },
+        { label: "👤 Сестра...", color: "#dc2626", action: () => addRelative(pid, "sister") },
+        { label: "💍 Супруг(а)...", action: () => addRelative(pid, "spouse") },
     ].filter(Boolean);
 
     const items = [
@@ -771,6 +771,10 @@ function showContextMenu(pid, x, y, persons) {
                 const si = document.createElement("div");
                 si.className = "cm-item";
                 si.textContent = s.label;
+                if (s.color) {
+                    si.style.color = s.color;
+                    si.style.fontWeight = "500";
+                }
                 si.onclick = () => { s.action(); closeContextMenu(); };
                 submenu.appendChild(si);
             });
