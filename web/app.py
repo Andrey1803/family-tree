@@ -260,7 +260,7 @@ def auth_check(login: str, password: str) -> bool:
     return False
 
 
-def auth_register(login: str, password: str):
+def auth_register(login: str, password: str, email: str = ""):
     """Зарегистрировать пользователя ТОЛЬКО через сервер синхронизации"""
     login = (login or "").strip()
     if not login:
@@ -269,7 +269,11 @@ def auth_register(login: str, password: str):
         return "Введите пароль."
     if len(password) < 4:
         return "Пароль должен быть не короче 4 символов."
-    
+
+    # Используем email из параметра или создаём заглушку
+    if not email:
+        email = f"{login}@local.com"
+
     # Регистрируем ТОЛЬКО на сервере синхронизации
     try:
         req = urllib.request.Request(
@@ -277,7 +281,7 @@ def auth_register(login: str, password: str):
             data=json.dumps({
                 "login": login,
                 "password": password,
-                "email": f"{login}@local.com"
+                "email": email
             }).encode(),
             headers={'Content-Type': 'application/json'},
             method='POST'
@@ -433,16 +437,17 @@ def api_register():
     login_val = (data.get("login") or "").strip()
     p1 = data.get("password") or ""
     p2 = data.get("password2") or p1
-    
+    email = data.get("email", "").strip()
+
     if not login_val:
         return jsonify({"error": "Введите логин."}), 400
     if p1 != p2:
         return jsonify({"error": "Пароли не совпадают."}), 400
-    
-    err = auth_register(login_val, p1)
+
+    err = auth_register(login_val, p1, email)
     if err:
         return jsonify({"error": err}), 400
-    
+
     return jsonify({"message": "Пользователь успешно зарегистрирован"}), 200
 
 
