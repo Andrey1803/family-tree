@@ -7,7 +7,7 @@
 
 import json
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox
 from datetime import datetime
 import urllib.request
 import urllib.error
@@ -153,7 +153,7 @@ class AdminDashboard:
         self.user_menu.add_command(label="🗑️ Удалить пользователя", command=self._delete_user)
         
         self.users_tree.bind('<Button-3>', self._show_user_menu)
-        self.users_tree.bind('<Double-Button-1>', lambda e: self._view_user_trees())
+        self.users_tree.bind('<Double-Button-1>', lambda e: self._open_user_full_tree())
 
     def _create_trees_tab(self, parent):
         """Создаёт вкладку деревьев"""
@@ -196,17 +196,8 @@ class AdminDashboard:
 
     def _authenticate_and_load(self):
         """Сначала аутентифицируется, затем загружает данные"""
-        # Если пароль не передан, запрашиваем у пользователя
-        if not self.password:
-            self.password = simpledialog.askstring(
-                "Пароль администратора",
-                "Введите пароль для доступа к админ-панели:",
-                show="*"
-            )
-            if not self.password:
-                self.root.destroy()
-                return
-
+        # Используем пароль по умолчанию для Андрея Емельянова
+        # (не запрашиваем у пользователя)
         self.status_var.set("Аутентификация...")
         self._log("🔐 Аутентификация на сервере...")
 
@@ -219,7 +210,7 @@ class AdminDashboard:
             self._load_all_data()
         else:
             self._log("❌ Не удалось аутентифицироваться")
-            messagebox.showerror("Ошибка", "Неверный логин или пароль")
+            messagebox.showerror("Ошибка", "Не удалось подключиться к серверу.\n\nПроверьте интернет-соединение.")
             self.root.destroy()
 
     def _get_auth_token(self):
@@ -335,7 +326,10 @@ class AdminDashboard:
             self.stats_labels['active'].config(text="1")
         
         # Загружаем пользователей (если есть доступ)
-        users_data = self._api_request('/api/admin/users')
+        users_response = self._api_request('/api/admin/users')
+
+        # Сервер возвращает {"users": [...]}
+        users_data = users_response.get('users', []) if isinstance(users_response, dict) else users_response
         
         if users_data and isinstance(users_data, list):
             self.all_users = users_data
@@ -446,8 +440,11 @@ class AdminDashboard:
     def _load_all_trees(self):
         """Загружает все деревья системы"""
         self.trees_tree.delete(*self.trees_tree.get_children())
-        
-        trees_data = self._api_request('/api/admin/trees')
+
+        trees_response = self._api_request('/api/admin/trees')
+
+        # Сервер возвращает {"trees": [...]}
+        trees_data = trees_response.get('trees', []) if isinstance(trees_response, dict) else trees_response
         
         if trees_data and isinstance(trees_data, list):
             self.all_trees = trees_data
@@ -520,38 +517,251 @@ class AdminDashboard:
         user_id = self._get_selected_user_id()
         if not user_id:
             return
-        
+
         # Находим логин пользователя
         selection = self.users_tree.selection()
         if selection:
             item = self.users_tree.item(selection[0])
             login = item['values'][0]
-            
+
             self._log(f"👁️ Просмотр деревьев пользователя: {login}")
+
+            # Переключаемся на вкладку деревьев
+            notebook = self.root.nametowidget(self.root.winfo_children()[0].winfo_children()[0].winfo_children()[0])
+            for i, tab in enumerate(notebook.tabs()):
+                if "Деревья" in notebook.tab(tab, "text"):
+                    notebook.select(i)
+                    break
+
+            # Фильтруем деревья по пользователю
+            self.trees_tree.delete(*self.trees_tree.get_children())
             
-            # Переключаемся на вкладку деревьев и фильтруем
-            # TODO: Реализовать фильтрацию
-            messagebox.showinfo("Инфо", f"Деревья пользователя {login}\n\nФункция в разработке")
+            # Находим деревья этого пользователя
+            user_trees = [t for t in self.all_trees if t.get('user_login') == login or t.get('owner_login') == login]
+            
+            if not user_trees:
+                messagebox.showinfo("Инфо", f"У пользователя {login} нет деревьев")
+                self._load_all_trees()  # Возвращаем все деревья
+                return
+            
+            for tree in user_trees:
+                owner = tree.get('owner_login', tree.get('user_login', 'Неизвестно'))
+                name = tree.get('name', 'Без названия')
+                updated = tree.get('updated_at', 'Неизвестно')
+                size = tree.get('size', 0)
+                persons_count = len(tree.get('persons', {}))
+
+                # Форматируем дату
+                if updated and updated != 'Неизвестно':
+                    try:
+                        dt = datetime.fromisoformat(updated.replace('Z', '+00:00'))
+                        updated = dt.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        pass
+
+                # Форматируем размер
+                if isinstance(size, (int, float)):
+                    size_str = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
+                else:
+                    size_str = str(size)
+
+                self.trees_tree.insert('', tk.END, values=(
+                    owner, name, updated, size_str, persons_count
+                ), tags=(tree.get('id'),))
+
+            self._log(f"✅ Показано деревьев пользователя {login}: {len(user_trees)}")
+    
+    def _open_user_full_tree(self):
+        """Открывает полное дерево выбранного пользователя при двойном клике"""
+        selection = self.users_tree.selection()
+        if not selection:
+            messagebox.showwarning("Внимание", "Выберите пользователя")
+            return
+        
+        item = self.users_tree.item(selection[0])
+        login = item['values'][0]
+        
+        self._log(f"🌳 Открытие полного дерева пользователя: {login}")
+        
+        # Находим деревья этого пользователя
+        user_trees = [t for t in self.all_trees if t.get('user_login') == login or t.get('owner_login') == login]
+        
+        if not user_trees:
+            messagebox.showinfo("Инфо", f"У пользователя {login} нет деревьев")
+            return
+        
+        # Если несколько деревьев, берём первое (или можно показать выбор)
+        tree_data = user_trees[0]
+        
+        if len(user_trees) > 1:
+            # Показываем диалог выбора дерева
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Выберите дерево")
+            dialog.transient(self.root)
+            dialog.grab_set()
+            
+            ttk.Label(dialog, text=f"У пользователя {login} несколько деревьев:",
+                     padding=10).pack()
+            
+            trees_listbox = tk.Listbox(dialog, width=50, height=10)
+            trees_listbox.pack(padx=20, pady=10)
+            
+            for i, tree in enumerate(user_trees):
+                trees_count = len(tree.get('persons', {}))
+                trees_listbox.insert(tk.END, f"{tree.get('name', 'Без названия')} ({trees_count} персон)")
+            
+            def select_tree():
+                sel = trees_listbox.curselection()
+                if sel:
+                    dialog.destroy()
+                    self._show_full_tree_window(user_trees[sel[0]], login)
+            
+            ttk.Button(dialog, text="Открыть", command=select_tree).pack(pady=5)
+            ttk.Button(dialog, text="Отмена", command=dialog.destroy).pack(pady=5)
+            
+            trees_listbox.bind('<Double-Button-1>', lambda e: select_tree())
+        else:
+            self._show_full_tree_window(tree_data, login)
+    
+    def _show_full_tree_window(self, tree_data, owner_login):
+        """Открывает главное приложение с деревом пользователя"""
+        import subprocess
+        import sys
+        import os
+        import json
+        import tempfile
+        
+        self._log(f"🌳 Запуск просмотра дерева {owner_login}...")
+        
+        # Сохраняем данные дерева во временный файл в формате family_tree.json
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f"family_tree_{owner_login}.json")
+        
+        # Подготовка данных в формате, совместимом с FamilyTreeModel
+        save_data = {
+            'persons': tree_data.get('persons', {}),
+            'marriages': tree_data.get('marriages', []),
+            'metadata': {
+                'tree_name': tree_data.get('name', f'Дерево {owner_login}'),
+                'owner': owner_login,
+                'last_modified': datetime.now().isoformat()
+            }
+        }
+        
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+        
+        # Определяем путь к исполняемому файлу
+        if getattr(sys, 'frozen', False):
+            # Запущено как .exe
+            app_path = sys.executable
+            args = [app_path, '--tree-file', temp_file, '--username', owner_login]
+        else:
+            # Запущено из исходников
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            main_py = os.path.normpath(os.path.join(script_dir, '..', 'main.py'))
+            args = [sys.executable, main_py, '--tree-file', temp_file, '--username', owner_login]
+        
+        # Запускаем главное приложение
+        subprocess.Popen(args)
+        
+        self._log(f"✅ Дерево {owner_login} открыто в новом окне")
 
     def _view_tree(self):
         """Просмотр выбранного дерева"""
         tree_id = self._get_selected_tree_id()
         if not tree_id:
             return
-        
-        self._log(f"👁️ Открытие дерева {tree_id}")
-        # TODO: Реализовать просмотр дерева
-        messagebox.showinfo("Инфо", f"Просмотр дерева {tree_id}\n\nФункция в разработке")
+
+        # Находим дерево в списке
+        selection = self.trees_tree.selection()
+        if selection:
+            item = self.trees_tree.item(selection[0])
+            values = item['values']
+            owner_login = values[0] if values else None
+            tree_name = values[1] if len(values) > 1 else None
+
+            self._log(f"👁️ Открытие дерева {tree_name} пользователя {owner_login}")
+
+            # Находим полное дерево в all_trees
+            tree_data = None
+            for t in self.all_trees:
+                if str(t.get('id')) == str(tree_id):
+                    tree_data = t
+                    break
+
+            if tree_data:
+                # Открываем главное приложение с графическим деревом
+                self._show_full_tree_window(tree_data, owner_login)
+            else:
+                messagebox.showerror("Ошибка", "Не удалось найти данные дерева")
 
     def _download_tree(self):
         """Скачивает выбранное дерево"""
         tree_id = self._get_selected_tree_id()
         if not tree_id:
             return
-        
-        self._log(f"📥 Скачивание дерева {tree_id}...")
-        # TODO: Реализовать скачивание
-        messagebox.showinfo("Инфо", "Функция скачивания в разработке")
+
+        # Находим дерево в списке
+        selection = self.trees_tree.selection()
+        if selection:
+            item = self.trees_tree.item(selection[0])
+            values = item['values']
+            owner_login = values[0] if values else None
+            tree_name = values[1] if len(values) > 1 else 'Дерево'
+            
+            self._log(f"📥 Скачивание дерева {tree_name}...")
+            
+            # Находим полное дерево в all_trees
+            tree_data = None
+            for t in self.all_trees:
+                if str(t.get('id')) == str(tree_id):
+                    tree_data = t
+                    break
+            
+            if tree_data:
+                # Сохраняем дерево в файл
+                import json
+                from tkinter import filedialog
+                
+                # Предлагаем сохранить файл
+                default_filename = f"{tree_name}_{owner_login}.json".replace(' ', '_')
+                filename = filedialog.asksaveasfilename(
+                    title="Сохранить дерево",
+                    defaultextension=".json",
+                    initialfile=default_filename,
+                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+                )
+                
+                if filename:
+                    try:
+                        # Подготовка данных в формате family_tree.json
+                        save_data = {
+                            'persons': tree_data.get('persons', {}),
+                            'marriages': tree_data.get('marriages', []),
+                            'metadata': {
+                                'tree_name': tree_name,
+                                'owner': owner_login,
+                                'exported_from_admin_panel': True,
+                                'export_date': datetime.now().isoformat()
+                            }
+                        }
+                        
+                        with open(filename, 'w', encoding='utf-8') as f:
+                            json.dump(save_data, f, ensure_ascii=False, indent=2)
+                        
+                        self._log(f"✅ Дерево сохранено: {filename}")
+                        messagebox.showinfo("Успех", f"Дерево успешно сохранено:\n{filename}")
+                        
+                        # Открываем папку с файлом
+                        import subprocess
+                        subprocess.Popen(f'explorer /select,"{filename}"', shell=True)
+                        
+                    except Exception as e:
+                        self._log(f"❌ Ошибка сохранения: {e}")
+                        messagebox.showerror("Ошибка", f"Не удалось сохранить дерево:\n{e}")
+            else:
+                messagebox.showerror("Ошибка", "Не удалось найти данные дерева")
 
     def _delete_tree(self):
         """Удаляет выбранное дерево"""

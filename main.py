@@ -62,7 +62,9 @@ if __name__ == "__main__":
             sys.path.insert(0, _data_root)
 
         # === ЗАГРУЖАЕМ ПАЛИТРУ ===
+        # Сначала добавляем папку Дерево в sys.path для импорта constants
         import constants
+        print(f"[MAIN] PALETTE_FILE = {constants.PALETTE_FILE}")
         _loaded_palette = constants.load_palette_from_file()
         if _loaded_palette:
             constants.apply_palette(_loaded_palette)
@@ -70,12 +72,39 @@ if __name__ == "__main__":
             for key, value in _loaded_palette.items():
                 if hasattr(constants, key):
                     setattr(constants, key, value)
+            print(f"[MAIN] Применено {len(_loaded_palette)} цветов из палитры")
+        else:
+            print(f"[MAIN] Палитра не загружена, используются значения по умолчанию")
         # === /ЗАГРУЖАЕМ ПАЛИТРУ ===
+
+        # === ОБРАБОТКА ПАРАМЕТРОВ КОМАНДНОЙ СТРОКИ ===
+        # Поддержка: --tree-file <путь> --username <имя>
+        _tree_file = None
+        _username = None
+        _args = sys.argv[1:]
+        _i = 0
+        while _i < len(_args):
+            if _args[_i] == '--tree-file' and _i + 1 < len(_args):
+                _tree_file = _args[_i + 1]
+                _i += 2
+            elif _args[_i] == '--username' and _i + 1 < len(_args):
+                _username = _args[_i + 1]
+                _i += 2
+            else:
+                _i += 1
+        
+        if _tree_file:
+            print(f"[MAIN] Tree file: {_tree_file}")
+        if _username:
+            print(f"[MAIN] Username: {_username}")
+        # === /ОБРАБОТКА ПАРАМЕТРОВ ===
 
         # Запускаем приложение
         sys.path.insert(0, _inner)
         import main as tree_main
-        tree_main.main()
+        
+        # Передаём параметры в tree_main.main()
+        tree_main.main(data_file=_tree_file, username=_username)
         
     except Exception as e:
         tb = traceback.format_exc()

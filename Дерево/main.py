@@ -26,17 +26,28 @@ from app import FamilyTreeApp
 from auth import run_login_window
 
 
-def main():
-    """Запуск приложения."""
+def main(data_file=None, username=None):
+    """Запуск приложения.
+    
+    Args:
+        data_file: Путь к файлу дерева (опционально)
+        username: Имя пользователя (опционально)
+    """
     def start_app(username):
         root = tk.Tk()
 
         # Применяем цвета из загруженной палитры
         _apply_ui_colors(root)
 
-        # Файл данных в папке data/
-        data_file = os.path.join("data", f"family_tree_{username}.json")
-        app = FamilyTreeApp(root, data_file=data_file, username=username)
+        # Файл данных в папке data/ или указанный
+        if data_file:
+            # Используем указанный файл
+            actual_data_file = data_file
+        else:
+            # Стандартный файл в папке data/
+            actual_data_file = os.path.join("data", f"family_tree_{username}.json")
+        
+        app = FamilyTreeApp(root, data_file=actual_data_file, username=username)
 
         # Принудительно применяем цвета ПОСЛЕ создания FamilyTreeApp
         _apply_ui_colors(root)
@@ -46,7 +57,11 @@ def main():
         root.protocol("WM_DELETE_WINDOW", app.on_exit)
         root.mainloop()
 
-    run_login_window(start_app)
+    # Если username передан напрямую (из админ-панели), запускаем без окна входа
+    if username:
+        start_app(username)
+    else:
+        run_login_window(start_app)
 
 
 def _apply_ui_colors(root):
