@@ -310,27 +310,55 @@ function render() {
     });
     // Линии между супругами
     (treeData.marriages || []).forEach(m => {
-        // Поддерживаем форматы: [a, b] или {persons: [a, b]}
+        // Поддерживаем форматы: [a, b] или {persons: [a, b]} или {persons: [a, b], date: ...}
         let a, b;
         if (Array.isArray(m)) {
             [a, b] = m;
         } else if (m.persons && Array.isArray(m.persons)) {
             [a, b] = m.persons;
         } else {
+            console.log('[MARRIAGE_LINE] Skipping invalid marriage format:', m);
             return; // Неверный формат
         }
-        
+
         const idA = String(a), idB = String(b);
-        if (!coords[idA] || !coords[idB] || !related.has(idA) || !related.has(idB)) return;
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", coords[idA].x + offsetX);
-        line.setAttribute("y1", coords[idA].y + offsetY);
-        line.setAttribute("x2", coords[idB].x + offsetX);
-        line.setAttribute("y2", coords[idB].y + offsetY);
-        line.setAttribute("stroke", "#b45309");
-            line.setAttribute("stroke-width", 2);
-        line.setAttribute("stroke-dasharray", "4 4");
-            svg.appendChild(line);
+        if (!coords[idA] || !coords[idB]) {
+            console.log('[MARRIAGE_LINE] Missing coords for:', idA, idB);
+            return;
+        }
+        if (!related.has(idA) || !related.has(idB)) {
+            console.log('[MARRIAGE_LINE] Not related:', idA, idB);
+            return;
+        }
+        
+        // Рисуем линию между карточками (горизонтально)
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        
+        // Вычисляем координаты для горизонтальной линии между супругами
+        // Супруги располагаются рядом горизонтально, соединяем их по центру высоты карточки
+        const yCenter = coords[idA].y + offsetY;  // Центр по Y
+        const xA = coords[idA].x + offsetX;
+        const xB = coords[idB].x + offsetX;
+        
+        // Определяем, кто слева, кто справа
+        const xLeft = Math.min(xA, xB);
+        const xRight = Math.max(xA, xB);
+        
+        // Вычисляем края карточек (ширина карточки = CARD_W)
+        const cardHalfWidth = CARD_W / 2;
+        const xLeftEdge = xLeft + cardHalfWidth;  // Правый край левой карточки
+        const xRightEdge = xRight - cardHalfWidth;  // Левый край правой карточки
+        
+        line.setAttribute("x1", xLeftEdge);
+        line.setAttribute("y1", yCenter);
+        line.setAttribute("x2", xRightEdge);
+        line.setAttribute("y2", yCenter);
+        line.setAttribute("stroke", "#b45309");  // Оранжево-коричневый
+        line.setAttribute("stroke-width", 2);
+        line.setAttribute("stroke-dasharray", "4 4");  // Пунктирная линия
+        line.setAttribute("stroke-linecap", "round");
+        console.log('[MARRIAGE_LINE] Drawn between', idA, 'and', idB, ':', xLeftEdge, yCenter, 'to', xRightEdge, yCenter);
+        svg.appendChild(line);
     });
 
     Object.entries(coords).forEach(([pid, pos]) => {
