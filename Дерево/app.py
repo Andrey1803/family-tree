@@ -249,24 +249,35 @@ class FamilyTreeApp:
         self.context_menu.add_command(label="Удалить", command=self.delete_person)
         self.context_menu.add_separator()
         self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0, font=("Segoe UI", 12, "bold"))
+        
+        # Группа 1: Родители
         self.add_relative_menu.add_command(label="Отец...",
                                            command=lambda: self.add_parent_dialog(self.last_selected_person_id,
                                                                                   "Мужской"))
         self.add_relative_menu.add_command(label="Мать...",
                                            command=lambda: self.add_parent_dialog(self.last_selected_person_id,
                                                                                   "Женский"))
+        self.add_relative_menu.add_separator()  # Отступ между группами
+        
+        # Группа 2: Дети
         self.add_relative_menu.add_command(label="Сын...",
                                            command=lambda: self.add_child_dialog(self.last_selected_person_id,
                                                                                  "Мужской"))
         self.add_relative_menu.add_command(label="Дочь...",
                                            command=lambda: self.add_child_dialog(self.last_selected_person_id,
                                                                                  "Женский"))
+        self.add_relative_menu.add_separator()  # Отступ между группами
+        
+        # Группа 3: Братья/Сёстры
         self.add_relative_menu.add_command(label="Брат...",
                                            command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
                                                                                    "Мужской"))
         self.add_relative_menu.add_command(label="Сестра...",
                                            command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
                                                                                    "Женский"))
+        self.add_relative_menu.add_separator()  # Отступ между группами
+        
+        # Группа 4: Супруги
         self.add_relative_menu.add_command(label="Супруг(а)...",
                                            command=lambda: self.add_spouse_dialog(self.last_selected_person_id))
         self.context_menu.add_cascade(label="Родственник", menu=self.add_relative_menu)
