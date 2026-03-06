@@ -251,28 +251,28 @@ class FamilyTreeApp:
         self.add_relative_menu = tk.Menu(self.context_menu, tearoff=0, font=("Segoe UI", 12, "bold"))
         
         # Группа 1: Родители
-        self.add_relative_menu.add_command(label="Отец...",
+        self.add_relative_menu.add_command(label="Отец...", foreground="#1e40af",
                                            command=lambda: self.add_parent_dialog(self.last_selected_person_id,
                                                                                   "Мужской"))
-        self.add_relative_menu.add_command(label="Мать...",
+        self.add_relative_menu.add_command(label="Мать...", foreground="#dc2626",
                                            command=lambda: self.add_parent_dialog(self.last_selected_person_id,
                                                                                   "Женский"))
         self.add_relative_menu.add_separator()  # Отступ между группами
         
         # Группа 2: Дети
-        self.add_relative_menu.add_command(label="Сын...",
+        self.add_relative_menu.add_command(label="Сын...", foreground="#1e40af",
                                            command=lambda: self.add_child_dialog(self.last_selected_person_id,
                                                                                  "Мужской"))
-        self.add_relative_menu.add_command(label="Дочь...",
+        self.add_relative_menu.add_command(label="Дочь...", foreground="#dc2626",
                                            command=lambda: self.add_child_dialog(self.last_selected_person_id,
                                                                                  "Женский"))
         self.add_relative_menu.add_separator()  # Отступ между группами
         
         # Группа 3: Братья/Сёстры
-        self.add_relative_menu.add_command(label="Брат...",
+        self.add_relative_menu.add_command(label="Брат...", foreground="#1e40af",
                                            command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
                                                                                    "Мужской"))
-        self.add_relative_menu.add_command(label="Сестра...",
+        self.add_relative_menu.add_command(label="Сестра...", foreground="#dc2626",
                                            command=lambda: self.add_sibling_dialog(self.last_selected_person_id,
                                                                                    "Женский"))
         self.add_relative_menu.add_separator()  # Отступ между группами
@@ -3876,14 +3876,11 @@ class FamilyTreeApp:
             self.model.current_center = center_key if center_key is not None else child_id
             self.refresh_view()
 
-        # Кнопки
+        # Кнопки — фиксируем внизу окна (вне прокручиваемой области)
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
-        ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
-        
-        # Закрепляем кнопки внизу окна (чтобы были видны всегда)
-        button_frame.update_idletasks()
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10, pady=10)
+        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10, pady=10)
 
     def add_child_dialog(self, parent_id, child_gender):
         # Если parent_id не передан, спрашиваем
@@ -4056,11 +4053,11 @@ class FamilyTreeApp:
             dialog.destroy()
             self.refresh_view()
 
+        # Кнопки — фиксируем внизу окна (вне прокручиваемой области)
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
-        ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
-        button_frame.update_idletasks()
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Button(button_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=10, pady=10)
+        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10, pady=10)
 
     def add_sibling_dialog(self, person_id, sibling_gender):
         """Диалог добавления брата/сестры с автозаполнением отчества от имени отца.
@@ -4249,11 +4246,10 @@ class FamilyTreeApp:
 
         # --- Кнопки ---
         btn_frame = ttk.Frame(dialog)
-        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        ttk.Button(btn_frame, text="Создать", command=submit).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
-        btn_frame.update_idletasks()
+        ttk.Button(btn_frame, text="Создать", command=submit).pack(side=tk.LEFT, padx=10, pady=10)
+        ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10, pady=10)
 
         # Фокус на поле имени
         try:
@@ -4431,7 +4427,7 @@ class FamilyTreeApp:
 
         # Кнопки OK/Cancel
         button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
+        button_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
         def on_ok():
             if mode_var.get() == "Select":
@@ -4451,9 +4447,8 @@ class FamilyTreeApp:
             elif mode_var.get() == "Create":
                 create_new_spouse_and_marriage()
 
-        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
-        button_frame.update_idletasks()
+        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=10, pady=10)
+        ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10, pady=10)
 
     def remove_marriage_from_edit(self, pid, dialog_window):
         """Удаляет один из браков персоны. При нескольких супругах — выбор, какой брак удалить."""
