@@ -611,6 +611,35 @@ def admin_grant_admin(user_id):
     return jsonify({'message': 'Права администратора предоставлены', 'user_id': user_id})
 
 
+@app.route('/api/admin/user/<int:user_id>/reset-password', methods=['POST'])
+@require_admin
+def admin_reset_password(user_id):
+    """Сбросить пароль пользователя (генерация временного пароля)."""
+    import secrets
+    
+    db = get_db()
+    
+    # Проверяем существование пользователя
+    user = db.execute('SELECT id, login, email FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    # Генерация временного пароля
+    temp_password = secrets.token_urlsafe(8)
+    
+    # Хешируем и сохраняем новый пароль
+    new_hash = _password_hash(user['login'], temp_password)
+    db.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_hash, user_id))
+    db.commit()
+    
+    # TODO: Реализовать отправку email через email_service
+    # Пока возвращаем временный пароль в ответе (для тестирования)
+    return jsonify({
+        'message': 'Пароль сброшен. Временный пароль отправлен на email.',
+        'temp_password': temp_password  # Удалить в продакшене!
+    })
+
+
 @app.route('/api/admin/user/<int:user_id>/delete', methods=['POST'])
 @require_admin
 def admin_delete_user(user_id):

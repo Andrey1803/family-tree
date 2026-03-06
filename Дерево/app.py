@@ -89,11 +89,17 @@ class FamilyTreeApp:
             self.base_title += f" — {username}"
         self.root.title(self.base_title)
         self.modified_indicator = " *"  # Индикатор несохранённых изменений
-        
+
+        # === ПРИМЕНЯЕМ ПАЛИТРУ В САМОМ НАЧАЛЕ (до создания виджетов) ===
+        print(f"[APP.__INIT__] MARRIAGE_LINE_COLOR = {constants.MARRIAGE_LINE_COLOR}")
+        print(f"[APP.__INIT__] CANVAS_BG = {constants.CANVAS_BG}")
+        # ================================================================
+
         # Авто-синхронизация при запуске (если есть username)
-        if username:
-            self.root.after(1000, self.auto_sync_on_startup)  # Через 1 секунду
-        
+        # ОТКЛЮЧЕНО: сервер не возвращает браки, используем локальный файл
+        # if username:
+        #     self.root.after(1000, self.auto_sync_on_startup)  # Через 1 секунду
+
         # Создание стиля для акцентных кнопок
         style = ttk.Style()
         style.configure('Accent.TButton', foreground='black', background='#e74c3c')
@@ -162,10 +168,14 @@ class FamilyTreeApp:
         self.file_menu.add_command(label="🌐 Открыть веб-версию", command=self.open_web_version)
 
         # Админ-панель только для Андрея Емельянова
-        if self.username == "Емельянов Андрей":
+        if self.username == "Емельянов Андрей" or self.username == "Андрей Емельянов":
             self.file_menu.add_separator()
             self.file_menu.add_command(label="👑 Админ-панель", command=self.open_admin_panel)
-        
+
+        # Персональная панель для всех пользователей
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="👤 Моя панель", command=self.open_user_dashboard)
+
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Зарегистрировать протокол (веб → приложение)", command=self._register_protocol)
         self.file_menu.add_separator()
@@ -277,8 +287,10 @@ class FamilyTreeApp:
             self.root.bind("<Control-y>", lambda e: self.redo())
         # --- /СВЯЗИ КЛАВИШ ---
         # --- ЗАГРУЗКА ---
+        # СНАЧАЛА загружаем данные из файла
         self.model.load_from_file()
-        
+        print(f"[APP.__INIT__] Загружено {len(self.model.persons)} персон, {len(self.model.marriages)} браков")
+
         # Если current_center не установлен, но есть персоны с супругами — установить на первую
         if not self.model.current_center:
             for pid, person in self.model.get_all_persons().items():
@@ -288,19 +300,20 @@ class FamilyTreeApp:
             # Если нет супругов — установить на первую персону
             if not self.model.current_center and self.model.get_all_persons():
                 self.model.current_center = next(iter(self.model.get_all_persons().keys()))
-        
-        self.check_first_run()
+
         self.hovered_person_id = None  # ID персоны под курсором
         self.selected_person_id = None  # ID выбранной персоны (центр)
-        # УБРАНО: повторная инициализация self.focus_mode_active (была дублирована!)
-        
+
         # Принудительно применяем цвета из палитры ПЕРЕД отрисовкой
         self.apply_ui_colors_from_palette()
-        
-        # Обновляем холст сразу после применения цветов
-        self.root.update_idletasks()
-        
+
+        # СНАЧАЛА отрисовываем дерево, ПОТОМ показываем диалоги
         self.refresh_view()
+        self.root.update_idletasks()  # Обновляем после отрисовки
+
+        # Теперь показываем приветственный диалог (если нужно)
+        self.check_first_run()
+
         self.root.protocol("WM_DELETE_WINDOW", self.on_exit)
         # --- /ЗАГРУЗКА ---
 
@@ -451,20 +464,9 @@ class FamilyTreeApp:
         tk.Label(welcome, text="* — обязательные поля",
                  font=("Arial", 8), fg="gray", pady=5).pack()
 
-        # Кнопки
-        btn_frame = tk.Frame(welcome, pady=10)
+        # Кнопка (только "Создать", без отмены)
+        btn_frame = tk.Frame(welcome, pady=15)
         btn_frame.pack(fill="x")
-
-        def on_cancel():
-            msg = "Пропустить заполнение? Персону можно добавить позже через ПКМ → «Добавить»."
-            if not self.username:
-                msg = "Без регистрации программа будет работать в ограниченном режиме.\nПродолжить без регистрации?"
-            if messagebox.askyesno("Подтверждение", msg):
-                welcome.destroy()
-                if self.username:
-                    self.statusbar.config(text="Добавьте персону через ПКМ по холсту → «Добавить».")
-                else:
-                    self.statusbar.config(text="Режим гостя: создайте персону вручную через меню «Файл → Новая персона».")
 
         def on_submit():
             # Валидация
@@ -500,9 +502,8 @@ class FamilyTreeApp:
             messagebox.showinfo("Успешно",
                                 f"Персона «{person_data['last_name']} {person_data['first_name']}» создана!\nТеперь вы можете добавлять родственников через контекстное меню.")
 
-        tk.Button(btn_frame, text="Отмена", command=on_cancel, width=12).pack(side="left", padx=10)
-        tk.Button(btn_frame, text="Создать", command=on_submit, width=12, bg="#4CAF50", fg="white").pack(side="right",
-                                                                                                         padx=10)
+        tk.Button(btn_frame, text="Создать персону", command=on_submit,
+                  width=20, bg="#4CAF50", fg="white", font=("Arial", 11, "bold")).pack(padx=10)
 
         # Фокус на поле имени
         fields['first_name'].focus_set()
@@ -1048,14 +1049,65 @@ class FamilyTreeApp:
     def open_admin_panel(self):
         """Открыть админ-панель (только для Андрея Емельянова)"""
         # Проверяем, что вошёл Андрей Емельянов
-        if self.username != "Емельянов Андрей":
-            messagebox.showerror("Доступ запрещён", 
-                "Админ-панель доступна только для пользователя:\nЕмельянов Андрей")
+        if self.username != "Емельянов Андрей" and self.username != "Андрей Емельянов":
+            messagebox.showerror("Доступ запрещён",
+                "Админ-панель доступна только для пользователя:\nАндрей Емельянов")
             return
-        
-        # Открываем СЕРВЕРНУЮ админ-панель (автоматический вход)
-        from server_admin_dashboard import open_server_admin_dashboard
-        open_server_admin_dashboard("admin", "admin123")
+
+        # Открываем ПОЛНУЮ админ-панель с данными с сервера
+        # Если пароль не сохранён, будет запрошен у пользователя
+        from admin_dashboard_full import open_admin_dashboard
+        open_admin_dashboard(self.username, None)
+
+    def open_user_dashboard(self):
+        """Открыть персональную панель пользователя (данные с сервера)"""
+        # Получаем пароль из файла запоминания
+        try:
+            from auth import _load_remember
+            remembered = _load_remember()
+            password = remembered.get("password", "")
+            
+            if not password:
+                # Если пароля нет, запрашиваем у пользователя
+                dialog = tk.Toplevel(self.root)
+                dialog.title("👤 Вход в панель")
+                dialog.transient(self.root)
+                dialog.grab_set()
+                
+                ttk.Label(dialog, text="Введите пароль для доступа к панели", padding=10).pack()
+                
+                password_var = tk.StringVar()
+                password_entry = ttk.Entry(dialog, textvariable=password_var, show="•", width=30)
+                password_entry.pack(padx=20, pady=10)
+                password_entry.focus_set()
+                
+                def submit():
+                    pwd = password_var.get()
+                    if pwd:
+                        dialog.destroy()
+                        self._do_open_user_dashboard(pwd)
+                
+                password_entry.bind("<Return>", lambda e: submit())
+                
+                btn_frame = ttk.Frame(dialog)
+                btn_frame.pack(pady=10)
+                ttk.Button(btn_frame, text="Войти", command=submit).pack(side=tk.LEFT, padx=5)
+                ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT)
+                
+                dialog.wait_window()
+            else:
+                self._do_open_user_dashboard(password)
+                
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось открыть панель: {e}")
+
+    def _do_open_user_dashboard(self, password):
+        """Открывает панель пользователя с указанным паролем"""
+        try:
+            from user_dashboard import open_user_dashboard
+            open_user_dashboard(self.username, password)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось открыть панель: {e}")
     
     def show_local_admin_panel(self):
         """Локальная админ-панель (резервная, если сервер недоступен)"""
@@ -1246,11 +1298,12 @@ class FamilyTreeApp:
         """Загрузить дерево из данных сервера"""
         tree_data = server_data.get('tree', {})
         persons = tree_data.get('persons', {})
-        
-        # Очищаем текущее дерево
+        marriages_data = tree_data.get('marriages', [])  # Сервер возвращает список
+
+        # Очища��м текущее дерево
         self.model.persons.clear()
         self.model.marriages.clear()
-        
+
         # Добавляем персоны из сервера
         for pid, pdata in persons.items():
             from models import Person
@@ -1268,7 +1321,27 @@ class FamilyTreeApp:
             p.children = set(pdata.get('children', []))
             p.spouse_ids = set(pdata.get('spouse_ids', []))
             self.model.persons[pid] = p
-        
+
+        # === ЗАГРУЖАЕМ БРАКИ ИЗ СЕРВЕРА (список словарей) ===
+        marriages_loaded = 0
+        if marriages_data and isinstance(marriages_data, list):
+            for marriage_item in marriages_data:
+                # marriage_item = {'persons': [h_id, w_id], 'date': '...'}
+                persons_in_marriage = marriage_item.get('persons', [])
+                if len(persons_in_marriage) == 2:
+                    h_id, w_id = str(persons_in_marriage[0]), str(persons_in_marriage[1])
+                    marriage_date = marriage_item.get('date', '')
+                    self.model.marriages[(h_id, w_id)] = {'date': marriage_date}
+                    marriages_loaded += 1
+            print(f"[SYNC_LOAD] Загружено {marriages_loaded} браков из сервера")
+        else:
+            print(f"[SYNC_LOAD] Браки не найдены в серверных данных (format: {type(marriages_data)})")
+        # === /ЗАГРУЖАЕМ БРАКИ ===
+
+        # Сохраняем загруженное дерево в локальный файл
+        self.model.save_to_file()
+        print(f"[SYNC_LOAD] Дерево сохранено в {self.model.data_file}")
+
         # Обновляем интерфейс
         self.refresh_view()
 
@@ -1430,6 +1503,7 @@ class FamilyTreeApp:
             self.is_dragging = True
             self.statusbar.config(text=constants.MSG_STATUS_PAN_ACTIVE)
             self.root.focus_set()  # Снимаем фокус с элементов
+            print(f"[PAN] Начало перетаскивания, units={len(self.units)}, coords={len(self.coords)}")
 
         if self.is_dragging:
             # ИСПРАВЛЕНО: карточки двигаются СИНХРОННО с курсором (без минуса!)
@@ -1441,8 +1515,9 @@ class FamilyTreeApp:
             self.drag_start_x = event.x
             self.drag_start_y = event.y
 
-            # Мгновенное обновление без задержек
-            self.refresh_view()
+            print(f"[PAN] Перетаскивание: offset=({self.offset_x}, {self.offset_y}), units={len(self.units)}, coords={len(self.coords)}")
+            # Мгновенное обновление без задержек (skip_layout=True чтобы не пересчитывать раскладку)
+            self.refresh_view(skip_layout=True)
 
     def stop_pan(self, event):
         """Завершение перетаскивания"""
@@ -1614,6 +1689,21 @@ class FamilyTreeApp:
                 anchor="n",
                 tags=card_tags
             )
+            y_offset += 12 * self.current_scale
+
+        # === СТЕПЕНЬ РОДСТВА (под карточкой, относительно выбранной персоны) ===
+        if hasattr(self, 'relationships') and pid in self.relationships:
+            relationship = self.relationships[pid]
+            if relationship and relationship != "Я":
+                self.canvas.create_text(
+                    scaled_x, text_y_start + y_offset,
+                    text=relationship,
+                    font=("Arial", int(7 * self.current_scale), "italic"),
+                    fill="#94a3b8",
+                    anchor="n",
+                    tags=card_tags
+                )
+        # === /СТЕПЕНЬ РОДСТВА ===
 
         # === ПРИВЯЗКА СОБЫТИЙ ===
         self.canvas.tag_bind(card_tags, "<Enter>", lambda e, p_id=pid: self.on_person_enter(p_id))
@@ -1720,8 +1810,10 @@ class FamilyTreeApp:
         self.refresh_view()
 
     def refresh_view(self, skip_layout=False):
+        print(f"[REFRESH] skip_layout={skip_layout}, units до delete={len(self.units)}, coords={len(self.coords)}")
         self.update_adaptive_settings()
         self.canvas.delete("all")
+        print(f"[REFRESH] После delete all, units={len(self.units)}, coords={len(self.coords)}")
 
         persons = self.model.get_all_persons()
         if not persons:
@@ -1789,6 +1881,15 @@ class FamilyTreeApp:
 
             visible_set = ancestors | descendants | siblings | spouses | {center_pid}
             visible_set |= set(self.coords.keys())  # все размещённые всегда видимы
+            
+            # === ИСПРАВЛЕНИЕ: добавляем всех супругов из self.units в visible_set ===
+            # Это гарантирует, что супруги из self.units будут видимы, даже если они не были добавлены через spouses
+            for unit_members in self.units.values():
+                for mid in unit_members:
+                    if mid in self.coords:
+                        visible_set.add(mid)
+            # === /ИСПРАВЛЕНИЕ ===
+            
             # у кого есть супруги — супруги тоже всегда видимы, если у них есть координаты
             for pid in list(visible_set):
                 person = self.model.get_person(pid)
@@ -1802,6 +1903,13 @@ class FamilyTreeApp:
         else:
             # ← КРИТИЧЕСКИ ВАЖНО: если центр не задан — показываем ВСЕХ персон
             visible_after_center = dict(self.coords)
+            
+            # === ИСПРАВЛЕНИЕ: добавляем супругов из self.units, если центр не задан ===
+            for unit_members in self.units.values():
+                for mid in unit_members:
+                    if mid in self.coords:
+                        visible_after_center[mid] = self.coords[mid]
+            # === /ИСПРАВЛЕНИЕ ===
 
         # === ПРИМЕНЕНИЕ СВОРАЧИВАНИЯ ВЕТВЕЙ ===
         after_collapse = {}
@@ -1848,7 +1956,26 @@ class FamilyTreeApp:
                 continue
             filtered_visible[pid] = coords
 
+        # === КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: добавляем всех супругов из self.units в filtered_visible ===
+        # Это гарантирует, что линии супругов будут отрисованы даже при skip_layout=True (перетаскивание)
+        for unit_members in self.units.values():
+            for mid in unit_members:
+                if mid in self.coords and mid not in filtered_visible:
+                    filtered_visible[mid] = self.coords[mid]
+                    print(f"[MARRIAGE_FIX] Добавлен супруг {mid} в filtered_visible")
+        # === /КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
+
         self.visible_persons_in_coords = filtered_visible
+
+        # === ВЫЧИСЛЕНИЕ СТЕПЕНИ РОДСТВА (если есть центральная персона) ===
+        self.relationships = {}
+        if self.model.current_center and KINSHIP_AVAILABLE:
+            try:
+                self.relationships = calculate_kinship(self.model, str(self.model.current_center))
+            except Exception as e:
+                print(f"[KINSHIP] Ошибка вычисления родства: {e}")
+                self.relationships = {}
+        # === /ВЫЧИСЛЕНИЕ СТЕПЕНИ РОДСТВА ===
 
         # === ОТРИСОВКА СВЯЗЕЙ РОДИТЕЛИ → ДЕТИ (середина линии родителей → общая линия детей → верх карточки ребёнка, скругления) ===
         def _key_in_vis(pid):
@@ -1942,9 +2069,27 @@ class FamilyTreeApp:
         marriage_lines_drawn = 0
         CARD_HALF_W = self.CARD_WIDTH / 2
         CARD_HALF_H = self.CARD_HEIGHT / 2
+
+        print(f"[MARRIAGE] Отрисовка линий: units={len(self.units)}, visible={len(self.visible_persons_in_coords)}, coords={len(self.coords)}")
+        print(f"[MARRIAGE] skip_layout={skip_layout}, current_center={self.model.current_center}")
         
+        # Проверка: выводим все units и их видимость
         for unit_key, members in self.units.items():
-            if len(members) < 2: continue
+            members_in_coords = [mid for mid in members if mid in self.coords]
+            members_in_visible = [mid for mid in members if mid in self.visible_persons_in_coords]
+            print(f"[MARRIAGE] Unit {unit_key}: members={members}, in_coords={members_in_coords}, in_visible={members_in_visible}")
+
+        for unit_key, members in self.units.items():
+            if len(members) < 2:
+                print(f"[MARRIAGE] Пропущен {unit_key}: меньше 2 членов ({len(members)})")
+                continue
+
+            # Проверка видимости супругов
+            missing_spouses = [mid for mid in members if mid not in self.visible_persons_in_coords]
+            if missing_spouses:
+                print(f"[MARRIAGE] WARNING: супруги {missing_spouses} из unit {unit_key} НЕ в visible_persons_in_coords!")
+                print(f"[MARRIAGE] visible_persons_in_coords ключи: {list(self.visible_persons_in_coords.keys())[:10]}")
+
             xs, ys = [], []
             all_visible = True
             for mid in members:
@@ -1955,8 +2100,11 @@ class FamilyTreeApp:
                     ys.append(y)
                 else:
                     all_visible = False
+                    print(f"[MARRIAGE] Супруг {mid} не найден в visible_persons_in_coords через _key_in_vis")
                     break
-            if not all_visible: continue
+            if not all_visible:
+                print(f"[MARRIAGE] Пропущен брак {unit_key}: не все супруги видимы (all_visible=False)")
+                continue
             if len(xs) == 2:
                 # Координаты центров карточек
                 cx1, cy1 = xs[0], ys[0]
@@ -1986,6 +2134,8 @@ class FamilyTreeApp:
                 scaled_y1 = y1 * self.current_scale + self.offset_y
                 scaled_x2 = x2 * self.current_scale + self.offset_x
                 scaled_y2 = y2 * self.current_scale + self.offset_y
+                # Отладка: проверяем цвет линии
+                print(f"[MARRIAGE_LINE] Цвет: {constants.MARRIAGE_LINE_COLOR}, Ширина: {self.MARRIAGE_LINE_WIDTH * self.current_scale}")
                 self.canvas.create_line(scaled_x1, scaled_y1, scaled_x2, scaled_y2,
                                         fill=constants.MARRIAGE_LINE_COLOR,
                                         width=self.MARRIAGE_LINE_WIDTH * self.current_scale,
@@ -2021,6 +2171,16 @@ class FamilyTreeApp:
             return
 
         marriages = self.model.get_marriages()
+        print(f"[DEBUG] marriages из модели: {marriages}")
+        print(f"[DEBUG] model.persons count: {len(self.model.persons)}")
+        print(f"[DEBUG] model.marriages count: {len(self.model.marriages)}")
+        # Проверка spouse_ids у ВСЕХ персон
+        persons_with_spouse = 0
+        for pid, p in self.model.persons.items():
+            if p.spouse_ids:
+                print(f"[DEBUG] {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
+                persons_with_spouse += 1
+        print(f"[DEBUG] Персон с супругами: {persons_with_spouse}")
 
         # === ШАГ 1: ОПРЕДЕЛЕНИЕ ЦЕНТРА (поиск по нормализованному id из‑за возможного int/str) ===
         center_pid = self.model.current_center
@@ -2098,7 +2258,23 @@ class FamilyTreeApp:
         if len(related_pids) == 1 and len(persons) > 1:
             # Нет связей между персонами — показываем всех
             related_pids = set(persons.keys())
-        
+
+        # === ИСПРАВЛЕНИЕ: добавляем всех супругов из marriages в related_pids ===
+        # Это гарантирует, что супруги будут отрисованы даже если не были найдены через BFS
+        for marriage_key in marriages.keys():
+            h_id, w_id = marriage_key
+            h_str, w_str = str(h_id), str(w_id)
+            # Ищем совпадения в persons
+            h_key = next((k for k in persons if str(k) == h_str), None)
+            w_key = next((k for k in persons if str(k) == w_str), None)
+            if h_key and h_key in related_pids and w_key and w_key not in related_pids:
+                related_pids.add(w_key)
+                print(f"[MARRIAGE_FIX] Добавлен супруг {w_key} в related_pids (из marriages)")
+            if w_key and w_key in related_pids and h_key and h_key not in related_pids:
+                related_pids.add(h_key)
+                print(f"[MARRIAGE_FIX] Добавлен супруг {h_key} в related_pids (из marriages)")
+        # === /ИСПРАВЛЕНИЕ ===
+
         filtered_persons = {pid: persons[pid] for pid in related_pids}
 
         # Сохраняем позицию центральной персоны: при перерисовке ветви останутся вокруг неё на месте
@@ -2378,12 +2554,44 @@ class FamilyTreeApp:
                     self.coords[pid] = (x + dx, y + dy)
 
         # === ШАГ 9: ФОРМИРОВАНИЕ СУПРУЖЕСКИХ ПАР ===
-        self.units = {}
+        # ИСПРАВЛЕНО: сохраняем units, если skip_centering=True (не пересчитываем при выборе персоны или перетаскивании)
+        if skip_centering:
+            print(f"[DEBUG] skip_centering=True, сохраняем units={len(self.units)}")
+        else:
+            print(f"[DEBUG] skip_centering=False, очищаем units перед пересчётом")
+            self.units = {}
         print(f"[DEBUG] Загружено браков из модели: {len(marriages)}")
         print(f"[DEBUG] filtered_persons: {len(filtered_persons)}")
-        for h_id, w_id in sorted(marriages):
+        print(f"[DEBUG] units перед циклом: {len(self.units)}")
+        
+        # Проверка spouse_ids у персон в filtered_persons
+        persons_with_spouse_in_filtered = 0
+        for pid, p in filtered_persons.items():
+            if p.spouse_ids:
+                print(f"[DEBUG] filtered_persons {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
+                persons_with_spouse_in_filtered += 1
+        print(f"[DEBUG] Персон с супругами в filtered_persons: {persons_with_spouse_in_filtered}")
+        
+        # marriages — это dict {(id1, id2): {"date": "..."}}, итерируем по ключам
+        for marriage_key in sorted(marriages.keys()):
+            h_id, w_id = marriage_key  # Распаковываем кортеж
+            
+            # === ИСПРАВЛЕНИЕ: добавляем супругов в filtered_persons, если они есть в coords ===
+            # Это гарантирует, что супруги будут отрисованы даже если не были найдены через связи
+            if h_id not in filtered_persons and h_id in self.coords:
+                h_obj = persons.get(h_id) or persons.get(str(h_id))
+                if h_obj:
+                    filtered_persons[h_id] = h_obj
+                    print(f"[MARRIAGE_FIX] Добавлен супруг {h_id} в filtered_persons (из coords)")
+            if w_id not in filtered_persons and w_id in self.coords:
+                w_obj = persons.get(w_id) or persons.get(str(w_id))
+                if w_obj:
+                    filtered_persons[w_id] = w_obj
+                    print(f"[MARRIAGE_FIX] Добавлен супруг {w_id} в filtered_persons (из coords)")
+            # === /ИСПРАВЛЕНИЕ ===
+            
             if h_id not in filtered_persons or w_id not in filtered_persons:
-                print(f"[DEBUG] Пропущен брак {h_id}-{w_id} (нет в filtered_persons)")
+                print(f"[DEBUG] Пропущен брак {h_id}-{w_id} (нет в filtered_persons): h_id in filtered={h_id in filtered_persons}, w_id in filtered={w_id in filtered_persons}")
                 continue
             p1, p2 = h_id, w_id
             p1_obj = filtered_persons.get(p1)
@@ -2395,6 +2603,8 @@ class FamilyTreeApp:
 
             unit_key = f"{min(p1, p2)}_{max(p1, p2)}"
             self.units[unit_key] = [p1, p2]
+            print(f"[DEBUG] Добавлен брак {unit_key}: {self.units[unit_key]}")
+        print(f"[DEBUG] units после цикла: {len(self.units)}")
         print(f"[DEBUG] Сформировано units: {len(self.units)}")
         for uk, uv in list(self.units.items())[:5]:
             print(f"[DEBUG]   {uk}: {uv}")
@@ -2544,7 +2754,7 @@ class FamilyTreeApp:
         row += 1
 
         # Стат��с смерт��
-        ttk.Label(scrollable_frame, text="Умер(ла)").grid(row=row, column=0, padx=10, pady=8, sticky='e')
+        ttk.Label(scrollable_frame, text="Ум��р(ла)").grid(row=row, column=0, padx=10, pady=8, sticky='e')
         deceased_var = tk.BooleanVar()
         ttk.Checkbutton(scrollable_frame, variable=deceased_var).grid(row=row, column=1, padx=10, pady=8, sticky='w')
         row += 1
@@ -3495,7 +3705,7 @@ class FamilyTreeApp:
 
         person = self.model.get_person(pid)
 
-        # Запрашиваем подтверждение на удаление
+        # Запр��шиваем подтверждение на удаление
         if not messagebox.askyesno("Подтверждение удаления",
                                    f"Вы уверены, что хотите удалить персону '{person.display_name()}' и все связанные с ней данные (родители, дети, браки)?"):
             return  # Пользователь отменил удаление
@@ -3571,7 +3781,7 @@ class FamilyTreeApp:
         if not child_id:
             all_persons = self.model.get_all_persons()
             if not all_persons:
-                messagebox.showerror("Ошибка", "Нет персон для выбора ребёнка.")
+                messagebox.showerror("Ошибка", "Нет персон дл�� выбора ребёнка.")
                 return
             options = [p.display_name() for p in all_persons.values()]
             selected_name = simpledialog.askstring("Выбор ребёнка", "Введите имя ребёнка (или часть):", initialvalue="")
@@ -3669,7 +3879,7 @@ class FamilyTreeApp:
                 messagebox.showerror("Ошибка", "Нет персон для выбора родителя.")
                 return
             options = [p.display_name() for p in all_persons.values()]
-            selected_name = simpledialog.askstring("Выбор родителя", "Введите имя родителя (или часть):",
+            selected_name = simpledialog.askstring("Выбор родителя", "Введите имя родителя (ил�� часть):",
                                                    initialvalue="")
             if not selected_name:
                 return
@@ -3716,11 +3926,11 @@ class FamilyTreeApp:
              self.model.generate_patronymic(parent.name) if parent.gender == constants.GENDER_MALE else "", {}),
             # Автоотчество от отца
             ("Дата рождения (ДД.ММ.ГГГГ):", "Entry", "", {}),
-            ("Дата смерти (ДД.ММ.ГГГГ):", "Entry", "", {}),
+            ("Дат�� смерти (ДД.ММ.ГГГГ):", "Entry", "", {}),
             ("Пол ребёнка:", "Label", "", {}),
         ]
         entries, _, row = create_form_fields(scrollable_frame, fields_config)
-        for key in ("Имя ребёнка:", "Фамилия ребёнка:", "Отчество ребёнка:"):
+        for key in ("Имя ребёнка:", "Фамилия ребёнка:", "Отчество р��бёнка:"):
             if key in entries:
                 self._enable_copy_paste(entries[key])
         # Привязываем ввод дат (только цифры + автоточки)
@@ -4689,7 +4899,10 @@ class FamilyTreeApp:
         ttk.Button(dialog, text="Применить", command=apply_filters).pack(pady=20)
 
     def apply_ui_colors_from_palette(self):
-        """Применяет цвета из сохранённой палитры к элементам интерфейса."""
+        """Применяет цвета из сохранённой палитры к эле��������ентам интерфейса."""
+        print(f"[APPLY_UI_COLORS] MARRIAGE_LINE_COLOR = {constants.MARRIAGE_LINE_COLOR}")
+        print(f"[APPLY_UI_COLORS] PARENT_LINE_COLOR = {constants.PARENT_LINE_COLOR}")
+        print(f"[APPLY_UI_COLORS] CANVAS_BG = {constants.CANVAS_BG}")
         style = ttk.Style()
         self.root.configure(bg=constants.WINDOW_BG)
         try:
@@ -4726,8 +4939,9 @@ class FamilyTreeApp:
         dialog.transient(self.root)
         dialog.grab_set()
 
-        g = globals()
-        current = {k: g.get(k, constants.PALETTE_DEFAULTS[k]) for k in constants.PALETTE_DEFAULTS}
+        # Загружаем ТЕКУЩИЕ значения из constants (а не из PALETTE_DEFAULTS)
+        current = {k: getattr(constants, k, constants.PALETTE_DEFAULTS[k]) for k in constants.PALETTE_DEFAULTS}
+        print(f"[PALETTE_DIALOG] Загружены цвета: MARRIAGE_LINE_COLOR={current.get('MARRIAGE_LINE_COLOR')}")
         swatches = {}
 
         main_f = ttk.Frame(dialog, padding=10)
@@ -4798,11 +5012,11 @@ class FamilyTreeApp:
         # Иконка
         tk.Label(dialog, text="🌳", font=("Segoe UI", 48)).pack(pady=10)
 
-        # Текст
+        # Те��ст
         about_text = (
             f"Семейное древо\n\n"
             f"Версия {self._get_app_version()}\n\n"
-            "Приложение для построения и редактирования\n"
+            "Пр��ложение для построения и редактирования\n"
             "семейного генеалогического дерева.\n\n"
             "© 2024-2026 Все права защищены."
         )
@@ -4821,7 +5035,7 @@ class FamilyTreeApp:
         def check_updates():
             self._check_for_updates(dialog)
 
-        tk.Button(btn_frame, text="🔄 Проверить обновления",
+        tk.Button(btn_frame, text="🔄 Проверить обновл��ния",
                  command=check_updates,
                  bg="#4CAF50", fg="white",
                  font=("Segoe UI", 10, "bold"),
@@ -4872,7 +5086,7 @@ class FamilyTreeApp:
 
         except Exception as e:
             if dialog:
-                self.update_status_label.config(text="❌ Ошибка проверки обновлений", fg="#F44336")
+                self.update_status_label.config(text="❌ Ошибка п��оверки обновлений", fg="#F44336")
             print(f"Update check error: {e}")
 
     def _compare_versions(self, v1, v2):
