@@ -154,6 +154,8 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     logger.info(f"[EMAIL] === Начало отправки письма ===")
     logger.info(f"[EMAIL] Получатель: {to_email}")
     logger.info(f"[EMAIL] Тема: {subject}")
+    logger.info(f"[EMAIL] Отправитель: {SENDGRID_FROM_EMAIL}")
+    logger.info(f"[EMAIL] SendGrid API ключ задан: {bool(SENDGRID_API_KEY)}")
 
     if not SENDGRID_API_KEY:
         logger.warning("[EMAIL] SendGrid API ключ не задан, пробуем SMTP...")
@@ -162,10 +164,10 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     try:
         # SendGrid API endpoint
         url = "https://api.sendgrid.com/v3/mail/send"
-        
+
         # Проверяем FROM_EMAIL
         if not SENDGRID_FROM_EMAIL:
-            logger.error("[EMAIL] SENDGRID_FROM_EMAIL не задан!")
+            logger.error("[EMAIL] ❌ SENDGRID_FROM_EMAIL не задан!")
             return False
 
         # Формируем запрос
@@ -185,9 +187,9 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
             ]
         }
 
-        logger.info(f"[EMAIL] Отправка через SendGrid API...")
+        logger.info(f"[EMAIL] 📤 Отправка через SendGrid API...")
         logger.info(f"[EMAIL] FROM: {SENDGRID_FROM_EMAIL}")
-        logger.info(f"[EMAIL] API ключ задан: {bool(SENDGRID_API_KEY)}")
+        logger.info(f"[EMAIL] TO: {to_email}")
 
         # Создаём запрос
         req = urllib.request.Request(

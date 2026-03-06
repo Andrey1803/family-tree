@@ -518,16 +518,21 @@ def api_send_code():
     email = data.get('email', '').strip()
     login = data.get('login', '').strip()
 
-    logger.info(f"Запрос кода подтверждения для email: {email}")
+    logger.info(f"[API] === Запрос кода подтверждения ===")
+    logger.info(f"[API] Email: {email}")
+    logger.info(f"[API] Login: {login}")
 
     if not email:
+        logger.warning("[API] ❌ Email не указан")
         return jsonify({"error": "Введите email"}), 400
 
     # Проверяем формат email
     if '@' not in email or '.' not in email:
+        logger.warning(f"[API] ❌ Неверный формат email: {email}")
         return jsonify({"error": "Неверный формат email"}), 400
 
     # Проверяем, не занят ли email
+    logger.info(f"[API] Проверка email на занятость...")
     try:
         req = urllib.request.Request(
             f"{SYNC_SERVER_URL}/api/auth/check-email",
@@ -538,24 +543,26 @@ def api_send_code():
         with urllib.request.urlopen(req, timeout=5) as resp:
             check_data = json.loads(resp.read().decode())
             if check_data.get('exists'):
+                logger.warning(f"[API] ❌ Email уже зарегистрирован: {email}")
                 return jsonify({"error": "Этот email уже зарегистрирован"}), 400
     except Exception as e:
-        logger.error(f"Ошибка проверки email: {e}")
+        logger.error(f"[API] Ошибка проверки email: {e}")
         pass  # Игнорируем ошибки проверки
 
     # Отправляем код
-    logger.info(f"Вызов send_verification_code для {email}")
+    logger.info(f"[API] Вызов send_verification_code для {email}")
     code = send_verification_code(email)
+    logger.info(f"[API] send_verification_code вернул: {'код' if code else 'None'}")
 
     if code:
         # Код отправлен на email (не показываем код на экране)
-        logger.info(f"Код сгенерирован и отправлен на {email}")
+        logger.info(f"[API] ✅ Код сгенерирован и отправлен на {email}")
         return jsonify({
             "message": "Код отправлен на email"
         }), 200
     else:
-        logger.error("Ошибка при отправке кода")
-        return jsonify({"error": "Ошибка отправки кода"}), 500
+        logger.error(f"[API] ❌ Ошибка при отправке кода для {email}")
+        return jsonify({"error": "Ошибка отправки кода. Проверьте настройки email."}), 500
 
 
 @app.route("/api/auth/verify-code", methods=["POST"])
