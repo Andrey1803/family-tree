@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 # SendGrid настройки
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "")
+# SendGrid FROM - используем verified sender
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "familyroots010326@gmail.com")
 
 # SMTP настройки (резервные, если SendGrid не настроен)
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -31,7 +32,7 @@ SMTP_LOGIN = os.environ.get("SMTP_LOGIN", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
 
-# EMAIL_FROM - используем SMTP_LOGIN для Gmail чтобы избежать DMARC проблем
+# EMAIL_FROM - приоритет SendGrid
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "")
 if not EMAIL_FROM:
     if SENDGRID_FROM_EMAIL:
