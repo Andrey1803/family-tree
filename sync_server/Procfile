@@ -1,2 +1,1 @@
-fix_admin: python fix_admin_once.py
-web: gunicorn app:app -b 0.0.0.0:$PORT
+web: python fix_admin_once.py && gunicorn app:app -b 0.0.0.0:$PORT
