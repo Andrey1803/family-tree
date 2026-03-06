@@ -338,8 +338,14 @@ function render() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", totalW);
     svg.setAttribute("height", totalH);
-    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none; z-index:10;";
+    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none;";
     wrap.appendChild(svg);
+
+    // Отладка: проверяем marriages
+    console.log('[DEBUG] Marriages count:', (treeData.marriages || []).length);
+    console.log('[DEBUG] Marriages:', treeData.marriages);
+    console.log('[DEBUG] Coords keys:', Object.keys(coords));
+    console.log('[DEBUG] Related size:', related.size);
 
     // Линии родитель–ребёнок
     const parentSetToChildren = {};
@@ -397,6 +403,7 @@ function render() {
     });
     
     // Линии между супругами
+    let marriageLinesDrawn = 0;
     (treeData.marriages || []).forEach(m => {
         let a, b;
         if (Array.isArray(m)) {
@@ -404,13 +411,24 @@ function render() {
         } else if (m.persons && Array.isArray(m.persons)) {
             [a, b] = m.persons;
         } else {
+            console.log('[MARRIAGE] Invalid format:', m);
             return;
         }
 
         const idA = String(a), idB = String(b);
-        if (!coords[idA] || !coords[idB]) return;
-        if (!related.has(idA) || !related.has(idB)) return;
+        console.log('[MARRIAGE] Processing:', idA, idB);
+        console.log('[MARRIAGE] Has coords:', !!coords[idA], !!coords[idB]);
+        console.log('[MARRIAGE] In related:', related.has(idA), related.has(idB));
         
+        if (!coords[idA] || !coords[idB]) {
+            console.log('[MARRIAGE] Skipping - no coords');
+            return;
+        }
+        if (!related.has(idA) || !related.has(idB)) {
+            console.log('[MARRIAGE] Skipping - not in related');
+            return;
+        }
+
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         const yCenter = coords[idA].y + offsetY;
         const xA = coords[idA].x + offsetX;
@@ -420,7 +438,7 @@ function render() {
         const cardHalfWidth = CARD_W / 2;
         const xLeftEdge = xLeft + cardHalfWidth;
         const xRightEdge = xRight - cardHalfWidth;
-        
+
         line.setAttribute("x1", xLeftEdge);
         line.setAttribute("y1", yCenter);
         line.setAttribute("x2", xRightEdge);
@@ -430,7 +448,10 @@ function render() {
         line.setAttribute("stroke-dasharray", "4 4");
         line.setAttribute("stroke-linecap", "round");
         svg.appendChild(line);
+        marriageLinesDrawn++;
+        console.log('[MARRIAGE] Line drawn:', idA, '->', idB);
     });
+    console.log('[MARRIAGE] Total lines drawn:', marriageLinesDrawn);
 
     setupPan(wrap, panZoomWrapper);
     setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
