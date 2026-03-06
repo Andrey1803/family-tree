@@ -164,7 +164,14 @@
             const verifyData = await verifyResp.json();
 
             if (!verifyResp.ok) {
-                errorDiv.textContent = verifyData.error || 'Неверный код';
+                // Показываем более подробную ошибку
+                if (verifyData.error && verifyData.error.includes('истёк')) {
+                    errorDiv.textContent = '⏰ Код истёк (10 минут). Нажмите "Отправить код повторно"';
+                } else if (verifyData.error && verifyData.error.includes('email')) {
+                    errorDiv.textContent = '📧 Код не найден. Возможно вы отправили код на другой email';
+                } else {
+                    errorDiv.textContent = '❌ ' + (verifyData.error || 'Неверный код. Проверьте и попробуйте ещё раз');
+                }
                 return;
             }
 

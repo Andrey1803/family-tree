@@ -65,51 +65,64 @@ def generate_code(length: int = 6) -> str:
 def create_verification_code(email: str) -> str:
     """
     Создать код подтверждения для email.
-    
+
     Args:
         email: Email пользователя
-        
+
     Returns:
         Сгенерированный код
     """
     code = generate_code()
     expiry = datetime.now() + timedelta(seconds=CODE_EXPIRY_SECONDS)
-    
+
+    # Проверяем есть ли уже код для этого email
+    if email in _verification_codes:
+        logger.warning(f"[VERIFY] ⚠️ Для {email} уже есть код ({_verification_codes[email]['code'][:2]}***), перезаписываем")
+
     _verification_codes[email] = {
         'code': code,
         'expiry': expiry,
         'created_at': datetime.now()
     }
-    
+
+    logger.info(f"[VERIFY] Код создан для {email}: {code[:2]}*** (истекает через {CODE_EXPIRY_SECONDS}с)")
     return code
 
 
 def verify_code(email: str, code: str) -> bool:
     """
     Проверить код подтверждения.
-    
+
     Args:
         email: Email пользователя
         code: Введённый код
-        
+
     Returns:
         True если код верный и не истёк
     """
+    logger.info(f"[VERIFY] Проверка кода для email: {email}")
+    
     if email not in _verification_codes:
+        logger.warning(f"[VERIFY] ❌ Email '{email}' не найден в хранилище кодов")
+        logger.warning(f"[VERIFY] Доступные emails: {list(_verification_codes.keys())}")
         return False
-    
+
     stored = _verification_codes[email]
-    
+    logger.info(f"[VERIFY] Найден код для {email}: {stored['code'][:2]}*** (введён: {code})")
+
     # Проверяем не истёк ли код
     if datetime.now() > stored['expiry']:
+        logger.warning(f"[VERIFY] ❌ Код истёк (создан: {stored['created_at']}, истёк: {stored['expiry']})")
         del _verification_codes[email]
         return False
-    
+
     # Проверяем код
     if stored['code'] != code:
+        logger.warning(f"[VERIFY] ❌ Код не совпадает")
         return False
-    
+
     # Код верный - удаляем его
+    logger.info(f"[VERIFY] ✅ Код подтверждён для {email}")
     del _verification_codes[email]
     return True
 

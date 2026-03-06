@@ -565,12 +565,16 @@ def api_verify_code():
     email = data.get('email', '').strip()
     code = data.get('code', '').strip()
 
+    logger.info(f"[API] Проверка кода: email={email}, code={code}")
+
     if not email or not code:
         return jsonify({"error": "Введите email и код"}), 400
 
     if verify_code(email, code):
+        logger.info(f"[API] ✅ Код подтверждён для {email}")
         return jsonify({"message": "Код подтверждён"}), 200
     else:
+        logger.warning(f"[API] ❌ Код не подтверждён для {email}")
         return jsonify({"error": "Неверный код или истёк срок действия"}), 400
 
 
@@ -1418,7 +1422,7 @@ def api_export_pdf():
 def api_backup_create():
     """Создание резервной копии дерева."""
     if "username" not in session:
-        return jsonify({"error": "Не авторизован"}), 401
+        return jsonify({"error": "��е авторизован"}), 401
     
     username = session["username"]
     data = load_tree(username)
