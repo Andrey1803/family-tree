@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # SendGrid настройки
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "familyroots010326@gmail.com")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "")
 
 # SMTP настройки (резервные, если SendGrid не настроен)
 SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -30,6 +30,14 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_LOGIN = os.environ.get("SMTP_LOGIN", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
+
+# EMAIL_FROM - используем SMTP_LOGIN для Gmail чтобы избежать DMARC проблем
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "")
+if not EMAIL_FROM:
+    if SENDGRID_FROM_EMAIL:
+        EMAIL_FROM = SENDGRID_FROM_EMAIL
+    elif SMTP_LOGIN:
+        EMAIL_FROM = SMTP_LOGIN
 
 # Остальные настройки
 EMAIL_SUBJECT = "Код подтверждения регистрации"
@@ -217,10 +225,13 @@ def _send_email_smtp(to_email: str, subject: str, body: str) -> bool:
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SENDGRID_FROM_EMAIL or SMTP_LOGIN
+        # Используем EMAIL_FROM который настроен правильно
+        msg['From'] = EMAIL_FROM or SMTP_LOGIN
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+        logger.info(f"[EMAIL] 📤 From: {msg['From']}")
 
         logger.info(f"[EMAIL] 📤 Подключение к {SMTP_SERVER}:{SMTP_PORT} ...")
 
