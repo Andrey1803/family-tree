@@ -264,7 +264,7 @@ function render() {
     wrap.className = "tree-wrap";
     wrap.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
 
-    const zoomContainer = document.createElement("div");
+    let zoomContainer = document.createElement("div");
     zoomContainer.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
 
     let panZoomWrapper = document.createElement("div");
@@ -453,12 +453,12 @@ function render() {
     panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
     root.appendChild(panZoomWrapper);
 
-    const zoomContainer = document.createElement("div");
+    zoomContainer = document.createElement("div");
     zoomContainer.className = "tree-zoom-container";
     zoomContainer.style.cssText = `position:relative; width:${totalW * treeZoom}px; height:${totalH * treeZoom}px;`;
     panZoomWrapper.appendChild(zoomContainer);
 
-    const wrap = document.createElement("div");
+    wrap = document.createElement("div");
     wrap.className = "tree-wrap";
     wrap.style.cssText = `position:relative; width:${totalW}px; height:${totalH}px; transform:scale(${treeZoom}); transform-origin:0 0;`;
     zoomContainer.appendChild(wrap);
