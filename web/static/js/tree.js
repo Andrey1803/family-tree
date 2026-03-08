@@ -477,10 +477,12 @@ function render() {
         let touchStartX = 0, touchStartY = 0;
         let hasMoved = false;
         
-        card.addEventListener("touchstart", (e) => {
-            console.log('[CARD] touchstart on', pid, 'touches:', e.touches.length);
+        // Обработка touchstart
+        const handleTouchStart = (e) => {
+            console.log('[CARD] touchstart on', pid, 'touches:', e.touches.length, 'target:', e.target.className);
             // Реагируем ТОЛЬКО на один палец
             if (e.touches.length !== 1) {
+                console.log('[LONG_PRESS] Cancelled: touches=', e.touches.length);
                 clearTimeout(longPressTimer);
                 return;
             }
@@ -491,10 +493,12 @@ function render() {
             touchStartTime = Date.now();
             hasMoved = false;
             
-            console.log('[LONG_PRESS] Touch start at', tx, ty);
+            console.log('[LONG_PRESS] Touch start at', tx, ty, 'time:', touchStartTime);
             
             longPressTimer = setTimeout(() => {
                 const touchDuration = Date.now() - touchStartTime;
+                console.log('[LONG_PRESS] Timer fired: duration=', touchDuration, 'moved=', hasMoved, 'pan=', window._treeDidPan);
+                
                 // Проверяем, что палец не двигался и не было панорамирования
                 if (hasMoved || window._treeDidPan || touchDuration < 900) {
                     console.log('[LONG_PRESS] Cancelled: moved=', hasMoved, 'pan=', window._treeDidPan, 'duration=', touchDuration);
@@ -502,19 +506,20 @@ function render() {
                 }
                 
                 card._longPressFired = true;
-                console.log('[LONG_PRESS] Triggered!');
+                console.log('[LONG_PRESS] Triggered! Showing menu for', pid);
                 // Показываем меню с вибрацией (если поддерживается)
                 if (navigator.vibrate) navigator.vibrate(50);
                 showContextMenu(pid, tx, ty, persons);
             }, 1000); // 1 секунда для долгого тапа
-        }, { passive: true });
+        };
         
-        // Отслеживаем движение пальца - сбрасываем таймер если сдвинулся
-        card.addEventListener("touchmove", (e) => {
+        // Обработка touchmove
+        const handleTouchMove = (e) => {
             // Если пальцев больше одного - сбрасываем
             if (e.touches.length !== 1) {
                 hasMoved = true;
                 clearTimeout(longPressTimer);
+                console.log('[LONG_PRESS] Cancelled: multi-touch');
                 return;
             }
             
@@ -523,22 +528,60 @@ function render() {
             if (moveDistance > 10) { // Если палец сдвинулся больше чем на 10px
                 hasMoved = true;
                 clearTimeout(longPressTimer);
-                console.log('[LONG_PRESS] Moved too far:', moveDistance);
+                console.log('[LONG_PRESS] Cancelled: moved', moveDistance.toFixed(1), 'px');
             }
-        }, { passive: true });
-
-        card.addEventListener("touchend", (e) => {
+        };
+        
+        // Обработка touchend
+        const handleTouchEnd = (e) => {
+            console.log('[CARD] touchend on', pid);
             clearTimeout(longPressTimer);
             // Предотвращаем клик если был долгий тап
             if (card._longPressFired && e.cancelable) {
                 e.preventDefault();
             }
-        });
+        };
         
-        card.addEventListener("touchcancel", () => {
-            console.log('[LONG_PRESS] Cancelled');
+        // Обработка touchcancel
+        const handleTouchCancel = () => {
+            console.log('[CARD] touchcancel on', pid);
             clearTimeout(longPressTimer);
-        });
+        };
+        
+        // Вешаем события с разными вариантами для совместимости
+        card.addEventListener("touchstart", handleTouchStart, { passive: true });
+        card.addEventListener("touchmove", handleTouchMove, { passive: true });
+        card.addEventListener("touchend", handleTouchEnd);
+        card.addEventListener("touchcancel", handleTouchCancel);
+        
+        // Для старых браузеров пробуем также pointer events
+        if (window.PointerEvent) {
+            let pointerDownTime = 0;
+            let pointerDownX = 0, pointerDownY = 0;
+            
+            card.addEventListener("pointerdown", (e) => {
+                if (e.pointerType !== 'touch') return;
+                pointerDownTime = Date.now();
+                pointerDownX = e.clientX;
+                pointerDownY = e.clientY;
+                console.log('[POINTER] pointerdown at', pointerDownX, pointerDownY);
+            });
+            
+            card.addEventListener("pointerup", (e) => {
+                if (e.pointerType !== 'touch') return;
+                const duration = Date.now() - pointerDownTime;
+                const moveDistance = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+                console.log('[POINTER] pointerup duration=', duration, 'move=', moveDistance);
+                
+                // Долгое нажатие без движения
+                if (duration > 900 && moveDistance < 10 && !card._longPressFired) {
+                    console.log('[POINTER] Long press detected!');
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    showContextMenu(pid, pointerDownX, pointerDownY, persons);
+                }
+            });
+        }
+        
         wrap.appendChild(card);
     });
 
