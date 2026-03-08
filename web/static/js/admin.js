@@ -14,6 +14,20 @@ document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     setupSearch();
     setupRefresh();
+    // Загружаем пользователей сразу при загрузке страницы
+    loadUsers();
+    
+    // Автоматически переключаемся на вкладку пользователей
+    const usersTabBtn = document.querySelector('.tab-btn[data-tab="users"]');
+    const usersPane = document.getElementById('tab-users');
+    if (usersTabBtn && usersPane) {
+        // Переключаем классы активности
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        usersTabBtn.classList.add('active');
+        usersPane.classList.add('active');
+        console.log('[ADMIN] Switched to users tab by default');
+    }
 });
 
 // Автообновление списка пользователей каждые 30 секунд
@@ -153,6 +167,9 @@ function renderUsersTable(users) {
         tbody.innerHTML = '<tr><td colspan="9" class="muted">Нет пользователей</td></tr>';
         return;
     }
+
+    console.log('[ADMIN] Rendering users:', users.length, 'users');
+    console.log('[ADMIN] Online users:', users.filter(u => u.is_online).length);
 
     tbody.innerHTML = users.map(u => `
         <tr>

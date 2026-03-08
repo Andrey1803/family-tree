@@ -138,5 +138,44 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    
+    <!-- HEARTBEAT: Отправка подтверждения активности каждую минуту -->
+    <script>
+    let heartbeatInterval = null;
+
+    function startHeartbeat() {
+        sendHeartbeat();
+        heartbeatInterval = setInterval(sendHeartbeat, 60000);
+        console.log('[HEARTBEAT] Started in admin panel');
+    }
+
+    function sendHeartbeat() {
+        fetch('/api/heartbeat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log('[HEARTBEAT] OK at', new Date().toLocaleTimeString());
+                // После успешного heartbeat обновляем список пользователей
+                if (typeof loadUsers === 'function') {
+                    loadUsers();
+                }
+            }
+        })
+        .catch(error => console.warn('[HEARTBEAT] Error:', error));
+    }
+
+    function stopHeartbeat() {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
+    }
+
+    window.addEventListener('load', startHeartbeat);
+    window.addEventListener('beforeunload', stopHeartbeat);
+    </script>
 </body>
 </html>
