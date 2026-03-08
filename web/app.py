@@ -860,6 +860,29 @@ def api_check_session():
     })
 
 
+@app.route("/api/heartbeat", methods=["POST"])
+def api_heartbeat():
+    """Отправка heartbeat на сервер синхронизации."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/heartbeat",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return jsonify({"status": "ok"})
+        except Exception as e:
+            print(f"[HEARTBEAT] Error: {e}")
+    
+    # Возвращаем OK даже если сервер недоступен
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/admin/user/<int:user_id>/toggle", methods=["POST"])
 def api_admin_toggle_user(user_id):
     """Активировать/деактивировать пользователя."""

@@ -135,8 +135,55 @@
         // Пересчёт при изменении размера окна
         window.addEventListener('resize', updateHamburgerVisibility);
     });
-    </script>
+
+    // === HEARTBEAT: Отправка подтверждения активности каждую минуту ===
+    let heartbeatInterval = null;
+
+    function startHeartbeat() {
+        // Отправляем heartbeat сразу при загрузке
+        sendHeartbeat();
+        
+        // Затем отправляем каждую минуту (60000 мс)
+        heartbeatInterval = setInterval(sendHeartbeat, 60000);
+        
+        console.log('[HEARTBEAT] Started');
+    }
+
+    function sendHeartbeat() {
+        fetch('/api/heartbeat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log('[HEARTBEAT] OK at', new Date().toLocaleTimeString());
+            } else {
+                console.warn('[HEARTBEAT] Failed:', response.status);
+            }
+        })
+        .catch(error => {
+            console.warn('[HEARTBEAT] Error:', error);
+        });
+    }
+
+    function stopHeartbeat() {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+            console.log('[HEARTBEAT] Stopped');
+        }
+    }
+
+    // Запускаем heartbeat после загрузки страницы
+    window.addEventListener('load', startHeartbeat);
     
+    // Останавливаем при закрытии страницы
+    window.addEventListener('beforeunload', stopHeartbeat);
+    </script>
+
     <script src="{{ url_for('static', filename='js/undo.js') }}?v=20260301-3"></script>
     <script src="{{ url_for('static', filename='js/tree.js') }}?v=20260301-3"></script>
 </body>

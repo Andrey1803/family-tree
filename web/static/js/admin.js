@@ -6,6 +6,7 @@
 let usersData = [];
 let treesData = [];
 let currentUserId = null;
+let usersRefreshInterval = null;
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +15,31 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSearch();
     setupRefresh();
 });
+
+// Автообновление списка пользователей каждые 30 секунд
+function startUsersAutoRefresh() {
+    if (usersRefreshInterval) {
+        clearInterval(usersRefreshInterval);
+    }
+    usersRefreshInterval = setInterval(() => {
+        // Обновляем только если вкладка пользователей активна
+        const usersTab = document.querySelector('.tab-btn[data-tab="users"]');
+        if (usersTab && usersTab.classList.contains('active')) {
+            loadUsers();
+        }
+    }, 30000); // 30 секунд
+    
+    console.log('[ADMIN] Users auto-refresh started (30s)');
+}
+
+// Остановка автообновления
+function stopUsersAutoRefresh() {
+    if (usersRefreshInterval) {
+        clearInterval(usersRefreshInterval);
+        usersRefreshInterval = null;
+        console.log('[ADMIN] Users auto-refresh stopped');
+    }
+}
 
 // Переключение вкладок
 function setupTabs() {
@@ -107,10 +133,13 @@ async function loadUsers() {
         if (!r.ok) throw new Error('Ошибка загрузки пользователей');
         const data = await r.json();
         usersData = data.users || [];
-        
+
         renderUsersTable(usersData);
         updateUserFilter();
         
+        // Запускаем автообновление после первой загрузки
+        startUsersAutoRefresh();
+
     } catch (err) {
         console.error('Users error:', err);
         document.getElementById('users-table').innerHTML = '<tr><td colspan="8">Ошибка загрузки</td></tr>';
@@ -128,7 +157,10 @@ function renderUsersTable(users) {
     tbody.innerHTML = users.map(u => `
         <tr>
             <td>${u.id}</td>
-            <td><strong>${escapeHtml(u.login)}</strong></td>
+            <td>
+                <span class="online-indicator ${u.is_online ? 'online' : ''}" title="${u.is_online ? 'Онлайн' : 'Оффлайн'}"></span>
+                <strong>${escapeHtml(u.login)}</strong>
+            </td>
             <td>${escapeHtml(u.email || '—')}</td>
             <td>${formatDate(u.created_at)}</td>
             <td>${formatDate(u.last_login) || '—'}</td>

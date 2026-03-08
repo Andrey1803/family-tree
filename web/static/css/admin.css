@@ -461,3 +461,30 @@
         padding: 8px;
     }
 }
+
+/* Индикатор онлайна */
+.online-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #9ca3af;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.online-indicator.online {
+    background-color: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}

@@ -335,8 +335,33 @@ def logout():
     db = get_db()
     db.execute('DELETE FROM user_sessions WHERE session_token = ?', (token,))
     db.commit()
-    
+
     return jsonify({'message': 'Выход выполнен успешно'})
+
+
+@app.route('/api/heartbeat', methods=['POST'])
+@require_auth
+def heartbeat():
+    """Подтверждение активности пользователя (обновление last_activity)."""
+    db = get_db()
+    
+    # Обновляем время последней активности
+    db.execute('''
+        UPDATE user_sessions 
+        SET last_activity = CURRENT_TIMESTAMP 
+        WHERE session_token = (
+            SELECT session_token FROM user_sessions 
+            WHERE user_id = ? AND last_activity > datetime("now", "-24 hours")
+            LIMIT 1
+        )
+    ''', (g.current_user_id,))
+    db.commit()
+    
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat()
+    })
+
 
 # === API СИНХРОНИЗАЦИИ ===
 @app.route('/api/sync/upload', methods=['POST'])
@@ -595,14 +620,28 @@ def admin_stats():
 @app.route('/api/admin/users', methods=['GET'])
 @require_admin
 def admin_users():
-    """Список всех пользователей."""
+    """Список всех пользователей со статусом онлайн."""
     db = get_db()
     users = db.execute('''
-        SELECT id, login, email, created_at, last_login, is_active, is_admin
+        SELECT id, login, email, created_at, last_login, is_active, is_admin,
+               (SELECT MAX(last_activity) FROM user_sessions 
+                WHERE user_sessions.user_id = users.id 
+                AND last_activity > datetime("now", "-5 minutes")) as last_activity
         FROM users ORDER BY created_at DESC
     ''').fetchall()
-    
-    return jsonify({'users': [dict(row) for row in users]})
+
+    users_list = []
+    for row in users:
+        user_dict = dict(row)
+        # Если last_activity не None и меньше 5 минут назад - пользователь онлайн
+        if user_dict.get('last_activity'):
+            user_dict['is_online'] = True
+        else:
+            user_dict['is_online'] = False
+            user_dict['last_activity'] = None
+        users_list.append(user_dict)
+
+    return jsonify({'users': users_list})
 
 @app.route('/api/admin/user/<int:user_id>/toggle', methods=['POST'])
 @require_admin
