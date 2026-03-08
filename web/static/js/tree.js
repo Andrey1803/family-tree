@@ -28,6 +28,102 @@ let activeFilters = { gender: "Все", status: "Все", photos_only: false, ch
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 
+/**
+ * Рассчитывает возраст по дате рождения.
+ * @param {string} birthDateStr - Дата рождения в формате "ДД.ММ.ГГГГ"
+ * @param {string} deathDateStr - Дата смерти (опционально)
+ * @param {boolean} isDeceased - Факт смерти
+ * @returns {string} Возраст или "?"
+ */
+function calculateAge(birthDateStr, deathDateStr = "", isDeceased = false) {
+    if (!birthDateStr) return "?";
+
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = dateStr.trim().split('.');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        return new Date(year, month, day);
+    }
+
+    const birthDate = parseDate(birthDateStr);
+    if (!birthDate) return "?";
+
+    const endDate = isDeceased && deathDateStr ? parseDate(deathDateStr) : new Date();
+    if (!endDate) return "?";
+
+    let age = endDate.getFullYear() - birthDate.getFullYear();
+    const birthMonthDay = birthDate.getMonth() * 100 + birthDate.getDate();
+    const endMonthDay = endDate.getMonth() * 100 + endDate.getDate();
+
+    if (endMonthDay < birthMonthDay) {
+        age--;
+    }
+
+    return age >= 0 ? String(age) : "?";
+}
+
+/**
+ * Преобразует дату в сортируемое значение.
+ * @param {string} dateStr - Дата в формате "ДД.ММ.ГГГГ"
+ * @returns {string} Строка в формате "ГГГГММДД" или "99999999" если дата невалидна
+ */
+function getSortableDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string' || dateStr.length !== 10) {
+        return "99999999";
+    }
+    const parts = dateStr.split('.');
+    if (parts.length !== 3) {
+        return "99999999";
+    }
+    return `${parts[2]}${parts[1].padStart(2, '0')}${parts[0].padStart(2, '0')}`;
+}
+
+/**
+ * Определяет знак зодиака по дате рождения.
+ * @param {string} birthDateStr - Дата рождения в формате "ДД.ММ.ГГГГ"
+ * @returns {string} Знак зодиака или пустая строка
+ */
+function getZodiacSign(birthDateStr) {
+    if (!birthDateStr) return "";
+
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = dateStr.trim().split('.');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        return { day, month, year };
+    }
+
+    const date = parseDate(birthDateStr);
+    if (!date) return "";
+
+    const day = date.day;
+    const month = date.month;
+
+    // Знаки зодиака
+    if ((month === 12 && day >= 22) || (month === 1 && day <= 20)) return "♑ Козерог";
+    if ((month === 1 && day >= 21) || (month === 2 && day <= 19)) return "♒ Водолей";
+    if ((month === 2 && day >= 20) || (month === 3 && day <= 20)) return "♓ Рыбы";
+    if ((month === 3 && day >= 21) || (month === 4 && day <= 20)) return "♈ Овен";
+    if ((month === 4 && day >= 21) || (month === 5 && day <= 21)) return "♉ Телец";
+    if ((month === 5 && day >= 22) || (month === 6 && day <= 21)) return "♊ Близнецы";
+    if ((month === 6 && day >= 22) || (month === 7 && day <= 23)) return "♋ Рак";
+    if ((month === 7 && day >= 24) || (month === 8 && day <= 23)) return "♌ Лев";
+    if ((month === 8 && day >= 24) || (month === 9 && day <= 23)) return "♍ Дева";
+    if ((month === 9 && day >= 24) || (month === 10 && day <= 23)) return "♎ Весы";
+    if ((month === 10 && day >= 24) || (month === 11 && day <= 22)) return "♏ Скорпион";
+    if ((month === 11 && day >= 23) || (month === 12 && day <= 21)) return "♐ Стрелец";
+
+    return "";
+}
+
 async function loadTree() {
     console.log('[LOAD_TREE] Starting to load tree...');
     const r = await fetch("/api/tree");
@@ -313,10 +409,14 @@ function render() {
             if (window._treeDidPan) return;
             editPerson(pid);
         };
+        
+        // Контекстное меню для десктопа (правая кнопка)
         card.addEventListener("contextmenu", (e) => {
             e.preventDefault();
             showContextMenu(pid, e.clientX, e.clientY, persons);
         });
+        
+        // Долгий тап для мобильных (1 секунда)
         let longPressTimer;
         card.addEventListener("touchstart", (e) => {
             if (e.touches.length !== 1) return;
@@ -327,11 +427,26 @@ function render() {
                 card._longPressFired = true;
                 e.preventDefault();
                 showContextMenu(pid, tx, ty, persons);
-            }, 500);
+            }, 1000); // 1 секунда для долгого тапа
         }, { passive: true });
+        
         card.addEventListener("touchend", () => clearTimeout(longPressTimer));
         card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
         wrap.appendChild(card);
+    });
+
+    // Закрытие контекстного меню при клике вне его области
+    document.addEventListener('click', function closeMenuOnClick(e) {
+        if (window._ctxMenu) {
+            const menu = window._ctxMenu;
+            const isClickInsideMenu = menu.contains(e.target);
+            const isClickOnCard = e.target.closest('.tree-card');
+            
+            // Закрываем если клик не внутри меню и не на карточке
+            if (!isClickInsideMenu && !isClickOnCard) {
+                closeContextMenu();
+            }
+        }
     });
 
     // Рисуем линии ПОСЛЕ карточек (чтобы они были поверх)
@@ -890,6 +1005,7 @@ function editPerson(pid) {
                     <input type="text" id="ed-patronymic" value="${escapeHtml(p.patronymic || "")}">
                     <label>Дата рождения (ДД.ММ.ГГГГ)</label>
                     <input type="text" id="ed-birth" value="${escapeHtml(p.birth_date || "")}" placeholder="ДД.ММ.ГГГГ">
+                    <div id="ed-age-info" class="age-info" style="margin-top: 4px; font-size: 0.85rem; color: #64748b;"></div>
                     <label>Место рождения</label>
                     <input type="text" id="ed-birth-place" value="${escapeHtml(p.birth_place || "")}">
                     <label>Пол</label>
@@ -937,7 +1053,20 @@ function editPerson(pid) {
                     }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
                     <h4>Дети</h4>
-                    <div id="ed-children">${(p.children || []).sort((a,b)=>(persons[a]?.birth_date||"9999").localeCompare(persons[b]?.birth_date||"9999")).map(c => `<div class="ed-family-item">${escapeHtml(displayName(c))}</div>`).join("") || '<div class="muted">— Нет</div>'}</div>
+                    <div id="ed-children">${(p.children || []).sort((a, b) => {
+                        const dateA = getSortableDate(persons[a]?.birth_date);
+                        const dateB = getSortableDate(persons[b]?.birth_date);
+                        if (dateA !== dateB) return dateA.localeCompare(dateB);
+                        return String(a).localeCompare(String(b));
+                    }).map(c => {
+                        const child = persons[c];
+                        const ageText = child?.birth_date ? ` (${calculateAge(child.birth_date, child.death_date, child.is_deceased)} л.)` : '';
+                        return `<div class="ed-family-item ed-child-row">
+                            <span class="child-name">${escapeHtml(displayName(c))}${ageText}</span>
+                            <button type="button" class="btn-view-child" data-child="${escapeHtml(String(c))}" title="Просмотр">👁</button>
+                            <button type="button" class="btn-edit-child" data-child="${escapeHtml(String(c))}" title="Редактировать">✏</button>
+                        </div>`;
+                    }).join("") || '<div class="muted">— Нет</div>'}</div>
                 </div>
                 <div class="tab-pane" id="tab-history">
                     <label>Биография, история жизни</label>
@@ -1152,6 +1281,50 @@ function editPerson(pid) {
         };
     });
 
+    // Обработчики для кнопок детей
+    ov.querySelectorAll(".btn-view-child").forEach(btn => {
+        btn.onclick = () => {
+            const childId = btn.dataset.child;
+            ov.remove();
+            editPerson(childId);
+        };
+    });
+
+    ov.querySelectorAll(".btn-edit-child").forEach(btn => {
+        btn.onclick = () => {
+            const childId = btn.dataset.child;
+            ov.remove();
+            editPerson(childId);
+        };
+    });
+
+    function updateAgeInfo() {
+        const birthDateVal = (ov.querySelector("#ed-birth")?.value || "").trim();
+        const isDeceased = ov.querySelector("#ed-deceased")?.checked || false;
+        const deathDateVal = (ov.querySelector("#ed-death")?.value || "").trim();
+        const ageInfoEl = ov.querySelector("#ed-age-info");
+
+        if (!ageInfoEl) return;
+
+        if (!birthDateVal) {
+            ageInfoEl.textContent = "";
+            return;
+        }
+
+        const age = calculateAge(birthDateVal, isDeceased ? deathDateVal : "", isDeceased);
+        const zodiac = getZodiacSign(birthDateVal);
+
+        if (age !== "?" || zodiac) {
+            let infoText = "(";
+            if (age !== "?") infoText += `${age} лет`;
+            if (zodiac) infoText += `, ${zodiac}`;
+            infoText += ")";
+            ageInfoEl.textContent = infoText;
+        } else {
+            ageInfoEl.textContent = "";
+        }
+    }
+
     function updatePhotoPreview() {
         const val = (ov.querySelector("#ed-photo")?.value || "").trim();
         const prev = ov.querySelector("#ed-photo-preview");
@@ -1182,10 +1355,16 @@ function editPerson(pid) {
     };
     ov.querySelector("#ed-deceased").onchange = () => {
         ov.querySelector("#ed-death-row").style.display = ov.querySelector("#ed-deceased").checked ? "flex" : "none";
+        updateAgeInfo();
     };
     ov.querySelector("#ed-gender").onchange = () => {
         ov.querySelector("#ed-maiden-row").style.display = ov.querySelector("#ed-gender").value === "Женский" ? "flex" : "none";
     };
+
+    // Обновление информации о возрасте и знаке зодиака
+    ov.querySelector("#ed-birth").oninput = updateAgeInfo;
+    ov.querySelector("#ed-death").oninput = updateAgeInfo;
+    updateAgeInfo();  // Первоначальное обновление
 
     ov.querySelectorAll(".tab-btn").forEach(btn => {
         btn.onclick = () => {
@@ -2545,7 +2724,7 @@ function setupDesktopAppButtons() {
     btnOpen.onclick = () => {
         const url = window.location.origin + "/";
         const protocolUrl = "derevo://open?url=" + encodeURIComponent(url);
-        // Создаём ссылку и кликаем — так браузеры надёжнее обрабатывают кастомные протоколы
+        // Создаём ссылку и кликаем — так браузеры надёжнее обрабатывают кастомные проток��лы
         const a = document.createElement("a");
         a.href = protocolUrl;
         a.style.display = "none";
@@ -2621,7 +2800,7 @@ if (isAdminViewCheck) {
 checkFirstRun();
 
 async function checkAdminView() {
-    // Проверяем, открыли ли дерево из админ-панели
+    // Проверяем, открыли ли дерево из адм��н-панели
     const urlParams = new URLSearchParams(window.location.search);
     console.log('[ADMIN_VIEW] URL params:', Object.fromEntries(urlParams));
     console.log('[ADMIN_VIEW] Tree owner:', urlParams.get('tree_owner'));

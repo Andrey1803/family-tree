@@ -653,6 +653,35 @@ body {
   border-color: #1e40af;
   box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.1);
 }
+.ed-child-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ed-child-row:last-child { border-bottom: none; }
+.ed-child-row .child-name {
+  flex: 1;
+  min-width: 150px;
+  font-weight: 500;
+}
+.ed-child-row .btn-view-child,
+.ed-child-row .btn-edit-child {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ed-child-row .btn-view-child:hover,
+.ed-child-row .btn-edit-child:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
 .ed-spouse-row .spouse-date::placeholder {
   color: #94a3b8;
   font-size: 0.8rem;
@@ -1187,15 +1216,34 @@ body {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   /* Контекстное меню — адаптивное позиционирование */
   .tree-context-menu {
     max-width: calc(100vw - 16px);
     min-width: auto;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .tree-context-menu .cm-submenu {
     left: auto;
     right: 100%;
+  }
+  
+  /* Улучшения для мобильного контекстного меню */
+  @media (max-width: 480px) {
+    .tree-context-menu {
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .tree-context-menu .cm-item {
+      padding: 12px 16px;
+      font-size: 15px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tree-context-menu .cm-item:active {
+      background: #e0e7ff;
+    }
   }
 }
 
