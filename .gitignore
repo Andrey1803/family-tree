@@ -54,3 +54,6 @@ __pycache__/
 exe_builds/  
 dist/  
 build/  
+"FamilyTree_v1.*/"  
+"FamilyTree_*/"  
+"*.pyc"  

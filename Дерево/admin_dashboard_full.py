@@ -32,16 +32,43 @@ class AdminDashboard:
         self.root.geometry("1200x750")
         self.root.minsize(1000, 700)
         
+        # Проверяем, тёмная ли тема активна
+        import constants
+        is_dark_theme = getattr(constants, 'WINDOW_BG', '#f8f9fa').lower() in ['#1e293b', '#0f172a', '#1a1a2e', '#16213e', '#2d3748', '#1a202c', '#2c3e50']
+
         # Настройка стиля
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure('Header.TLabel', font=('Segoe UI', 18, 'bold'), foreground='#2c3e50')
-        style.configure('SubHeader.TLabel', font=('Segoe UI', 12), foreground='#7f8c8d')
-        style.configure('Stat.TLabel', font=('Segoe UI', 16, 'bold'), foreground='#34495e')
-        style.configure('Success.TLabel', foreground='#27ae60')
-        style.configure('Warning.TLabel', foreground='#e67e22')
-        style.configure('Danger.TLabel', foreground='#e74c3c')
-        style.configure('Admin.TFrame', background='#ecf0f1')
+        
+        if is_dark_theme:
+            # Тёмная тема
+            self.root.configure(bg='#1e293b')
+            style.configure('Header.TLabel', font=('Segoe UI', 18, 'bold'), foreground='#ffffff', background='#1e293b')
+            style.configure('SubHeader.TLabel', font=('Segoe UI', 12), foreground='#cbd5e1', background='#1e293b')
+            style.configure('Stat.TLabel', font=('Segoe UI', 16, 'bold'), foreground='#ffffff', background='#1e293b')
+            style.configure('Success.TLabel', foreground='#4ade80', background='#1e293b')
+            style.configure('Warning.TLabel', foreground='#fbbf24', background='#1e293b')
+            style.configure('Danger.TLabel', foreground='#f87171', background='#1e293b')
+            style.configure('Admin.TFrame', background='#1e293b')
+            style.configure('TLabel', background='#1e293b', foreground='#ffffff')
+            style.configure('TButton', background='#334155', foreground='#ffffff', font=('Arial', 10, 'bold'))
+            style.configure('TEntry', fieldbackground='#334155', foreground='#ffffff')
+            style.configure('TCombobox', fieldbackground='#334155', foreground='#ffffff')
+            style.configure('Treeview', background='#1e293b', foreground='#ffffff', fieldbackground='#1e293b')
+            style.configure('Treeview.Heading', background='#334155', foreground='#ffffff')
+            style.configure('TNotebook', background='#1e293b')
+            style.configure('TNotebook.Tab', background='#334155', foreground='#ffffff')
+            style.map('TNotebook.Tab', background=[('selected', '#475569')])
+            style.map('TButton', background=[('active', '#475568'), ('pressed', '#1e293b')])
+        else:
+            # Светлая тема
+            style.configure('Header.TLabel', font=('Segoe UI', 18, 'bold'), foreground='#2c3e50')
+            style.configure('SubHeader.TLabel', font=('Segoe UI', 12), foreground='#7f8c8d')
+            style.configure('Stat.TLabel', font=('Segoe UI', 16, 'bold'), foreground='#34495e')
+            style.configure('Success.TLabel', foreground='#27ae60')
+            style.configure('Warning.TLabel', foreground='#e67e22')
+            style.configure('Danger.TLabel', foreground='#e74c3c')
+            style.configure('Admin.TFrame', background='#ecf0f1')
         
         self._setup_ui()
         
@@ -107,30 +134,69 @@ class AdminDashboard:
         self.log_text = tk.Text(log_frame, wrap=tk.WORD, font=('Consolas', 10))
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
+        # Добавляем контекстное меню для копирования
+        self.log_menu = tk.Menu(self.log_text, tearoff=0)
+        self.log_menu.add_command(label="📋 Копировать", command=self._copy_log)
+        self.log_menu.add_command(label="📋 Копировать всё", command=self._copy_all_log)
+        self.log_menu.add_separator()
+        self.log_menu.add_command(label="🗑️ Очистить", command=self._clear_log)
+        self.log_text.bind("<Button-3>", self._show_log_menu)
+        
         # === СТАТУС БАР ===
         self.status_var = tk.StringVar(value="Готово")
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(fill=tk.X)
+        
+    def _show_log_menu(self, event):
+        """Показывает контекстное меню лога"""
+        self.log_menu.post(event.x_root, event.y_root)
+        
+    def _copy_log(self):
+        """Копирует выделенный текст из лога"""
+        try:
+            text = self.log_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update()
+        except tk.TclError:
+            pass  # Ничего не выделено
+            
+    def _copy_all_log(self):
+        """Копирует весь текст из лога"""
+        text = self.log_text.get("1.0", tk.END)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.root.update()
+        
+    def _clear_log(self):
+        """Очищает лог"""
+        self.log_text.delete("1.0", tk.END)
 
     def _create_users_tab(self, parent):
         """Создаёт вкладку пользователей"""
         # Таблица пользователей
-        columns = ('login', 'email', 'created', 'trees', 'status', 'last_sync')
+        columns = ('online', 'login', 'email', 'created', 'trees', 'status', 'last_sync')
         self.users_tree = ttk.Treeview(parent, columns=columns, show='headings', height=20)
-        
+
+        self.users_tree.heading('online', text='Статус')
         self.users_tree.heading('login', text='Логин')
         self.users_tree.heading('email', text='Email')
         self.users_tree.heading('created', text='Создан')
         self.users_tree.heading('trees', text='Деревья')
         self.users_tree.heading('status', text='Статус')
         self.users_tree.heading('last_sync', text='Последняя синхронизация')
-        
+
+        self.users_tree.column('online', width=80, anchor='center')
         self.users_tree.column('login', width=150)
         self.users_tree.column('email', width=200)
         self.users_tree.column('created', width=120)
         self.users_tree.column('trees', width=80)
         self.users_tree.column('status', width=100)
         self.users_tree.column('last_sync', width=150)
+        
+        # Настраиваем теги для красивых индикаторов
+        self.users_tree.tag_configure('online', background='#dcfce7')  # Светло-зелёный
+        self.users_tree.tag_configure('offline', background='#fef2f2')  # Светло-красный
         
         # Скроллбары
         vsb = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=self.users_tree.yview)
@@ -307,103 +373,181 @@ class AdminDashboard:
         """Загружает все данные с сервера"""
         self.status_var.set("Загрузка данных...")
         self._log("🔄 Загрузка данных системы...")
+
+        # === ОЧИЩАЕМ ВСЕ ДЕРЕВЬЯ ПЕРЕД ЗАГРУЗКОЙ ===
+        self.users_tree.delete(*self.users_tree.get_children())
+        if hasattr(self, 'trees_tree'):
+            self.trees_tree.delete(*self.trees_tree.get_children())
+        # === /ОЧИЩАЕМ ===
+
+        # Запоминаем время загрузки для определения онлайна
+        self._load_time = datetime.now()
+
+        # === ПРИОРИТЕТ: СЕРВЕР ===
+        self._log("🌐 Подключение к серверу...")
         
-        # Загружаем статистику (если есть доступ)
+        # Загружаем статистику
         stats = self._api_request('/api/admin/stats')
-        
+
         if stats:
+            self._log("✅ Сервер доступен")
             self.stats_labels['users'].config(text=str(stats.get('overview', {}).get('total_users', 0)))
             self.stats_labels['trees'].config(text=str(stats.get('overview', {}).get('total_trees', 0)))
             self.stats_labels['persons'].config(text=str(stats.get('overview', {}).get('total_persons', 0)))
             self.stats_labels['active'].config(text=str(stats.get('overview', {}).get('active_users', 0)))
-            self._log("✅ Статистика загружена")
-        else:
-            # Если нет доступа к админ API, показываем данные пользователя
-            self._log("⚠️ Режим ограниченного доступа")
-            self.stats_labels['users'].config(text="1")
-            self.stats_labels['trees'].config(text="—")
-            self.stats_labels['persons'].config(text="—")
-            self.stats_labels['active'].config(text="1")
-        
-        # Загружаем пользователей (если есть доступ)
-        users_response = self._api_request('/api/admin/users')
-
-        # Сервер возвращает {"users": [...]}
-        users_data = users_response.get('users', []) if isinstance(users_response, dict) else users_response
-        
-        if users_data and isinstance(users_data, list):
-            self.all_users = users_data
-            for user in users_data:
-                login = user.get('login', 'Неизвестно')
-                email = user.get('email', '-')
-                created = user.get('created_at', '-')
-                trees_count = user.get('trees_count', 0)
-                is_active = user.get('is_active', True)
-                last_sync = user.get('last_sync', 'Никогда')
-                
-                # Форматируем даты
-                if created and created != '-':
-                    try:
-                        dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
-                        created = dt.strftime("%d.%m.%Y")
-                    except:
-                        pass
-                
-                if last_sync and last_sync != 'Никогда':
-                    try:
-                        dt = datetime.fromisoformat(last_sync.replace('Z', '+00:00'))
-                        last_sync = dt.strftime("%d.%m.%Y %H:%M")
-                    except:
-                        pass
-                
-                status = "✅ Активен" if is_active else "⚠️ Заблокирован"
-                
-                self.users_tree.insert('', tk.END, values=(
-                    login, email, created, trees_count, status, last_sync
-                ), tags=(user.get('id'),))
             
-            self._log(f"✅ Загружено пользователей: {len(users_data)}")
+            # Загружаем пользователей
+            users_response = self._api_request('/api/admin/users')
+            users_data = users_response.get('users', []) if isinstance(users_response, dict) else users_response
+            
+            if users_data and isinstance(users_data, list):
+                self.all_users = users_data
+                for user in users_data:
+                    login = user.get('login', 'Неизвестно')
+                    email = user.get('email', '-')
+                    created = user.get('created_at', '-')
+                    trees_count = user.get('trees_count', 0)
+                    is_active = user.get('is_active', True)
+                    last_sync_raw = user.get('last_sync', None)
+                    
+                    # Логируем что вернул сервер
+                    if last_sync_raw is None:
+                        self._log(f"⚠️ {login}: last_sync не указан")
+                    else:
+                        self._log(f"✓ {login}: last_sync={last_sync_raw}")
+                    
+                    last_sync = last_sync_raw if last_sync_raw else 'Никогда'
+
+                    # Форматируем даты
+                    if created and created != '-':
+                        try:
+                            dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                            created = dt.strftime("%d.%m.%Y")
+                        except:
+                            pass
+
+                    if last_sync and last_sync != 'Никогда':
+                        try:
+                            dt = datetime.fromisoformat(last_sync.replace('Z', '+00:00'))
+                            last_sync = dt.strftime("%d.%m.%Y %H:%M")
+                        except:
+                            pass
+
+                    # Проверяем онлайн
+                    try:
+                        from active_users import is_user_active
+                        is_online = is_user_active(login)
+                    except:
+                        is_online = False
+
+                    online_indicator = "● Онлайн" if is_online else "○ Офлайн"
+                    status = "✅ Активен" if is_active else "⚠️ Заблокирован"
+                    tag = 'online' if is_online else 'offline'
+
+                    self.users_tree.insert('', tk.END, values=(
+                        online_indicator, login, email, created, trees_count, status, last_sync
+                    ), tags=(tag,))
+
+                self._log(f"✅ Загружено пользователей: {len(users_data)}")
+
+            # Загружаем деревья
+            self._load_all_trees()
+            
+            # === ОБНОВЛЯЕМ trees_count ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ===
+            # Сервер может не возвращать trees_count, поэтому считаем сами
+            self._log("📊 Подсчёт деревьев для пользователей...")
+            user_trees = {}
+            for tree in self.all_trees:
+                # Сервер возвращает user_login, а не owner_login
+                owner = tree.get('user_login', tree.get('owner_login', 'Неизвестно'))
+                user_trees[owner] = user_trees.get(owner, 0) + 1
+                self._log(f"  🌳 Дерево: {tree.get('name', '???')} (владелец: {owner})")
+            
+            self._log(f"📁 Всего пользователей в таблице: {len(self.users_tree.get_children())}")
+            self._log(f"📁 Найдено владельцев деревьев: {len(user_trees)}")
+            
+            # Обновляем значения в таблице
+            updated_count = 0
+            for item in self.users_tree.get_children():
+                values = self.users_tree.item(item, 'values')
+                if values:
+                    login = values[1]  # Логин во втором столбце
+                    current_trees = int(values[4]) if values[4] else 0  # Деревья в пятом столбце
+                    self._log(f"  👤 {login}: текущее значение={current_trees}")
+                    
+                    if login in user_trees:
+                        new_trees = user_trees[login]
+                        self._log(f"    → Обновляем: {current_trees} → {new_trees}")
+                        # Обновляем значение
+                        new_values = list(values)
+                        new_values[4] = new_trees
+                        self.users_tree.item(item, values=new_values)
+                        updated_count += 1
+            
+            self._log(f"✅ Подсчёт завершён (обновлено {updated_count} записей)")
+            
         else:
-            # Показываем только текущего пользователя
-            self._log("⚠️ Показаны данные текущего пользователя")
-            self.all_users = [{
-                'id': 'current',
-                'login': self.login,
-                'email': '-',
-                'created_at': '-',
-                'trees_count': 0,
-                'is_active': True,
-                'last_sync': datetime.now().strftime("%Y-%m-%d %H:%M")
-            }]
-            self.users_tree.insert('', tk.END, values=(
-                self.login, '-', '-', '0', '✅ Активен', datetime.now().strftime("%d.%m.%Y %H:%M")
-            ))
-        
-        # Загружаем деревья (если есть доступ)
-        self._load_all_trees()
+            # Сервер недоступен
+            self._log("⚠️ Сервер недоступен")
+            messagebox.showwarning("Сервер недоступен", 
+                "Не удалось подключиться к серверу.\n\n"
+                "Возможные причины:\n"
+                "• Нет подключения к интернету\n"
+                "• Сервер временно недоступен\n"
+                "• Истёк срок действия токена\n\n"
+                "Показываем локальные данные...")
+            
+            # Показываем локальные данные
+            self._load_local_users()
+            self._load_local_trees()
+            
+            # Показываем локальную статистику
+            users_count = len(self.users_tree.get_children())
+            trees_count = len(self.trees_tree.get_children())
+            persons_count = sum(t.get('persons_count', 0) for t in self.all_trees)
+            
+            self.stats_labels['users'].config(text=str(users_count))
+            self.stats_labels['trees'].config(text=str(trees_count))
+            self.stats_labels['persons'].config(text=str(persons_count))
+            self.stats_labels['active'].config(text="1")
 
     def _load_stats(self):
         """Загружает статистику системы"""
+        # Пытаемся загрузить с сервера
         stats = self._api_request('/api/admin/stats')
         
+        # Получаем локальных активных пользователей
+        try:
+            from active_users import get_active_users
+            active_list = get_active_users()
+            active_count = len(active_list)
+        except:
+            active_count = 1  # Хотя бы текущий пользователь
+
         if stats:
             self.stats_labels['users'].config(text=str(stats.get('total_users', 0)))
             self.stats_labels['trees'].config(text=str(stats.get('total_trees', 0)))
             self.stats_labels['persons'].config(text=str(stats.get('total_persons', 0)))
-            self.stats_labels['active'].config(text=str(stats.get('active_users', 0)))
-            self._log(f"✅ Статистика загружена")
+            # Показываем локальных активных пользователей
+            self.stats_labels['active'].config(text=str(active_count))
+            self._log(f"✅ Статистика загружена (активных: {active_count})")
         else:
             self._log("⚠️ Не удалось загрузить статистику")
+            # Показываем хотя бы локальных активных
+            self.stats_labels['users'].config(text="1")
+            self.stats_labels['trees'].config(text="—")
+            self.stats_labels['persons'].config(text="—")
+            self.stats_labels['active'].config(text=str(active_count))
 
     def _load_users(self):
         """Загружает список пользователей"""
         self.users_tree.delete(*self.users_tree.get_children())
-        
+
         users_data = self._api_request('/api/admin/users')
-        
+
         if users_data and isinstance(users_data, list):
             self.all_users = users_data
-            
+
             for user in users_data:
                 login = user.get('login', 'Неизвестно')
                 email = user.get('email', '-')
@@ -411,7 +555,7 @@ class AdminDashboard:
                 trees_count = user.get('trees_count', 0)
                 is_active = user.get('is_active', True)
                 last_sync = user.get('last_sync', 'Никогда')
-                
+
                 # Форматируем даты
                 if created and created != '-':
                     try:
@@ -419,43 +563,161 @@ class AdminDashboard:
                         created = dt.strftime("%d.%m.%Y")
                     except:
                         pass
-                
+
                 if last_sync and last_sync != 'Никогда':
                     try:
                         dt = datetime.fromisoformat(last_sync.replace('Z', '+00:00'))
                         last_sync = dt.strftime("%d.%m.%Y %H:%M")
                     except:
                         pass
-                
+
+                # Определяем онлайн/офлайн
+                # Проверяем локальную активность
+                try:
+                    from active_users import is_user_active
+                    is_online = is_user_active(login)
+                except:
+                    is_online = False
+
+                # Красивый индикатор
+                online_indicator = "● Онлайн" if is_online else "○ Офлайн"
                 status = "✅ Активен" if is_active else "⚠️ Заблокирован"
-                
+
+                # Тег для цвета строки
+                tag = 'online' if is_online else 'offline'
+
                 self.users_tree.insert('', tk.END, values=(
-                    login, email, created, trees_count, status, last_sync
-                ), tags=(user.get('id'),))
-            
+                    online_indicator, login, email, created, trees_count, status, last_sync
+                ), tags=(tag,))
+
             self._log(f"✅ Загружено пользователей: {len(users_data)}")
         else:
-            self._log("⚠️ Не удалось загрузить пользователей")
+            # Загружаем локальных пользователей
+            self._log("📂 Загрузка локальных пользователей...")
+            self._load_local_users()
+    
+    def _load_local_users(self):
+        """Загружает локальных пользователей и их деревья"""
+        import os
+        import json
+
+        # Правильный путь к папке data
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
+        if not os.path.exists(data_dir):
+            self._log(f"⚠️ Папка data не найдена (путь: {data_dir})")
+            return
+
+        self._log(f"📂 Путь к data: {data_dir}")
+
+        # Считаем деревья по пользователям
+        user_trees_count = {}
+
+        # Ищем файлы family_tree_*.json
+        try:
+            tree_files = [f for f in os.listdir(data_dir) if f.startswith('family_tree_') and f.endswith('.json')]
+            self._log(f"📁 Найдено файлов деревьев: {len(tree_files)}")
+
+            for filename in tree_files:
+                username = filename.replace('family_tree_', '').replace('.json', '')
+                user_trees_count[username] = user_trees_count.get(username, 0) + 1
+                self._log(f"  - {username}: {user_trees_count[username]} дерево(ев)")
+        except Exception as e:
+            self._log(f"⚠️ Ошибка сканирования папки: {e}")
+            return
+
+        # Если есть users.json - загружаем оттуда
+        users_file = os.path.join(data_dir, 'users.json')
+        if os.path.exists(users_file):
+            try:
+                with open(users_file, 'r', encoding='utf-8') as f:
+                    users_data = json.load(f)
+
+                users_list = users_data.get('users', []) if isinstance(users_data, dict) else users_data
+
+                for user in users_list:
+                    login = user.get('login', 'Неизвестно')
+                    email = user.get('email', '-')
+                    created = user.get('created_at', '-')
+                    is_active = user.get('is_active', True)
+                    trees_count = user_trees_count.get(login, 0)
+
+                    # Форматируем дату
+                    if created and created != '-':
+                        try:
+                            dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                            created = dt.strftime("%d.%m.%Y")
+                        except:
+                            pass
+
+                    # Проверяем активность
+                    try:
+                        from active_users import is_user_active
+                        is_online = is_user_active(login)
+                    except:
+                        is_online = False
+
+                    online_indicator = "● Онлайн" if is_online else "○ Офлайн"
+                    status = "✅ Активен" if is_active else "⚠️ Заблокирован"
+                    tag = 'online' if is_online else 'offline'
+
+                    self.users_tree.insert('', tk.END, values=(
+                        online_indicator, login, email, created, trees_count, status, 'Локальный'
+                    ), tags=(tag,))
+
+                self._log(f"✅ Загружено локальных пользователей: {len(users_list)}")
+
+            except Exception as e:
+                self._log(f"⚠️ Ошибка чтения users.json: {e}")
+                # Продолжаем без users.json
+
+        # Если users.json нет или пустой - создаём список из имён файлов деревьев
+        if self.users_tree.get_children():
+            return  # Уже загрузили
+
+        self._log("📝 Создаём список пользователей из имён файлов...")
+        for username, count in user_trees_count.items():
+            try:
+                from active_users import is_user_active
+                is_online = is_user_active(username)
+            except:
+                is_online = False
+
+            online_indicator = "● Онлайн" if is_online else "○ Офлайн"
+            tag = 'online' if is_online else 'offline'
+
+            self.users_tree.insert('', tk.END, values=(
+                online_indicator, username, '-', '-', count, '✅ Активен', 'Локальный'
+            ), tags=(tag,))
+
+        self._log(f"✅ Создано пользователей: {len(user_trees_count)}")
 
     def _load_all_trees(self):
         """Загружает все деревья системы"""
         self.trees_tree.delete(*self.trees_tree.get_children())
+        self._log("🌳 Загрузка деревьев...")
 
+        # Пытаемся загрузить с сервера
         trees_response = self._api_request('/api/admin/trees')
+        self._log(f"📡 Ответ сервера: {trees_response}")
 
         # Сервер возвращает {"trees": [...]}
         trees_data = trees_response.get('trees', []) if isinstance(trees_response, dict) else trees_response
-        
-        if trees_data and isinstance(trees_data, list):
+        self._log(f"📁 Получено деревьев от сервера: {len(trees_data) if trees_data else 0}")
+
+        if trees_data and isinstance(trees_data, list) and len(trees_data) > 0:
             self.all_trees = trees_data
-            
+
             for tree in trees_data:
-                owner = tree.get('owner_login', 'Неизвестно')
+                # Сервер возвращает user_login, а не owner_login
+                owner = tree.get('user_login', tree.get('owner_login', 'Неизвестно'))
                 name = tree.get('name', 'Без названия')
+                self._log(f"  🌳 Дерево: {name} (владелец: {owner})")
+                
                 updated = tree.get('updated_at', 'Неизвестно')
                 size = tree.get('size', 0)
                 persons_count = tree.get('persons_count', 0)
-                
+
                 # Форматируем дату
                 if updated and updated != 'Неизвестно':
                     try:
@@ -463,20 +725,82 @@ class AdminDashboard:
                         updated = dt.strftime("%d.%m.%Y %H:%M")
                     except:
                         pass
-                
+
                 # Форматируем размер
                 if isinstance(size, (int, float)):
                     size_str = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
                 else:
                     size_str = str(size)
-                
+
                 self.trees_tree.insert('', tk.END, values=(
                     owner, name, updated, size_str, persons_count
                 ), tags=(tree.get('id'),))
-            
+
             self._log(f"✅ Загружено деревьев: {len(trees_data)}")
         else:
-            self._log("⚠️ Не удалось загрузить деревья")
+            # Загружаем локальные деревья пользователей
+            self._log("⚠️ Сервер не вернул деревья, загружаем локальные...")
+            self._load_local_trees()
+    
+    def _load_local_trees(self):
+        """Загружает локальные деревья пользователей"""
+        import os
+        import json
+        
+        # Правильный путь к папке data
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        
+        if not os.path.exists(data_dir):
+            self._log(f"⚠️ Папка data не найдена (путь: {data_dir})")
+            return
+        
+        self._log(f"📂 Путь к data: {data_dir}")
+        
+        self.all_trees = []
+        
+        # Ищем файлы family_tree_*.json
+        tree_files = [f for f in os.listdir(data_dir) if f.startswith('family_tree_') and f.endswith('.json')]
+        self._log(f"📁 Найдено файлов деревьев: {len(tree_files)}")
+        
+        for filename in tree_files:
+            try:
+                filepath = os.path.join(data_dir, filename)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    tree_data = json.load(f)
+                
+                # Извлекаем информацию
+                username = filename.replace('family_tree_', '').replace('.json', '')
+                persons = tree_data.get('persons', {})
+                persons_count = len(persons)
+                
+                # Получаем время модификации
+                mtime = os.path.getmtime(filepath)
+                updated = datetime.fromtimestamp(mtime).strftime("%d.%m.%Y %H:%M")
+                
+                # Размер файла
+                size = os.path.getsize(filepath)
+                size_str = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
+                
+                self.trees_tree.insert('', tk.END, values=(
+                    username, filename, updated, size_str, persons_count
+                ), tags=(filename,))
+                
+                self.all_trees.append({
+                    'id': filename,
+                    'owner_login': username,
+                    'name': filename,
+                    'updated_at': updated,
+                    'size': size,
+                    'persons_count': persons_count
+                })
+                
+            except Exception as e:
+                self._log(f"⚠️ Ошибка чтения {filename}: {e}")
+        
+        if self.all_trees:
+            self._log(f"✅ Загружено локальных деревьев: {len(self.all_trees)}")
+        else:
+            self._log("⚠️ Локальные деревья не найдены")
 
     def _get_selected_user_id(self):
         """Получает ID выбранного пользователя"""

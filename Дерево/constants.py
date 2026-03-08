@@ -94,6 +94,34 @@ PALETTE_DEFAULTS = {
     "CARD_TOGGLE_BTN_OUTLINE": "#334155",
     "CARD_TOGGLE_BTN_TEXT": "#1e293b",
 }
+
+# Тёмная тема (альтернативная палитра)
+DARK_THEME_DEFAULTS = {
+    "WINDOW_BG": "#1e293b",
+    "MENUBAR_BG": "#0f172a",
+    "MENU_MALE_COLOR": "#60a5fa",
+    "MENU_FEMALE_COLOR": "#f472b6",
+    "CANVAS_BG": "#0f172a",
+    "MALE_COLOR": "#3b82f6",
+    "FEMALE_COLOR": "#ec4899",
+    "DECEASED_COLOR": "#94a3b8",
+    "CENTER_COLOR": "#fbbf24",
+    "MARRIAGE_LINE_COLOR": "#f97316",
+    "PARENT_LINE_COLOR": "#60a5fa",
+    "CARD_BORDER_COLOR": "#334155",
+    "CARD_HOVER_BORDER": "#fbbf24",
+    "CARD_INNER_RIM": "#475569",
+    "CARD_TEXT_PRIMARY": "#f1f5f9",
+    "CARD_TEXT_SECONDARY": "#cbd5e1",
+    "CARD_DATE_BIRTH": "#34d399",
+    "CARD_DATE_DEATH": "#f87171",
+    "CARD_PHOTO_PLACEHOLDER_FILL": "#334155",
+    "CARD_PHOTO_PLACEHOLDER_OUTLINE": "#64748b",
+    "CARD_INNER_HIGHLIGHT": "#475569",
+    "CARD_TOGGLE_BTN_FILL": "#334155",
+    "CARD_TOGGLE_BTN_OUTLINE": "#64748b",
+    "CARD_TOGGLE_BTN_TEXT": "#f1f5f9",
+}
 PALETTE_LABELS = {
     "WINDOW_BG": "Фон окна и рамка",
     "MENUBAR_BG": "Фон строки меню",
@@ -143,6 +171,11 @@ def apply_palette(palette_dict):
             applied_count += 1
             print(f"[APPLY_PALETTE] {k}: {old_val} -> {v}")
     print(f"[APPLY_PALETTE] Всего применено: {applied_count} цветов")
+
+def apply_dark_theme():
+    """Применяет тёмную тему оформления."""
+    apply_palette(DARK_THEME_DEFAULTS)
+    print("[DARK_THEME] Тёмная тема применена")
 
 
 def load_palette_from_file():

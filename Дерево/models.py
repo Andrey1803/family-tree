@@ -29,7 +29,8 @@ class Person:
                  photo=None, photo_path="", is_deceased=False, death_date="", maiden_name="",
                  birth_place="", biography="", burial_place="", burial_date="",
                  photo_album=None, links=None, occupation="", education="", address="", notes="",
-                 significant_events=None, phone="", email="", social_media=None, blood_type="", medical_info=None):
+                 significant_events=None, phone="", email="", social_media=None, blood_type="", medical_info=None,
+                 vk="", telegram="", whatsapp="", rh_factor="", allergies="", chronic_conditions=""):
         self.id = None
         self.name = name
         self.surname = surname
@@ -61,6 +62,12 @@ class Person:
         self.social_media = list(social_media) if social_media is not None else []
         self.blood_type = blood_type if blood_type is not None else ""
         self.medical_info = list(medical_info) if medical_info is not None else []
+        self.vk = vk if vk is not None else ""
+        self.telegram = telegram if telegram is not None else ""
+        self.whatsapp = whatsapp if whatsapp is not None else ""
+        self.rh_factor = rh_factor if rh_factor is not None else ""
+        self.allergies = allergies if allergies is not None else ""
+        self.chronic_conditions = chronic_conditions if chronic_conditions is not None else ""
 
     def full_name(self):
         return f"{self.name} {self.surname}"
@@ -164,7 +171,8 @@ class FamilyTreeModel:
                    birth_place="", biography="", burial_place="", burial_date="",
                    photo_album=None, links=None, occupation="", education="", address="", notes="",
                    significant_events=None, phone="", email="", social_media=None,
-                   blood_type="", medical_info=None):
+                   blood_type="", medical_info=None, vk="", telegram="", whatsapp="",
+                   rh_factor="", allergies="", chronic_conditions=""):
         # Поддержка двух вариантов вызова: с объектом Person или с отдельными параметрами
         if isinstance(name, Person):
             person = name
@@ -205,7 +213,9 @@ class FamilyTreeModel:
                 burial_date=burial_date, photo_album=photo_album, links=links,
                 occupation=occupation, education=education, address=address, notes=notes,
                 significant_events=significant_events, phone=phone, email=email,
-                social_media=social_media, blood_type=blood_type, medical_info=medical_info
+                social_media=social_media, blood_type=blood_type, medical_info=medical_info,
+                vk=vk, telegram=telegram, whatsapp=whatsapp, rh_factor=rh_factor,
+                allergies=allergies, chronic_conditions=chronic_conditions
             )
             new_person.id = new_id
             new_person.parents = set()
@@ -371,6 +381,15 @@ class FamilyTreeModel:
                         "education": getattr(p, "education", "") or "",
                         "address": getattr(p, "address", "") or "",
                         "notes": getattr(p, "notes", "") or "",
+                        "phone": getattr(p, "phone", "") or "",
+                        "email": getattr(p, "email", "") or "",
+                        "blood_type": getattr(p, "blood_type", "") or "",
+                        "vk": getattr(p, "vk", "") or "",
+                        "telegram": getattr(p, "telegram", "") or "",
+                        "whatsapp": getattr(p, "whatsapp", "") or "",
+                        "rh_factor": getattr(p, "rh_factor", "") or "",
+                        "allergies": getattr(p, "allergies", "") or "",
+                        "chronic_conditions": getattr(p, "chronic_conditions", "") or "",
                     } for pid, p in self.persons.items()
                 },
                 "marriages": [
@@ -422,6 +441,15 @@ class FamilyTreeModel:
                     education=pdata.get("education", ""),
                     address=pdata.get("address", ""),
                     notes=pdata.get("notes", ""),
+                    phone=pdata.get("phone", ""),
+                    email=pdata.get("email", ""),
+                    blood_type=pdata.get("blood_type", ""),
+                    vk=pdata.get("vk", ""),
+                    telegram=pdata.get("telegram", ""),
+                    whatsapp=pdata.get("whatsapp", ""),
+                    rh_factor=pdata.get("rh_factor", ""),
+                    allergies=pdata.get("allergies", ""),
+                    chronic_conditions=pdata.get("chronic_conditions", ""),
                 )
                 p.id = pid
                 p.parents = set(str(pid) for pid in pdata.get("parents", []) if pid)

@@ -1060,18 +1060,41 @@ async function saveTree() {
     if (treeData && treeData.persons) {
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
-    
-    // Отправляем на сервер
-    try {
-        await fetch("/api/tree", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(treeData),
-        });
-        console.log('[SAVE] Tree saved successfully at', new Date().toLocaleTimeString());
-    } catch (e) {
-        console.error('[SAVE] Error:', e);
+
+    // Отправляем на сервер с повторной попыткой
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch("/api/tree", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(treeData),
+                keepalive: true  // Важно для мобильных
+            });
+            
+            if (response.ok) {
+                console.log('[SAVE] Tree saved successfully at', new Date().toLocaleTimeString());
+                // Показываем уведомление на мобильных
+                if (window.innerWidth <= 480) {
+                    const msg = document.createElement('div');
+                    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                    msg.textContent = '✅ Дерево сохранено!';
+                    document.body.appendChild(msg);
+                    setTimeout(() => msg.remove(), 3000);
+                }
+                return;  // Успех
+            } else {
+                console.error('[SAVE] Server returned error:', response.status, 'attempt', attempt);
+            }
+        } catch (e) {
+            console.error('[SAVE] Error:', e, 'attempt', attempt);
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1000));  // Ждём 1 секунду
+            }
+        }
     }
+    
+    console.error('[SAVE] Failed after', maxRetries, 'attempts');
 }
 
 function showContextMenu(pid, x, y, persons) {
