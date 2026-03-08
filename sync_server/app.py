@@ -666,38 +666,60 @@ def admin_reset_password(user_id):
     })
 
 
-@app.route('/api/admin/user/<int:user_id>/delete', methods=['POST'])
+@app.route('/api/admin/user/<int:user_id>/delete', methods=['POST', 'DELETE'])
 @require_admin
 def admin_delete_user(user_id):
-    """Удалить пользователя (только супер-админ)."""
-    db = get_db()
+    """Удалить пользователя (только супер-админ).
     
+    Супер-админы (имеют полные права всегда):
+    - admin (по умолчанию)
+    - Андрей Емельянов (персональный супер-админ)
+    """
+    return _do_delete_user(user_id)
+
+
+@app.route('/api/admin/user/<int:user_id>', methods=['DELETE'])
+@require_admin
+def admin_delete_user_short(user_id):
+    """Удалить пользователя (короткий URL для desktop-версии).
+    
+    Супер-админы (имеют полные права всегда):
+    - admin (по умолчанию)
+    - Андрей Емельянов (персональный супер-админ)
+    """
+    return _do_delete_user(user_id)
+
+
+def _do_delete_user(user_id):
+    """Внутренняя функция удаления пользователя."""
+    db = get_db()
+
     # Проверяем существование пользователя
     user = db.execute('SELECT id, login FROM users WHERE id = ?', (user_id,)).fetchone()
     if not user:
         return jsonify({'error': 'Пользователь не найден'}), 404
-    
+
     # Нельзя удалить супер-админа
     if user['login'] == 'admin':
         return jsonify({'error': 'Нельзя удалить супер-админа'}), 400
-    
+
     # Получаем все деревья пользователя
     trees = db.execute('SELECT id FROM family_trees WHERE user_id = ?', (user_id,)).fetchall()
     tree_ids = [t[0] for t in trees]
-    
+
     # Удаляем персон из деревьев
     if tree_ids:
         placeholders = ','.join('?' * len(tree_ids))
         db.execute(f'DELETE FROM persons WHERE tree_id IN ({placeholders})', tree_ids)
-    
+
     # Удаляем деревья
     db.execute('DELETE FROM family_trees WHERE user_id = ?', (user_id,))
-    
+
     # Удаляем пользователя
     db.execute('DELETE FROM users WHERE id = ?', (user_id,))
-    
+
     db.commit()
-    
+
     return jsonify({'message': 'Пользователь удалён'})
 
 @app.route('/api/admin/user/<int:user_id>/trees', methods=['GET'])
