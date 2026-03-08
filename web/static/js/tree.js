@@ -267,7 +267,7 @@ function render() {
     const zoomContainer = document.createElement("div");
     zoomContainer.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
 
-    const panZoomWrapper = document.createElement("div");
+    let panZoomWrapper = document.createElement("div");
     panZoomWrapper.className = "tree-pan-zoom";
     panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
 
@@ -445,7 +445,10 @@ function render() {
     totalW = bounds.right - bounds.left + PAD * 2;
     totalH = bounds.bottom - bounds.top + PAD * 2;
 
-    const panZoomWrapper = document.createElement("div");
+    // Пересоздаём структуру для дерева с персонами
+    root.innerHTML = "";
+    
+    panZoomWrapper = document.createElement("div");
     panZoomWrapper.className = "tree-pan-zoom";
     panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
     root.appendChild(panZoomWrapper);
