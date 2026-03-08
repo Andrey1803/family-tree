@@ -7,7 +7,7 @@ from app import _password_hash
 
 DB_FILE = os.environ.get('DATA_DIR', '.') + '/family_tree.db'
 
-print(f"📦 Создание БД: {DB_FILE}")
+print(f"[DB] Creating database: {DB_FILE}")
 
 conn = sqlite3.connect(DB_FILE)
 cursor = conn.cursor()
@@ -33,8 +33,16 @@ INSERT OR IGNORE INTO users (login, password_hash, email, is_admin)
 VALUES (?, ?, ?, ?)
 ''', ("admin", admin_password, "admin@familytree.local", 1))
 
+# Создаём Андрея Емельянова как супер-админа
+andrey_password = _password_hash("Андрей Емельянов", "andrey123")
+cursor.execute('''
+INSERT OR IGNORE INTO users (login, password_hash, email, is_admin)
+VALUES (?, ?, ?, ?)
+''', ("Андрей Емельянов", andrey_password, "andrey@familytree.local", 1))
+
 conn.commit()
 conn.close()
 
-print("✅ Таблица users создана!")
-print("✅ Администратор admin/admin123 создан!")
+print("[DB] Table users created!")
+print("[DB] Admin admin/admin123 created!")
+print("[DB] Super-admin Andrey Emelyanov/andrey123 created!")

@@ -138,11 +138,17 @@ def is_admin(username: str) -> bool:
 
     Проверяет только локальный файл users.json.
     Для проверки через сервер используйте check_admin_access().
+    
+    Супер-админы (имеют полные права):
+    - admin (по умолчанию)
+    - Андрей Емельянов (персональный супер-админ)
     """
     if not username:
         return False
-    # Супер-админ
-    if username == "admin":
+    
+    # Супер-админы по имени
+    SUPER_ADMINS = ["admin", "Андрей Емельянов"]
+    if username in SUPER_ADMINS:
         return True
 
     # Проверяем флаг is_admin в локальных пользователях

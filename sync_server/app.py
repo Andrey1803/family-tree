@@ -183,10 +183,13 @@ def init_db():
         db.execute('DELETE FROM users WHERE login = "admin"')
         print("✅ Пользователь 'admin' удалён")
 
-    # Проверяем нужно ли сделать Андрея Емельянова супер-админом
-    if os.environ.get("ANDREY_SUPER_ADMIN") == "true":
-        print("⚙️ ANDREY_SUPER_ADMIN=true, предоставляю права Андрею Емельянову...")
+    # Андрей Емельянов — супер-админ по умолчанию (полные права)
+    # Если переменная ANDREY_SUPER_ADMIN явно установлена в "false", права не предоставляем
+    if os.environ.get("ANDREY_SUPER_ADMIN") != "false":
+        print("⚙️ Предоставление прав супер-админа Андрею Емельянову...")
         db.execute('UPDATE users SET is_admin = 1 WHERE login = "Андрей Емельянов"')
+        db.execute('INSERT OR IGNORE INTO users (login, password_hash, email, is_admin) VALUES (?, ?, ?, ?)',
+                   ("Андрей Емельянов", _password_hash("Андрей Емельянов", "andrey123"), "andrey@familytree.local", 1))
         print("✅ Андрей Емельянов теперь супер-админ")
 
     db.commit()
@@ -238,16 +241,27 @@ def require_auth(f):
     return decorated
 
 def require_admin(f):
-    """Требует права администратора."""
+    """Требует права администратора.
+    
+    Супер-админы (имеют полные права всегда):
+    - admin (по умолчанию)
+    - Андрей Емельянов (персональный супер-админ)
+    """
     @wraps(f)
     @require_auth
     def decorated(*args, **kwargs):
         db = get_db()
-        user = db.execute('SELECT is_admin FROM users WHERE id = ?', (g.current_user_id,)).fetchone()
+        user = db.execute('SELECT login, is_admin FROM users WHERE id = ?', (g.current_user_id,)).fetchone()
+
+        # Супер-админы всегда имеют доступ
+        SUPER_ADMINS = ["admin", "Андрей Емельянов"]
+        if user and user['login'] in SUPER_ADMINS:
+            return f(*args, **kwargs)
         
+        # Проверяем флаг is_admin для остальных
         if not user or not user['is_admin']:
             return jsonify({'error': 'Требуется права администратора'}), 403
-        
+
         return f(*args, **kwargs)
     return decorated
 
@@ -825,76 +839,49 @@ def initialize_database():
     # Используем DATA_DIR из переменных окружения
     db_dir = os.environ.get('DATA_DIR', '/data')
     DB_FILE = os.path.join(db_dir, 'family_tree.db')
-    
-    print(f"📦 DB_DIR: {db_dir}")
-    print(f"📦 DB_FILE: {DB_FILE}")
-    
+
+    # Используем ASCII символы для совместимости с Windows консолью
+    print(f"[DB] DB_DIR: {db_dir}")
+    print(f"[DB] DB_FILE: {DB_FILE}")
+
     # Создаём директорию если нет
     try:
         os.makedirs(db_dir, exist_ok=True)
-        print(f"📦 Dir exists: {os.path.exists(db_dir)}")
+        print(f"[DB] Dir exists: {os.path.exists(db_dir)}")
     except Exception as e:
-        print(f"⚠️  Dir create error: {e}")
-    
+        print(f"[DB] Dir create error: {e}")
+
     # Проверяем есть ли таблица users
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
         if not cursor.fetchone():
-            print("📦 Инициализация базы данных...")
+            print("[DB] Initializing database...")
             conn.close()
             init_db()
-            print("✅ База данных инициализирована!")
+            print("[DB] Database initialized!")
         else:
             # Проверяем количество пользователей
             cursor.execute('SELECT COUNT(*) FROM users')
             count = cursor.fetchone()[0]
-            print(f"✅ База данных уже инициализирована. Пользователей: {count}")
+            print(f"[DB] Database already initialized. Users: {count}")
             # Выводим логинов
             cursor.execute('SELECT login FROM users')
             for row in cursor.fetchall():
                 print(f"   - {row[0]}")
         conn.close()
     except Exception as e:
-        print(f"❌ DB error: {e}")
-        print("📦 Попытка создания БД...")
+        print(f"[DB] Error: {e}")
+        print("[DB] Trying to create DB...")
         try:
             init_db()
-            print("✅ База данных создана!")
+            print("[DB] Database created!")
         except Exception as e2:
-            print(f"❌ DB create error: {e2}")
+            print(f"[DB] Create error: {e2}")
 
 # Авто-инициализация при импорте
 initialize_database()
-
-# Удаляем admin и предоставляем права Андрею при каждом старте
-def apply_admin_settings():
-    """Применить настройки администратора при старте."""
-    try:
-        import sqlite3
-        DB_FILE = os.environ.get('DATA_DIR', '/data') + '/family_tree.db'
-        if os.path.exists(DB_FILE):
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-            
-            # Удаляем admin
-            if os.environ.get("REMOVE_ADMIN") == "true":
-                cursor.execute('DELETE FROM users WHERE login = "admin"')
-                conn.commit()
-                print("✅ Пользователь 'admin' удалён")
-            
-            # Делаем Андрея админом
-            if os.environ.get("ANDREY_SUPER_ADMIN") == "true":
-                cursor.execute('UPDATE users SET is_admin = 1 WHERE login = "Андрей Емельянов"')
-                conn.commit()
-                print("✅ Андрей Емельянов теперь супер-админ")
-            
-            conn.close()
-    except Exception as e:
-        print(f"⚠️ Ошибка apply_admin_settings: {e}")
-
-apply_admin_settings()
 
 if __name__ == '__main__':
     # Инициализация БД
