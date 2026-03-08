@@ -1,0 +1,105 @@
+warning: in the working copy of 'Дерево/app.py', LF will be replaced by CRLF the next time Git touches it
+diff --git "a/\320\224\320\265\321\200\320\265\320\262\320\276/app.py" "b/\320\224\320\265\321\200\320\265\320\262\320\276/app.py"
+index 0af7186..27cd91c 100644
+--- "a/\320\224\320\265\321\200\320\265\320\262\320\276/app.py"
++++ "b/\320\224\320\265\321\200\320\265\320\262\320\276/app.py"
+@@ -19,6 +19,15 @@ import constants
+ from models import Person, FamilyTreeModel
+ from ui_helpers import create_form_fields
+ 
++# Модуль родства
++try:
++    from kinship import calculate_kinship
++    KINSHIP_AVAILABLE = True
++except ImportError:
++    KINSHIP_AVAILABLE = False
++    def calculate_kinship(model, center_id):
++        return {}
++
+ class FamilyTreeApp:
+     def __init__(self, root, data_file=None, username=None):
+         self.root = root
+@@ -67,6 +76,7 @@ class FamilyTreeApp:
+         self.focus_mode_active = False  # ← ИНИЦИАЛИЗИРУЕМ ОДИН РАЗ (было дублирование!)
+         self.precomputed_hidden_nodes = set()
+         self.active_filters = {"gender": constants.FILTER_ALL, "status": constants.FILTER_ALL, "photos_only": False, "childless": False}
++        self.kinship_labels = {}  # {person_id: "Брат", "Дядя" и т.д.}
+         # --- /ПЕРЕМЕННЫЕ ---
+         # --- НАСТРОЙКИ РАЗМЕРОВ ---
+         self.BASE_CARD_WIDTH = 120
+@@ -114,10 +124,12 @@ class FamilyTreeApp:
+         self.menu_bar.add_cascade(label="Правка", menu=self.edit_menu)
+         root.config(menu=self.menu_bar)
+         # --- /МЕНЮ ---
+-        # --- СТАТУСБАР И ПАНЕЛЬ ЦЕНТРА (в тон холста) ---
+-        self.statusbar = tk.Label(root, text=constants.MSG_STATUS_IDLE, bd=1, relief=tk.SUNKEN, anchor=tk.W,
+-                                 bg="#f1f5f9", fg="#334155", font=("Segoe UI", 9))
+-        self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
++        # --- ПАНЕЛЬ ЦЕНТРА И СЧЁТЧИК ПЕРСОН ---
++        # Счётчик персон
++        self.counter_label = tk.Label(root, text="Персон: 0", bd=1, relief=tk.SUNKEN, anchor=tk.CENTER,
++                                     bg="#e2e8f0", fg="#1e293b", font=("Segoe UI", 9, "bold"))
++        self.counter_label.pack(side=tk.BOTTOM, fill=tk.X)
++
+         self.center_label = tk.Label(root, text="Центр: Не выбран", bd=1, relief=tk.SUNKEN, anchor=tk.W,
+                                      bg="#e2e8f0", fg="#1e293b", font=("Segoe UI", 9, "bold"))
+         self.center_label.pack(side=tk.BOTTOM, fill=tk.X)
+@@ -330,9 +342,9 @@ class FamilyTreeApp:
+             if messagebox.askyesno("Подтверждение", msg):
+                 welcome.destroy()
+                 if self.username:
+-                    self.statusbar.config(text="Добавьте персону через ПКМ по холсту → «Добавить».")
++                    pass  # statusbar удалён
+                 else:
+-                    self.statusbar.config(text="Режим гостя: создайте персону вручную через меню «Файл → Новая персона».")
++                    pass  # statusbar удалён
+ 
+         def on_submit():
+             # Валидация
+@@ -1172,6 +1184,19 @@ class FamilyTreeApp:
+                 anchor="n",
+                 tags=card_tags
+             )
++            y_offset += 12 * self.current_scale
++
++        # === ОТОБРАЖЕНИЕ РОДСТВА ===
++        if pid in self.kinship_labels and pid != self.model.current_center:
++            kinship = self.kinship_labels[pid]
++            self.canvas.create_text(
++                scaled_x, text_y_start + y_offset,
++                text=f"({kinship})",
++                font=("Arial", int(7 * self.current_scale), "italic"),
++                fill="#fbbf24",  # Янтарный цвет
++                anchor="n",
++                tags=card_tags
++            )
+ 
+         # === ПРИВЯЗКА СОБЫТИЙ ===
+         self.canvas.tag_bind(card_tags, "<Enter>", lambda e, p_id=pid: self.on_person_enter(p_id))
+@@ -1296,6 +1321,11 @@ class FamilyTreeApp:
+         if not skip_layout or not self.coords:
+             self.calculate_layout(skip_centering=skip_centering)
+ 
++        # === ВЫЧИСЛЯЕМ РОДСТВО ДЛЯ ВСЕХ ПЕРСОН ===
++        self.kinship_labels = {}
++        if self.model.current_center and KINSHIP_AVAILABLE:
++            self.kinship_labels = calculate_kinship(self.model, self.model.current_center)
++
+         # === ФИЛЬТРАЦИЯ ПЕРСОН (предки, потомки, братья/сёстры, супруги) ===
+         visible_after_center = {}
+         if self.model.current_center:
+@@ -1407,6 +1437,14 @@ class FamilyTreeApp:
+             filtered_visible[pid] = coords
+ 
+         self.visible_persons_in_coords = filtered_visible
++        
++        # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
++        total_persons = len(self.model.persons)
++        visible_persons = len(self.visible_persons_in_coords)
++        if total_persons == visible_persons:
++            self.counter_label.config(text=f"Персон: {total_persons}")
++        else:
++            self.counter_label.config(text=f"Персон: {total_persons} (видимо: {visible_persons})")
+ 
+         # === ОТРИСОВКА СВЯЗЕЙ РОДИТЕЛИ → ДЕТИ (середина линии родителей → общая линия детей → верх карточки ребёнка, скругления) ===
+         def _key_in_vis(pid):

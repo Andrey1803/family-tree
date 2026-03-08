@@ -57,3 +57,6 @@ build/
 "FamilyTree_v1.*/"  
 "FamilyTree_*/"  
 "*.pyc"  
+"FamilyTree_*/"  
+"*.db"  
+"*.txt"  

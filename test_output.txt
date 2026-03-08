@@ -1,0 +1,221 @@
+============================================================
+SBOR INFORMATSII O PRILOZHENII
+============================================================
+
+1. Fail app.py: D:\Мои документы\Рабочий стол\hobby\Projects\Family tree\Дерево\app.py
+
+2. Proverka koda add_sibling_dialog:
+   [OK] btn_frame создан (stroka 16 iz 204)
+   [OK] btn_frame.pack() naiden (stroka 17)
+   Kontekst: # СНАЧАЛА создаем кнопки внизу (чтобы они были размещены первыми и не перекрывались)
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # === Фрейм для прокрутки (после кнопок, чтобы не перекрывать их) ===
+   [OK] Knopka 'Soхранit'' naidena (stroka 194)
+
+3. Poriadok sozdaniia vidzhetov v add_sibling_dialog:
+   1. dialog = tk.Toplevel(self.root)
+   2. btn_frame = ttk.Frame(dialog)
+   3. scroll_container = ttk.Frame(dialog)
+
+4. Testirovanie vidimosti knopok:
+[APP.__INIT__] MARRIAGE_LINE_COLOR = #f97316
+[APP.__INIT__] CANVAS_BG = #f1f5f9
+[DEBUG] __init__: data_file=data/family_tree_Андрей Емельянов.json, actual=data/family_tree_Андрей Емельянов.json
+[DEBUG] __init__: model.data_file=data/family_tree_Андрей Емельянов.json
+[APP.__INIT__] Загружено 42 персон, 14 браков
+[APPLY_UI_COLORS] MARRIAGE_LINE_COLOR = #f97316
+[APPLY_UI_COLORS] PARENT_LINE_COLOR = #3b82f6
+[APPLY_UI_COLORS] CANVAS_BG = #f1f5f9
+[REFRESH] skip_layout=False, units до delete=0, coords=0
+[REFRESH] После delete all, units=0, coords=0
+[DEBUG] marriages из модели: {('1', '4'): {'date': ''}, ('2', '3'): {'date': ''}, ('6', '7'): {'date': ''}, ('10', '8'): {'date': ''}, ('20', '9'): {'date': ''}, ('12', '22'): {'date': ''}, ('13', '14'): {'date': ''}, ('15', '16'): {'date': ''}, ('15', '17'): {'date': ''}, ('25', '29'): {'date': ''}, ('26', '27'): {'date': ''}, ('28', '35'): {'date': ''}, ('33', '37'): {'date': ''}, ('40', '41'): {'date': ''}}
+[DEBUG] model.persons count: 42
+[DEBUG] model.marriages count: 14
+[DEBUG] 1 (Андрей Николаевич Емельянов): spouse_ids={'4'}
+[DEBUG] 2 (Николаей Андреевич Емельянов): spouse_ids={'3'}
+[DEBUG] 3 (Тамара Флоровна Емельянов): spouse_ids={'2'}
+[DEBUG] 4 (Наталья Юрьевна Емельянова): spouse_ids={'1'}
+[DEBUG] 6 (Юра Тимофеевич Юркевич): spouse_ids={'7'}
+[DEBUG] 7 (Светлана Владимировна Юркевич): spouse_ids={'6'}
+[DEBUG] 8 (Андрей Иванович Емельянов): spouse_ids={'10'}
+[DEBUG] 9 (Егор Андрейевич Емельянов): spouse_ids={'20'}
+[DEBUG] 10 (Ганна Ефимовнна Емельянова): spouse_ids={'8'}
+[DEBUG] 12 (Сергей Николаейевич Емельянов): spouse_ids={'22'}
+[DEBUG] 13 (Тимофеей Юркевич): spouse_ids={'14'}
+[DEBUG] 14 (Анна-Галина Юркевич): spouse_ids={'13'}
+[DEBUG] 15 (Анна Тимофеевна Фёдорова): spouse_ids={'16', '17'}
+[DEBUG] 16 (Александр Николаевич Федоров): spouse_ids={'15'}
+[DEBUG] 17 (Владимир Юшкевич): spouse_ids={'15'}
+[DEBUG] 20 (Галина Емельянова): spouse_ids={'9'}
+[DEBUG] 22 (Галина Емельянова): spouse_ids={'12'}
+[DEBUG] 25 (Виктор Николаейевич Емельянов): spouse_ids={'29'}
+[DEBUG] 26 (Ирина Николаейевна Баглай): spouse_ids={'27'}
+[DEBUG] 27 (Николай Анатольевич Баглай): spouse_ids={'26'}
+[DEBUG] 28 (Юлия Николаевна Баглай): spouse_ids={'35'}
+[DEBUG] 29 (Светлана Емельянова): spouse_ids={'25'}
+[DEBUG] 33 (Артем Николаевич Баглай): spouse_ids={'37'}
+[DEBUG] 35 (Дмитрий Владимирович Звонкович): spouse_ids={'28'}
+[DEBUG] 37 (Евгения Баглай): spouse_ids={'33'}
+[DEBUG] 40 (Флор Адамович Емельянов): spouse_ids={'41'}
+[DEBUG] 41 (Клавдия Дешкович): spouse_ids={'40'}
+[DEBUG] Персон с супругами: 27
+[DEBUG] skip_centering=False, очищаем units перед пересчётом
+[DEBUG] Загружено браков из модели: 14
+[DEBUG] filtered_persons: 42
+[DEBUG] units перед циклом: 0
+[DEBUG] filtered_persons 7 (Светлана Владимировна Юркевич): spouse_ids={'6'}
+[DEBUG] filtered_persons 40 (Флор Адамович Емельянов): spouse_ids={'41'}
+[DEBUG] filtered_persons 1 (Андрей Николаевич Емельянов): spouse_ids={'4'}
+[DEBUG] filtered_persons 22 (Галина Емельянова): spouse_ids={'12'}
+[DEBUG] filtered_persons 35 (Дмитрий Владимирович Звонкович): spouse_ids={'28'}
+[DEBUG] filtered_persons 12 (Сергей Николаейевич Емельянов): spouse_ids={'22'}
+[DEBUG] filtered_persons 8 (Андрей Иванович Емельянов): spouse_ids={'10'}
+[DEBUG] filtered_persons 13 (Тимофеей Юркевич): spouse_ids={'14'}
+[DEBUG] filtered_persons 4 (Наталья Юрьевна Емельянова): spouse_ids={'1'}
+[DEBUG] filtered_persons 29 (Светлана Емельянова): spouse_ids={'25'}
+[DEBUG] filtered_persons 9 (Егор Андрейевич Емельянов): spouse_ids={'20'}
+[DEBUG] filtered_persons 25 (Виктор Николаейевич Емельянов): spouse_ids={'29'}
+[DEBUG] filtered_persons 41 (Клавдия Дешкович): spouse_ids={'40'}
+[DEBUG] filtered_persons 33 (Артем Николаевич Баглай): spouse_ids={'37'}
+[DEBUG] filtered_persons 6 (Юра Тимофеевич Юркевич): spouse_ids={'7'}
+[DEBUG] filtered_persons 3 (Тамара Флоровна Емельянов): spouse_ids={'2'}
+[DEBUG] filtered_persons 20 (Галина Емельянова): spouse_ids={'9'}
+[DEBUG] filtered_persons 15 (Анна Тимофеевна Фёдорова): spouse_ids={'16', '17'}
+[DEBUG] filtered_persons 2 (Николаей Андреевич Емельянов): spouse_ids={'3'}
+[DEBUG] filtered_persons 17 (Владимир Юшкевич): spouse_ids={'15'}
+[DEBUG] filtered_persons 37 (Евгения Баглай): spouse_ids={'33'}
+[DEBUG] filtered_persons 27 (Николай Анатольевич Баглай): spouse_ids={'26'}
+[DEBUG] filtered_persons 14 (Анна-Галина Юркевич): spouse_ids={'13'}
+[DEBUG] filtered_persons 28 (Юлия Николаевна Баглай): spouse_ids={'35'}
+[DEBUG] filtered_persons 26 (Ирина Николаейевна Баглай): spouse_ids={'27'}
+[DEBUG] filtered_persons 16 (Александр Николаевич Федоров): spouse_ids={'15'}
+[DEBUG] filtered_persons 10 (Ганна Ефимовнна Емельянова): spouse_ids={'8'}
+[DEBUG] Персон с супругами в filtered_persons: 27
+[DEBUG] Добавлен брак 1_4: ['1', '4']
+[DEBUG] Добавлен брак 10_8: ['8', '10']
+[DEBUG] Добавлен брак 12_22: ['12', '22']
+[DEBUG] Добавлен брак 13_14: ['13', '14']
+[DEBUG] Добавлен брак 15_16: ['16', '15']
+[DEBUG] Добавлен брак 15_17: ['17', '15']
+[DEBUG] Добавлен брак 2_3: ['2', '3']
+[DEBUG] Добавлен брак 20_9: ['9', '20']
+[DEBUG] Добавлен брак 25_29: ['25', '29']
+[DEBUG] Добавлен брак 26_27: ['27', '26']
+[DEBUG] Добавлен брак 28_35: ['35', '28']
+[DEBUG] Добавлен брак 33_37: ['33', '37']
+[DEBUG] Добавлен брак 40_41: ['40', '41']
+[DEBUG] Добавлен брак 6_7: ['6', '7']
+[DEBUG] units после цикла: 14
+[DEBUG] Сформировано units: 14
+[DEBUG]   1_4: ['1', '4']
+[DEBUG]   10_8: ['8', '10']
+[DEBUG]   12_22: ['12', '22']
+[DEBUG]   13_14: ['13', '14']
+[DEBUG]   15_16: ['16', '15']
+[MARRIAGE] Отрисовка линий: units=14, visible=12, coords=12
+[MARRIAGE] skip_layout=False, current_center=4
+[MARRIAGE] Unit 1_4: members=['1', '4'], in_coords=['1', '4'], in_visible=['1', '4']
+[MARRIAGE] Unit 10_8: members=['8', '10'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 12_22: members=['12', '22'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 13_14: members=['13', '14'], in_coords=['13', '14'], in_visible=['13', '14']
+[MARRIAGE] Unit 15_16: members=['16', '15'], in_coords=['16', '15'], in_visible=['16', '15']
+[MARRIAGE] Unit 15_17: members=['17', '15'], in_coords=['17', '15'], in_visible=['17', '15']
+[MARRIAGE] Unit 2_3: members=['2', '3'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 20_9: members=['9', '20'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 25_29: members=['25', '29'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 26_27: members=['27', '26'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 28_35: members=['35', '28'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 33_37: members=['33', '37'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 40_41: members=['40', '41'], in_coords=[], in_visible=[]
+[MARRIAGE] Unit 6_7: members=['6', '7'], in_coords=['6', '7'], in_visible=['6', '7']
+[MARRIAGE_LINE] Цвет: #f97316, Ширина: 3.0
+[MARRIAGE] WARNING: супруги ['8', '10'] из unit 10_8 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 8 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 10_8: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['12', '22'] из unit 12_22 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 12 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 12_22: не все супруги видимы (all_visible=False)
+[MARRIAGE_LINE] Цвет: #f97316, Ширина: 3.0
+[MARRIAGE_LINE] Цвет: #f97316, Ширина: 3.0
+[MARRIAGE_LINE] Цвет: #f97316, Ширина: 3.0
+[MARRIAGE] WARNING: супруги ['2', '3'] из unit 2_3 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 2 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 2_3: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['9', '20'] из unit 20_9 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 9 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 20_9: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['25', '29'] из unit 25_29 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 25 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 25_29: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['27', '26'] из unit 26_27 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 27 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 26_27: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['35', '28'] из unit 28_35 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 35 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 28_35: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['33', '37'] из unit 33_37 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 33 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 33_37: не все супруги видимы (all_visible=False)
+[MARRIAGE] WARNING: супруги ['40', '41'] из unit 40_41 НЕ в visible_persons_in_coords!
+[MARRIAGE] visible_persons_in_coords ключи: ['13', '14', '16', '17', '15', '18', '19', '6', '7', '1']
+[MARRIAGE] Супруг 40 не найден в visible_persons_in_coords через _key_in_vis
+[MARRIAGE] Пропущен брак 40_41: не все супруги видимы (all_visible=False)
+[MARRIAGE_LINE] Цвет: #f97316, Ширина: 3.0
+[DEBUG] Нарисовано линий супругов: 5
+   Testovaia persona: Андрей Николаевич Емельянов (ID: 1)
+
+   Dialog:
+   - winfo_ismapped(): 1
+   - winfo_width(): 500
+   - winfo_height(): 450
+
+   btn_frame:
+   - winfo_ismapped(): 0
+   - winfo_x(): 0
+   - winfo_y(): 0
+   - winfo_width(): 1
+   - winfo_height(): 1
+
+   scroll_container:
+   - winfo_ismapped(): 0
+   - winfo_y(): 0
+   - winfo_height(): 1
+
+   Кнопка 'Сохранить':
+   - winfo_ismapped(): 0
+   - winfo_x(): 0
+   - winfo_y(): 0
+
+   Позиционирование:
+   - btn_frame.y = 0
+   - scroll_container.y = 0
+   - scroll_container.height = 1
+   - scroll_container.bottom = 1
+   [ERR] Knopki PEREKRYVAIUTSIA skroll-oblastiu!
+
+   Дерево виджетов диалога:
+   Toplevel: x=130, y=130, w=500, h=450, mapped=1
+     Frame: x=0, y=0, w=1, h=1, mapped=0
+       Button: x=0, y=0, w=1, h=1, mapped=0
+       Button: x=0, y=0, w=1, h=1, mapped=0
+     Frame: x=0, y=0, w=1, h=1, mapped=0
+       Canvas: x=0, y=0, w=1, h=1, mapped=0
+         Frame: x=0, y=0, w=238, h=41, mapped=1
+           Frame: x=0, y=0, w=238, h=41, mapped=1
+             Label: x=10, y=11, w=32, h=19, mapped=1
+             Entry: x=42, y=10, w=186, h=21, mapped=1
+       Scrollbar: x=0, y=0, w=1, h=1, mapped=0
+
+============================================================
+TEST ZAVERSHEN
+============================================================

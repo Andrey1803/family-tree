@@ -1,0 +1,8 @@
+# Railway / Nixpacks: сборка из корня репозитория
+# Сборка веб-приложения (web/requirements.txt)
+
+[phases.setup]
+nixPkgs = ["python312"]
+
+[phases.install]
+cmds = ["python -m pip install -r web/requirements.txt"]

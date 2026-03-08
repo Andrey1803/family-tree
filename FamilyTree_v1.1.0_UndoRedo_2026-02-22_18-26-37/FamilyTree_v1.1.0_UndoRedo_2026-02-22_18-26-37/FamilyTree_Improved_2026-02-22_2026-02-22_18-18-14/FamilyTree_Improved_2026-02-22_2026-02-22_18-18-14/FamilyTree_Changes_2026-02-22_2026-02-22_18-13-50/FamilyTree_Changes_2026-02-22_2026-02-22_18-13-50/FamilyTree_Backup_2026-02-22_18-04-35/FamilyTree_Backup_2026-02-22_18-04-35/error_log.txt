@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "d:\Мои документы\Рабочий стол\hobby\Projects\Family tree\main.py", line 51, in <module>
+    runpy.run_path(os.path.join(_inner, "main.py"), run_name="__main__")
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "d:\Мои документы\Рабочий стол\hobby\Projects\Family tree\Дерево\main.py", line 17, in <module>
+    from app import FamilyTreeApp
+  File "D:\Мои документы\Рабочий стол\hobby\Projects\Family tree\Дерево\app.py", line 420
+    # statusbar �����
+                ^
+SyntaxError: Non-UTF-8 code starting with '\xf3' on line 420, but no encoding declared; see https://peps.python.org/pep-0263/ for details

@@ -1,0 +1,8 @@
+# Nixpacks для веб-приложения
+# Railway: Root Directory = web
+
+[phases.setup]
+nixPkgs = ["python312"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]

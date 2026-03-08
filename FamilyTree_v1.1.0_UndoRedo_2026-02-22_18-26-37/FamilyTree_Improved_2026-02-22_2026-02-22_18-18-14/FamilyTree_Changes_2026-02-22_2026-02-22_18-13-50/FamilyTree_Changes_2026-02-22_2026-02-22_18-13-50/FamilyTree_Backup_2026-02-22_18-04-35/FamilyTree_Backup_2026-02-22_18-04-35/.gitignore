@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtualenv
+venv/
+.venv/
+env/
+
+# PyInstaller (сборка .exe)
+dist/
+build/
+*.manifest
+*.spec.bak
+*.spec~
+
+# Релизные архивы (создаются scripts/create_release_zip)
+Семейное_древо_*_source.zip
+
+# Данные пользователя (создаются при работе, см. docs/DATA.md)
+users.json
+family_tree*.json
+user_settings*.json
+login_remember.json
+palette.json
+window_settings.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug / temp
+*.log
+*.tmp

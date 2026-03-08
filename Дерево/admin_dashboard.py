@@ -16,10 +16,29 @@ class AdminDashboard:
         self.root = root
         self.server_url = server_url
         self.admin_token = admin_token
-        
+
         self.root.title("👑 Админ-панель")
         self.root.geometry("1200x800")
         
+        # Проверяем, тёмная ли тема
+        import constants
+        is_dark_theme = getattr(constants, 'WINDOW_BG', '#f8f9fa').lower() in ['#1e293b', '#0f172a', '#1a1a2e', '#16213e', '#2d3748', '#1a202c', '#2c3e50']
+        
+        if is_dark_theme:
+            self.root.configure(bg='#1e293b')
+            style = ttk.Style()
+            style.theme_use('clam')
+            style.configure('.', background='#1e293b', foreground='#ffffff')
+            style.configure('TLabel', background='#1e293b', foreground='#ffffff')
+            style.configure('TButton', background='#334155', foreground='#ffffff', font=('Arial', 10, 'bold'))
+            style.configure('TEntry', fieldbackground='#334155', foreground='#ffffff')
+            style.configure('Treeview', background='#1e293b', foreground='#ffffff', fieldbackground='#1e293b')
+            style.configure('Treeview.Heading', background='#334155', foreground='#ffffff')
+            style.configure('TNotebook', background='#1e293b')
+            style.configure('TNotebook.Tab', background='#334155', foreground='#ffffff')
+            style.map('TNotebook.Tab', background=[('selected', '#475569')])
+            style.map('TButton', background=[('active', '#475568'), ('pressed', '#1e293b')])
+
         self.create_ui()
         self.load_stats()
     

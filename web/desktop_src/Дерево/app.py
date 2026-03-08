@@ -2164,7 +2164,7 @@ class FamilyTreeApp:
             self.refresh_view()
             messagebox.showinfo("Успех", f"Персона добавлена с ID: {new_id}")
 
-        ttk.Button(btn_frame, text="Добавить", command=submit, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Сохранить", command=submit, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
         # Фокус на поле имени
@@ -3259,7 +3259,7 @@ class FamilyTreeApp:
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=20)
 
-        ttk.Button(btn_frame, text="Создать", command=submit).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Сохранить", command=submit).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
         # Фокус на поле имени
@@ -3458,7 +3458,7 @@ class FamilyTreeApp:
             elif mode_var.get() == "Create":
                 create_new_spouse_and_marriage()
 
-        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=10)
+        ttk.Button(button_frame, text="Сохранить", command=on_ok).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
     def remove_marriage_from_edit(self, pid, dialog_window):
