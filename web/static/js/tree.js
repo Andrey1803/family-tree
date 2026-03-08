@@ -260,11 +260,35 @@ function render() {
 
     const persons = treeData.persons || {};
     const ids = Object.keys(persons);
-    
+
     console.log('[RENDER] persons count:', ids.length);
     console.log('[RENDER] centerId:', centerId);
     console.log('[RENDER] treeData:', treeData);
+
+    // === СОЗДАЁМ panZoomWrapper ВСЕГДА (даже для пустого дерева) ===
+    const totalW = Math.max(window.innerWidth * 2, 2000);
+    const totalH = Math.max(window.innerHeight * 2, 2000);
     
+    const wrap = document.createElement("div");
+    wrap.className = "tree-wrap";
+    wrap.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
+
+    const zoomContainer = document.createElement("div");
+    zoomContainer.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
+
+    const panZoomWrapper = document.createElement("div");
+    panZoomWrapper.className = "tree-pan-zoom";
+    panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
+
+    panZoomWrapper.appendChild(zoomContainer);
+    zoomContainer.appendChild(wrap);
+    root.appendChild(panZoomWrapper);
+
+    // Вешаем события НА ВСЕГДА (работает и на пустом поле)
+    setupPan(wrap, panZoomWrapper);
+    setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
+    // ================================================================
+
     if (ids.length === 0) {
         console.log('[RENDER] No persons, showing empty message');
         emptyMsg.style.display = "block";
@@ -777,8 +801,6 @@ function render() {
     });
     console.log('[MARRIAGE] Total lines drawn:', marriageLinesDrawn);
 
-    setupPan(wrap, panZoomWrapper);
-    setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
     updateStatusBar();
 }
 
@@ -1123,6 +1145,7 @@ function showContextMenu(pid, x, y, persons) {
             subWrap.appendChild(mainItem);
             const submenu = document.createElement("div");
             submenu.className = "cm-submenu tree-context-menu";
+            console.log('[CONTEXT_MENU] Creating submenu for', it.label, 'with', it.sub.length, 'items');
             it.sub.forEach((s) => {
                 const si = document.createElement("div");
                 si.className = "cm-item";
@@ -1134,10 +1157,15 @@ function showContextMenu(pid, x, y, persons) {
                 // Поддержка и touch и click для разных устройств
                 si.addEventListener('touchend', (e) => {
                     e.preventDefault(); // Предотвращаем двойное срабатывание
+                    console.log('[CONTEXT_MENU] touchend on', s.label);
                     s.action();
                     closeContextMenu();
                 }, {passive: false});
-                si.onclick = () => { s.action(); closeContextMenu(); };
+                si.onclick = () => { 
+                    console.log('[CONTEXT_MENU] onclick on', s.label);
+                    s.action(); 
+                    closeContextMenu(); 
+                };
                 submenu.appendChild(si);
             });
             subWrap.appendChild(submenu);
