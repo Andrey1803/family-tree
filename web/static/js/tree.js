@@ -441,8 +441,9 @@ function render() {
     const bounds = layout(rootId, 0, 0, CARD_W * 3) || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
-    const totalW = bounds.right - bounds.left + PAD * 2;
-    const totalH = bounds.bottom - bounds.top + PAD * 2;
+    // Пересчитываем totalW и totalH на основе реальных размеров дерева
+    totalW = bounds.right - bounds.left + PAD * 2;
+    totalH = bounds.bottom - bounds.top + PAD * 2;
 
     const panZoomWrapper = document.createElement("div");
     panZoomWrapper.className = "tree-pan-zoom";
