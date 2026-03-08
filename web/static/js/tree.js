@@ -126,25 +126,26 @@ function getZodiacSign(birthDateStr) {
 
 async function loadTree() {
     console.log('[LOAD_TREE] Starting to load tree...');
-    
+
     // Применяем палитру перед загрузкой
     loadPalette();
-    
-    // Сначала пробуем загрузить из backup в localStorage (для мобильных)
+
+    // Загружаем backup из localStorage (самая свежая локальная версия)
     const backup = localStorage.getItem('family_tree_backup');
+    let hasBackup = false;
     if (backup) {
         try {
             const backupData = JSON.parse(backup);
             if (backupData && backupData.persons && Object.keys(backupData.persons).length > 0) {
-                console.log('[LOAD_TREE] Loaded from backup:', Object.keys(backupData.persons).length, 'persons');
-                // Используем backup если сервер вернёт ошибку
+                console.log('[LOAD_TREE] Loaded backup:', Object.keys(backupData.persons).length, 'persons');
                 treeData = backupData;
+                hasBackup = true;
             }
         } catch (e) {
             console.warn('[LOAD_TREE] Backup parse error:', e);
         }
     }
-    
+
     const r = await fetch("/api/tree");
     console.log('[LOAD_TREE] Fetch response status:', r.status);
     if (r.status === 401) {
@@ -155,8 +156,8 @@ async function loadTree() {
     if (!r.ok) {
         console.error('[LOAD_TREE] Response not ok:', r.status);
         // Если сервер не ответил, используем backup
-        if (treeData && treeData.persons) {
-            console.log('[LOAD_TREE] Using backup data');
+        if (hasBackup) {
+            console.log('[LOAD_TREE] Using backup data (server error)');
             centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
             treeZoom = 0.5;
             treePanX = 0;
@@ -165,19 +166,27 @@ async function loadTree() {
         }
         return;
     }
-    treeData = await r.json();
-    console.log('[LOAD_TREE] Loaded treeData:', treeData);
-    console.log('[LOAD_TREE] Persons count:', Object.keys(treeData.persons || {}).length);
-    console.log('[LOAD_TREE] Marriages:', treeData.marriages);
-    console.log('[LOAD_TREE] Marriages type:', Array.isArray(treeData.marriages) ? 'array' : typeof treeData.marriages);
-    if (Array.isArray(treeData.marriages)) {
-        console.log('[LOAD_TREE] First marriage:', treeData.marriages[0]);
+    
+    const serverData = await r.json();
+    console.log('[LOAD_TREE] Loaded from server:', Object.keys(serverData.persons || {}).length, 'persons');
+    
+    // ВАЖНО: Если сервер вернул пустое дерево, а у нас есть backup - НЕ перезаписываем!
+    const serverPersonsCount = Object.keys(serverData.persons || {}).length;
+    const backupPersonsCount = hasBackup ? Object.keys(treeData.persons || {}).length : 0;
+    
+    if (serverPersonsCount === 0 && backupPersonsCount > 0) {
+        console.log('[LOAD_TREE] Server returned empty tree, keeping backup (', backupPersonsCount, 'persons)');
+        // Оставляем backup, не перезаписываем пустыми данными
+    } else {
+        // Сервер вернул данные - используем их
+        console.log('[LOAD_TREE] Using server data');
+        treeData = serverData;
+        // Сохраняем свежую версию в backup
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
+    
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId);
-
-    // Сохраняем свежую версию в backup
-    localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
 
     // Сбрасываем зум и панорамирование при загрузке
     treeZoom = 0.5;  // Уменьшенный начальный зум
@@ -1328,7 +1337,7 @@ function editPerson(pid) {
         const el = ov.querySelector("#ed-links-list");
         el.innerHTML = links.map((l, i) => `
             <div class="ed-row ed-links-row" data-idx="${i}">
-                <input type="text" class="ed-link-title" placeholder="Название" value="${escapeHtml(l.title)}">
+                <input type="text" class="ed-link-title" placeholder="Назва��ие" value="${escapeHtml(l.title)}">
                 <input type="text" class="ed-link-url" placeholder="URL" value="${escapeHtml(l.url)}">
                 <button type="button" class="btn-open-link" data-idx="${i}" title="Открыть">Открыть</button>
                 <button type="button" class="btn-remove" data-idx="${i}">✕</button>
