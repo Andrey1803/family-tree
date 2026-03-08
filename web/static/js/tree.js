@@ -126,6 +126,22 @@ function getZodiacSign(birthDateStr) {
 
 async function loadTree() {
     console.log('[LOAD_TREE] Starting to load tree...');
+    
+    // Сначала пробуем загрузить из backup в localStorage (для мобильных)
+    const backup = localStorage.getItem('family_tree_backup');
+    if (backup) {
+        try {
+            const backupData = JSON.parse(backup);
+            if (backupData && backupData.persons && Object.keys(backupData.persons).length > 0) {
+                console.log('[LOAD_TREE] Loaded from backup:', Object.keys(backupData.persons).length, 'persons');
+                // Используем backup если сервер вернёт ошибку
+                treeData = backupData;
+            }
+        } catch (e) {
+            console.warn('[LOAD_TREE] Backup parse error:', e);
+        }
+    }
+    
     const r = await fetch("/api/tree");
     console.log('[LOAD_TREE] Fetch response status:', r.status);
     if (r.status === 401) {
@@ -135,6 +151,15 @@ async function loadTree() {
     }
     if (!r.ok) {
         console.error('[LOAD_TREE] Response not ok:', r.status);
+        // Если сервер не ответил, используем backup
+        if (treeData && treeData.persons) {
+            console.log('[LOAD_TREE] Using backup data');
+            centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
+            treeZoom = 0.5;
+            treePanX = 0;
+            treePanY = 0;
+            render();
+        }
         return;
     }
     treeData = await r.json();
@@ -147,14 +172,17 @@ async function loadTree() {
     }
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId);
-    
+
+    // Сохраняем свежую версию в backup
+    localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+
     // Сбрасываем зум и панорамирование при загрузке
     treeZoom = 0.5;  // Уменьшенный начальный зум
     treePanX = 0;
     treePanY = 0;
-    
+
     render();
-    
+
     // Центрируем дерево после рендеринга
     setTimeout(() => {
         const root = document.getElementById("tree-root");
@@ -162,11 +190,11 @@ async function loadTree() {
         if (wrap) {
             const rootRect = root.getBoundingClientRect();
             const wrapRect = wrap.getBoundingClientRect();
-            
+
             // Центрируем по центру экрана
             treePanX = (rootRect.width - wrapRect.width * treeZoom) / 2;
             treePanY = (rootRect.height - wrapRect.height * treeZoom) / 2;
-            
+
             const panZoomWrapper = root.querySelector(".tree-pan-zoom");
             if (panZoomWrapper) {
                 panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
@@ -418,24 +446,39 @@ function render() {
         
         // Долгий тап для мобильных (1 секунда)
         let longPressTimer;
+        let touchStartTime;
+        
         card.addEventListener("touchstart", (e) => {
             if (e.touches.length !== 1) return;
             card._longPressFired = false;
             const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            
             longPressTimer = setTimeout(() => {
-                if (window._treeDidPan) return; // панорамирование — не показываем меню
+                const touchDuration = Date.now() - touchStartTime;
+                // Проверяем, что палец всё ещё на экране и не было панорамирования
+                if (window._treeDidPan || touchDuration < 900) return;
+                
                 card._longPressFired = true;
-                e.preventDefault();
+                // Показываем меню с вибрацией (если поддерживается)
+                if (navigator.vibrate) navigator.vibrate(50);
                 showContextMenu(pid, tx, ty, persons);
             }, 1000); // 1 секунда для долгого тапа
         }, { passive: true });
+
+        card.addEventListener("touchend", (e) => {
+            clearTimeout(longPressTimer);
+            // Предотвращаем клик если был долгий тап
+            if (card._longPressFired && e.cancelable) {
+                e.preventDefault();
+            }
+        });
         
-        card.addEventListener("touchend", () => clearTimeout(longPressTimer));
         card.addEventListener("touchcancel", () => clearTimeout(longPressTimer));
         wrap.appendChild(card);
     });
 
-    // Закрытие контекстного меню при клике вне его области
+    // Закрытие контекстного меню при клике/тапе вне его области
     document.addEventListener('click', function closeMenuOnClick(e) {
         if (window._ctxMenu) {
             const menu = window._ctxMenu;
@@ -447,7 +490,20 @@ function render() {
                 closeContextMenu();
             }
         }
-    });
+    }, true); // Используем capture phase для надёжности
+    
+    // Закрытие меню при тапе вне его (для мобильных)
+    document.addEventListener('touchend', function closeMenuOnTouch(e) {
+        if (window._ctxMenu) {
+            const menu = window._ctxMenu;
+            const isTouchInsideMenu = menu.contains(e.target);
+            const isTouchOnCard = e.target.closest('.tree-card');
+            
+            if (!isTouchInsideMenu && !isTouchOnCard) {
+                closeContextMenu();
+            }
+        }
+    }, true);
 
     // Рисуем линии ПОСЛЕ карточек (чтобы они были поверх)
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -2973,3 +3029,34 @@ function showWelcomeDialog() {
     document.body.appendChild(ov);
     ov.querySelector("#welcome-name").focus();
 }
+
+// === АВТОСОХРАНЕНИЕ ПРИ ЗАКРЫТИИ СТРАНИЦЫ (важно для мобильных) ===
+let saveTimeout = null;
+
+// Сохраняем дерево при закрытии/обновлении страницы
+window.addEventListener('beforeunload', (e) => {
+    // Сохраняем в localStorage для быстрого восстановления
+    if (treeData && treeData.persons) {
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+        console.log('[AUTO-SAVE] Saved to localStorage at', new Date().toLocaleTimeString());
+    }
+});
+
+// Сохранение при уходе в фон (mobile)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        // Пользователь свернул браузер или перешёл на другую вкладку
+        if (treeData && treeData.persons) {
+            localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+            console.log('[AUTO-SAVE] Saved on visibilitychange at', new Date().toLocaleTimeString());
+        }
+    }
+});
+
+// Периодическое автосохранение каждые 30 секунд
+setInterval(() => {
+    if (treeData && treeData.persons && Object.keys(treeData.persons).length > 0) {
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+        console.log('[AUTO-SAVE] Periodic save at', new Date().toLocaleTimeString());
+    }
+}, 30000);
