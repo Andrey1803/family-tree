@@ -127,6 +127,9 @@ function getZodiacSign(birthDateStr) {
 async function loadTree() {
     console.log('[LOAD_TREE] Starting to load tree...');
     
+    // Применяем палитру перед загрузкой
+    loadPalette();
+    
     // Сначала пробуем загрузить из backup в localStorage (для мобильных)
     const backup = localStorage.getItem('family_tree_backup');
     if (backup) {
@@ -853,18 +856,29 @@ function setupPan(wrap, panZoomWrapper) {
 }
 
 function setCenterAndSave(pid) {
-            centerId = pid;
-            treeData.current_center = pid;
+    centerId = pid;
+    treeData.current_center = pid;
     saveTree();
     render();
 }
 
-function saveTree() {
-            fetch("/api/tree", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(treeData),
-            });
+async function saveTree() {
+    // Сохраняем в localStorage сразу (для мобильных)
+    if (treeData && treeData.persons) {
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+    }
+    
+    // Отправляем на сервер
+    try {
+        await fetch("/api/tree", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(treeData),
+        });
+        console.log('[SAVE] Tree saved successfully at', new Date().toLocaleTimeString());
+    } catch (e) {
+        console.error('[SAVE] Error:', e);
+    }
 }
 
 function showContextMenu(pid, x, y, persons) {
@@ -1517,7 +1531,7 @@ function deletePerson(pid) {
 function addFirstPerson() {
     // Сохраняем состояние перед добавлением
     if (window.undoManager) window.undoManager.beforeAddPerson(treeData);
-    
+
     const ov = document.createElement("div");
     ov.className = "tree-modal-overlay";
     ov.innerHTML = `
@@ -1546,11 +1560,13 @@ function addFirstPerson() {
         </div>`;
     ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     ov.querySelector(".cancel").onclick = () => ov.remove();
-    ov.querySelector(".save").onclick = () => {
+    
+    ov.querySelector(".save").onclick = async () => {
         const name = ov.querySelector("#fp-name").value.trim();
         const surname = ov.querySelector("#fp-surname").value.trim();
         if (!name) { alert("Введите имя."); return; }
         if (!surname) { alert("Введите фамилию."); return; }
+        
         const numIds = Object.keys(treeData.persons).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
         const newId = numIds.length ? String(Math.max(...numIds) + 1) : "1";
         const np = {
@@ -1565,7 +1581,9 @@ function addFirstPerson() {
         treeData.persons[newId] = np;
         centerId = newId;
         treeData.current_center = newId;
-        saveTree();
+        
+        // Ждём сохранения перед закрытием
+        await saveTree();
         ov.remove();
         render();
     };
@@ -2824,7 +2842,7 @@ if ("serviceWorker" in navigator) {
 // Инициализация менеджера отмены/повтора
 window.undoManager = new UndoManager(50);
 
-loadPalette();
+// Палитра применяется в loadTree()
 
 // ПРОВЕРЯЕМ admin_view ПЕРЕД загрузкой дерева!
 const urlParamsCheck = new URLSearchParams(window.location.search);
