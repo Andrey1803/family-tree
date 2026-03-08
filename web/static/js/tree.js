@@ -1360,7 +1360,7 @@ async function editPerson(pid) {
                         return `<div class="ed-family-item ed-spouse-row" data-spouse-id="${escapeHtml(String(s))}">
                             <span class="spouse-name">${escapeHtml(displayName(s))}</span>
                             <input type="text" class="spouse-date" placeholder="Дата брака (ДД.ММ.ГГГГ)" value="${escapeHtml(marriageDate)}" data-spouse="${escapeHtml(String(s))}">
-                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��я��ь">✕</button>
+                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��я����ь">✕</button>
                         </div>`;
                     }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
@@ -3102,10 +3102,20 @@ if (isAdminViewCheck) {
     loadTree();
 }
 
-setupMenubar();
-setupDesktopAppButtons();
-setupUndoRedo();
-setupAdminButton();
+// Вызываем после загрузки DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setupMenubar();
+        setupDesktopAppButtons();
+        setupUndoRedo();
+        setupAdminButton();
+    });
+} else {
+    setupMenubar();
+    setupDesktopAppButtons();
+    setupUndoRedo();
+    setupAdminButton();
+}
 
 // Проверка режима просмотра из админ-панели (после инициализации)
 if (isAdminViewCheck) {
