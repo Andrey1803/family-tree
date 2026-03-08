@@ -1,12 +1,1 @@
-{
-  "users": {
-    "testuser": "$2b$12$OpbQexrGE/jFDtFOaot0UOML3QgJXCh3sHJBujZazM5RygHhD1yWy",
-    "Емельянов Андрей": "da5ebb24051038266f017f3be493f6565ba492f15b17d5695cdf8ac76d4d5083",
-    "йцу": "bb170032781219f2eda3bb011fb833b53739aed882eebf3b1942511baf2d1975",
-    "фыва": "ee3d6599386bab86fab0ba3c92fa77390da1bd9ffdf1218c4135077ce3b32327",
-    "Андрей Емельянов": {
-      "password": "27199b75eb8b4953e74a10ea43c702a5906a7cc9b779ee169ec9e2c28edc7c1e",
-      "is_admin": true
-    }
-  }
-}
+{"users": [{"username": "admin", "password": "admin", "role": "admin"}]} 
