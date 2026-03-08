@@ -1360,7 +1360,7 @@ async function editPerson(pid) {
                         return `<div class="ed-family-item ed-spouse-row" data-spouse-id="${escapeHtml(String(s))}">
                             <span class="spouse-name">${escapeHtml(displayName(s))}</span>
                             <input type="text" class="spouse-date" placeholder="Дата брака (ДД.ММ.ГГГГ)" value="${escapeHtml(marriageDate)}" data-spouse="${escapeHtml(String(s))}">
-                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��я����ь">✕</button>
+                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��я������ь">✕</button>
                         </div>`;
                     }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
@@ -3090,40 +3090,41 @@ window.undoManager = new UndoManager(50);
 const urlParamsCheck = new URLSearchParams(window.location.search);
 const isAdminViewCheck = urlParamsCheck.get('admin_view') === '1';
 
-if (isAdminViewCheck) {
-    // Для админ-просмотра НЕ загружаем дерево сразу - загрузим через checkAdminView
-    console.log('[INIT] Admin view detected, skipping initial loadTree()');
-    // Инициализируем пустое дерево
-    treeData = { persons: {}, marriages: [], current_center: null };
-    centerId = null;
-} else {
-    // Обычный режим - загружаем дерево пользователя
-    console.log('[INIT] Normal view, loading tree');
-    loadTree();
-}
-
-// Вызываем после загрузки DOM
+// Вызываем ПОСЛЕ загрузки DOM
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        setupMenubar();
-        setupDesktopAppButtons();
-        setupUndoRedo();
-        setupAdminButton();
+        initApp();
     });
 } else {
+    initApp();
+}
+
+function initApp() {
+    if (isAdminViewCheck) {
+        // Для админ-просмотра НЕ загружаем дерево сразу - загрузим через checkAdminView
+        console.log('[INIT] Admin view detected, skipping initial loadTree()');
+        // Инициализируем пустое дерево
+        treeData = { persons: {}, marriages: [], current_center: null };
+        centerId = null;
+    } else {
+        // Обычный режим - загружаем дерево пользователя
+        console.log('[INIT] Normal view, loading tree');
+        loadTree();
+    }
+
     setupMenubar();
     setupDesktopAppButtons();
     setupUndoRedo();
     setupAdminButton();
-}
 
-// Проверка режима просмотра из админ-панели (после инициализации)
-if (isAdminViewCheck) {
-    checkAdminView();
-}
+    // Проверка режима просмотра из админ-панели (после инициализации)
+    if (isAdminViewCheck) {
+        checkAdminView();
+    }
 
-// Проверка первого запуска
-checkFirstRun();
+    // Проверка первого запуска
+    checkFirstRun();
+}
 
 async function checkAdminView() {
     // Проверяем, открыли ли дерево из адм��н-панели
