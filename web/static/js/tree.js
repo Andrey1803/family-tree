@@ -478,6 +478,7 @@ function render() {
         let hasMoved = false;
         
         card.addEventListener("touchstart", (e) => {
+            console.log('[CARD] touchstart on', pid, 'touches:', e.touches.length);
             // Реагируем ТОЛЬКО на один палец
             if (e.touches.length !== 1) {
                 clearTimeout(longPressTimer);
@@ -768,8 +769,9 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     // Pinch zoom (mobile)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     let pinchStartTime = 0;
-    
+
     panZoomWrapper.addEventListener("touchstart", (e) => {
+        console.log('[PINCH] touchstart, touches:', e.touches.length);
         if (e.touches.length === 2) {
             pinchStartTime = Date.now();
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
@@ -778,6 +780,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             // Вычисляем центр между двумя пальцами относительно viewport
             pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
             pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+            console.log('[PINCH] Started dist:', pinchDist0, 'zoom:', zoom0);
         }
     }, { passive: true });
 
@@ -879,7 +882,8 @@ function setupPan(wrap, panZoomWrapper) {
             stopTouchPan();
             return;
         }
-        e.preventDefault();
+        // preventDefault только если действительно панорамируем
+        if (active) e.preventDefault();
         const t = e.touches[0];
         window._treeDidPan = true;
         treePanX = startPanX + t.clientX - startX;
@@ -902,9 +906,9 @@ function setupPan(wrap, panZoomWrapper) {
         startPan(e.clientX, e.clientY);
     });
     viewport.addEventListener("touchstart", (e) => {
-        // Начинаем pan только если 1 палец и не было недавнего double-tap
+        // Начинаем pan только если 1 палец
         if (e.touches.length !== 1) return;
-        e.preventDefault(); // важно для iOS: блокируем браузерный скролл, чтобы pan работал
+        // НЕ делаем preventDefault - позволяем событиям проходить к карточкам
         const t = e.touches[0];
         startX = t.clientX;
         startY = t.clientY;
@@ -915,7 +919,7 @@ function setupPan(wrap, panZoomWrapper) {
         document.addEventListener("touchmove", onTouchMove, { passive: false });
         document.addEventListener("touchend", onTouchEnd);
         document.addEventListener("touchcancel", onTouchEnd);
-    }, { passive: false });
+    }, { passive: true });
 }
 
 function setCenterAndSave(pid) {
@@ -1333,7 +1337,7 @@ function editPerson(pid) {
                 <h3>Выберите супруга(у)</h3>
                 <div class="pick-list" id="pick-spouse-list"></div>
                 <div class="tree-modal-btns">
-                    <button type="button" class="cancel">Отмена</button>
+                    <button type="button" class="cancel">О��мена</button>
                 </div>
             </div>`;
         const listEl = pickOv.querySelector("#pick-spouse-list");
