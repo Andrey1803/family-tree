@@ -809,12 +809,12 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
         applyZoom(treeZoom * factor, cx, cy);
     }, { passive: false });
 
-    // Pinch zoom (mobile)
+    // Pinch zoom (mobile) - вешаем на panZoomWrapper (работает и на пустом поле)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     let pinchStartTime = 0;
 
     panZoomWrapper.addEventListener("touchstart", (e) => {
-        console.log('[PINCH] touchstart, touches:', e.touches.length);
+        console.log('[PINCH] touchstart on wrapper, touches:', e.touches.length);
         if (e.touches.length === 2) {
             pinchStartTime = Date.now();
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
@@ -823,7 +823,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             // Вычисляем центр между двумя пальцами относительно viewport
             pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
             pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-            console.log('[PINCH] Started dist:', pinchDist0, 'zoom:', zoom0);
+            console.log('[PINCH] Started dist:', pinchDist0.toFixed(1), 'zoom:', zoom0.toFixed(2));
         }
     }, { passive: true });
 
@@ -949,9 +949,13 @@ function setupPan(wrap, panZoomWrapper) {
         startPan(e.clientX, e.clientY);
     });
     viewport.addEventListener("touchstart", (e) => {
+        console.log('[PAN] viewport touchstart, touches:', e.touches.length, 'target:', e.target.className);
         // Начинаем pan только если 1 палец
-        if (e.touches.length !== 1) return;
-        // НЕ делаем preventDefault - позволяем событиям проходить к карточкам
+        if (e.touches.length !== 1) {
+            console.log('[PAN] Ignored: touches=', e.touches.length);
+            return;
+        }
+        // НЕ делаем preventDefault - позволяем событиям проходить к карточкам и зуму
         const t = e.touches[0];
         startX = t.clientX;
         startY = t.clientY;
@@ -959,6 +963,7 @@ function setupPan(wrap, panZoomWrapper) {
         startPanY = treePanY;
         active = true;
         window._treeDidPan = false;
+        console.log('[PAN] Started at', startX, startY);
         document.addEventListener("touchmove", onTouchMove, { passive: false });
         document.addEventListener("touchend", onTouchEnd);
         document.addEventListener("touchcancel", onTouchEnd);
