@@ -257,9 +257,9 @@ function render() {
     console.log('[RENDER] treeData:', treeData);
 
     // === СОЗДАЁМ panZoomWrapper ВСЕГДА (даже для пустого дерева) ===
-    const totalW = Math.max(window.innerWidth * 2, 2000);
-    const totalH = Math.max(window.innerHeight * 2, 2000);
-    
+    let totalW = Math.max(window.innerWidth * 2, 2000);
+    let totalH = Math.max(window.innerHeight * 2, 2000);
+
     const wrap = document.createElement("div");
     wrap.className = "tree-wrap";
     wrap.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
@@ -1360,7 +1360,7 @@ async function editPerson(pid) {
                         return `<div class="ed-family-item ed-spouse-row" data-spouse-id="${escapeHtml(String(s))}">
                             <span class="spouse-name">${escapeHtml(displayName(s))}</span>
                             <input type="text" class="spouse-date" placeholder="Дата брака (ДД.ММ.ГГГГ)" value="${escapeHtml(marriageDate)}" data-spouse="${escapeHtml(String(s))}">
-                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��язь">✕</button>
+                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��я��ь">✕</button>
                         </div>`;
                     }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
