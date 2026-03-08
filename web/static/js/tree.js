@@ -1711,11 +1711,12 @@ async function editPerson(pid) {
             p.spouse_dates = spouseDates;
         }
 
-        await saveTree(true);  // Сохраняем с уведомлением
-        ov.remove();
-        render();
-        const savedName = [p.name, p.patronymic, p.surname].filter(Boolean).join(" ");
-        alert(`Данные персоны «${savedName}» сохранены.`);
+        saveTree(true).then(() => {
+            ov.remove();
+            render();
+            const savedName = [p.name, p.patronymic, p.surname].filter(Boolean).join(" ");
+            alert(`Данные персоны «${savedName}» сохранены.`);
+        });
     };
     document.body.appendChild(ov);
 }
@@ -1805,11 +1806,12 @@ function addFirstPerson() {
         treeData.persons[newId] = np;
         centerId = newId;
         treeData.current_center = newId;
-        
+
         // Ждём сохранения перед закрытием
-        await saveTree(true);  // Показываем уведомление
-        ov.remove();
-        render();
+        saveTree(true).then(() => {
+            ov.remove();
+            render();
+        });
     };
     document.body.appendChild(ov);
 }
