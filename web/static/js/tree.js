@@ -256,30 +256,6 @@ function render() {
     console.log('[RENDER] centerId:', centerId);
     console.log('[RENDER] treeData:', treeData);
 
-    // === СОЗДАЁМ panZoomWrapper ВСЕГДА (даже для пустого дерева) ===
-    let totalW = Math.max(window.innerWidth * 2, 2000);
-    let totalH = Math.max(window.innerHeight * 2, 2000);
-
-    const wrap = document.createElement("div");
-    wrap.className = "tree-wrap";
-    wrap.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
-
-    let zoomContainer = document.createElement("div");
-    zoomContainer.style.cssText = `position:absolute; left:0; top:0; width:${totalW}px; height:${totalH}px;`;
-
-    let panZoomWrapper = document.createElement("div");
-    panZoomWrapper.className = "tree-pan-zoom";
-    panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
-
-    panZoomWrapper.appendChild(zoomContainer);
-    zoomContainer.appendChild(wrap);
-    root.appendChild(panZoomWrapper);
-
-    // Вешаем события НА ВСЕГДА (работает и на пустом поле)
-    setupPan(wrap, panZoomWrapper);
-    setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
-    // ================================================================
-
     if (ids.length === 0) {
         console.log('[RENDER] No persons, showing empty message');
         emptyMsg.style.display = "block";
@@ -441,27 +417,29 @@ function render() {
     const bounds = layout(rootId, 0, 0, CARD_W * 3) || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
-    // Пересчитываем totalW и totalH на основе реальных размеров дерева
-    totalW = bounds.right - bounds.left + PAD * 2;
-    totalH = bounds.bottom - bounds.top + PAD * 2;
+    // Вычисляем размеры на основе реальных размеров дерева
+    const totalW = bounds.right - bounds.left + PAD * 2;
+    const totalH = bounds.bottom - bounds.top + PAD * 2;
 
-    // Пересоздаём структуру для дерева с персонами
-    root.innerHTML = "";
-    
-    panZoomWrapper = document.createElement("div");
+    // Создаём структуру для дерева
+    const panZoomWrapper = document.createElement("div");
     panZoomWrapper.className = "tree-pan-zoom";
     panZoomWrapper.style.cssText = `position:absolute; left:0; top:0; transform:translate(${treePanX}px,${treePanY}px);`;
     root.appendChild(panZoomWrapper);
 
-    zoomContainer = document.createElement("div");
+    const zoomContainer = document.createElement("div");
     zoomContainer.className = "tree-zoom-container";
     zoomContainer.style.cssText = `position:relative; width:${totalW * treeZoom}px; height:${totalH * treeZoom}px;`;
     panZoomWrapper.appendChild(zoomContainer);
 
-    wrap = document.createElement("div");
+    const wrap = document.createElement("div");
     wrap.className = "tree-wrap";
     wrap.style.cssText = `position:relative; width:${totalW}px; height:${totalH}px; transform:scale(${treeZoom}); transform-origin:0 0;`;
     zoomContainer.appendChild(wrap);
+
+    // Вешаем события
+    setupPan(wrap, panZoomWrapper);
+    setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
 
     // Сначала рисуем карточки
     Object.entries(coords).forEach(([pid, pos]) => {
@@ -2668,7 +2646,7 @@ function showAboutDeveloper() {
                 <p><strong>📞 Телефон:</strong> <a href="tel:+375291472108">+375 29 147-21-08</a></p>
                 <p><strong>📧 Email:</strong> <a href="mailto:familyroots010326@gmail.com">familyroots010326@gmail.com</a></p>
                 <hr>
-                <p>Приложение создано для удобного построения и визуализации семейных генеалогических деревьев с возможностью экспорта, резервного копирования и работы в веб-интерфейсе.</p>
+                <p>Приложение со��дано для удобного построения и визуализации семейных генеалогических деревьев с возможностью экспорта, резервного копирования и работы в веб-интерфейсе.</p>
             </div>
             <div class="tree-modal-btns">
                 <button type="button" class="cancel">Закрыть</button>
