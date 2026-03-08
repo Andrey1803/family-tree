@@ -130,22 +130,24 @@ async function loadTree() {
     // Применяем палитру перед загрузкой
     loadPalette();
 
-    // Загружаем backup из localStorage (самая свежая локальная версия)
+    // Загружаем backup из localStorage (локальная версия)
     const backup = localStorage.getItem('family_tree_backup');
-    let hasBackup = false;
+    let localData = null;
     if (backup) {
         try {
-            const backupData = JSON.parse(backup);
-            if (backupData && backupData.persons && Object.keys(backupData.persons).length > 0) {
-                console.log('[LOAD_TREE] Loaded backup:', Object.keys(backupData.persons).length, 'persons');
-                treeData = backupData;
-                hasBackup = true;
+            localData = JSON.parse(backup);
+            if (localData && localData.persons && Object.keys(localData.persons).length > 0) {
+                console.log('[LOAD_TREE] Local backup:', Object.keys(localData.persons).length, 'persons');
+            } else {
+                localData = null;
             }
         } catch (e) {
             console.warn('[LOAD_TREE] Backup parse error:', e);
+            localData = null;
         }
     }
 
+    // Загружаем данные с сервера
     const r = await fetch("/api/tree");
     console.log('[LOAD_TREE] Fetch response status:', r.status);
     if (r.status === 401) {
@@ -155,9 +157,10 @@ async function loadTree() {
     }
     if (!r.ok) {
         console.error('[LOAD_TREE] Response not ok:', r.status);
-        // Если сервер не ответил, используем backup
-        if (hasBackup) {
-            console.log('[LOAD_TREE] Using backup data (server error)');
+        // Если сервер не ответил, используем локальные данные
+        if (localData) {
+            console.log('[LOAD_TREE] Using local data (server error)');
+            treeData = localData;
             centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
             treeZoom = 0.5;
             treePanX = 0;
@@ -168,28 +171,66 @@ async function loadTree() {
     }
     
     const serverData = await r.json();
-    console.log('[LOAD_TREE] Loaded from server:', Object.keys(serverData.persons || {}).length, 'persons');
-    
-    // ВАЖНО: Если сервер вернул пустое дерево, а у нас есть backup - НЕ перезаписываем!
     const serverPersonsCount = Object.keys(serverData.persons || {}).length;
-    const backupPersonsCount = hasBackup ? Object.keys(treeData.persons || {}).length : 0;
+    const localPersonsCount = localData ? Object.keys(localData.persons || {}).length : 0;
     
-    if (serverPersonsCount === 0 && backupPersonsCount > 0) {
-        console.log('[LOAD_TREE] Server returned empty tree, keeping backup (', backupPersonsCount, 'persons)');
-        // Оставляем backup, не перезаписываем пустыми данными
-    } else {
-        // Сервер вернул данные - используем их
-        console.log('[LOAD_TREE] Using server data');
+    console.log('[LOAD_TREE] Server:', serverPersonsCount, 'persons, Local:', localPersonsCount, 'persons');
+    
+    // === ЛОГИКА СИНХРОНИЗАЦИИ ===
+    
+    // 1. Если сервер пустой, а локально есть данные - оставляем локальные
+    if (serverPersonsCount === 0 && localPersonsCount > 0) {
+        console.log('[SYNC] Server empty, keeping local data');
+        treeData = localData;
+    }
+    // 2. Если локально пусто, а сервер вернул данные - используем сервер
+    else if (serverPersonsCount > 0 && localPersonsCount === 0) {
+        console.log('[SYNC] Local empty, using server data');
         treeData = serverData;
-        // Сохраняем свежую версию в backup
-        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+    }
+    // 3. Если есть и там и там - ОБЪЕДИНЯЕМ (добавляем недостающее с сервера)
+    else if (serverPersonsCount > 0 && localPersonsCount > 0) {
+        console.log('[SYNC] Merging data...');
+        
+        // Берём сервер за основу
+        treeData = serverData;
+        
+        // Добавляем локальные персоны которых нет на сервере
+        let addedCount = 0;
+        for (const [localId, localPerson] of Object.entries(localData.persons)) {
+            if (!serverData.persons[localId]) {
+                treeData.persons[localId] = localPerson;
+                addedCount++;
+            }
+        }
+        
+        // Добавляем локальные браки которых нет на сервере
+        if (localData.marriages && localData.marriages.length > 0) {
+            const serverMarriagesJson = JSON.stringify(serverData.marriages || []);
+            for (const marriage of (localData.marriages || [])) {
+                const marriageJson = JSON.stringify(marriage);
+                if (!serverMarriagesJson.includes(marriageJson)) {
+                    treeData.marriages.push(marriage);
+                }
+            }
+        }
+        
+        console.log('[SYNC] Added', addedCount, 'local persons to server data');
+    }
+    // 4. Если оба пустые - оставляем как есть
+    else {
+        console.log('[SYNC] Both empty');
+        treeData = {persons: {}, marriages: [], current_center: null};
     }
     
+    // Сохраняем объединённые данные в backup
+    localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+    
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
-    console.log('[LOAD_TREE] centerId:', centerId);
+    console.log('[LOAD_TREE] centerId:', centerId, 'total persons:', Object.keys(treeData.persons).length);
 
     // Сбрасываем зум и панорамирование при загрузке
-    treeZoom = 0.5;  // Уменьшенный начальный зум
+    treeZoom = 0.5;
     treePanX = 0;
     treePanY = 0;
 
@@ -202,16 +243,12 @@ async function loadTree() {
         if (wrap) {
             const rootRect = root.getBoundingClientRect();
             const wrapRect = wrap.getBoundingClientRect();
-
-            // Центрируем по центру экрана
             treePanX = (rootRect.width - wrapRect.width * treeZoom) / 2;
             treePanY = (rootRect.height - wrapRect.height * treeZoom) / 2;
-
             const panZoomWrapper = root.querySelector(".tree-pan-zoom");
             if (panZoomWrapper) {
                 panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
             }
-            console.log('[LOAD_TREE] Centered: panX=', treePanX, 'panY=', treePanY);
         }
     }, 100);
 }
@@ -1307,7 +1344,7 @@ function editPerson(pid) {
             const hasPreview = (path || "").trim().startsWith("data:image/");
             return `
             <div class="ed-row ed-album-row" data-idx="${i}">
-                ${hasPreview ? `<img src="${path}" alt="" class="ed-album-thumb" onerror="this.style.display='none'">` : '<span class="ed-album-no-thumb">Нет превью</span>'}
+                ${hasPreview ? `<img src="${path}" alt="" class="ed-album-thumb" onerror="this.style.display='none'">` : '<span class="ed-album-no-thumb">Нет превь����</span>'}
                 <input type="text" class="ed-album-path" value="${escapeHtml(path)}" placeholder="Путь или base64">
                 <label class="btn-browse">Обзор
                     <input type="file" class="ed-album-file" data-idx="${i}" accept="image/*" style="display:none">
@@ -3185,11 +3222,18 @@ window.addEventListener('beforeunload', (e) => {
         console.log('[AUTO-SAVE] Saved to localStorage');
     }
     
+    // ЗАЩИТА: Не отправляем пустое дерево на сервер!
+    const personsCount = treeData && treeData.persons ? Object.keys(treeData.persons).length : 0;
+    if (personsCount === 0) {
+        console.log('[AUTO-SAVE] Skipping server save - tree is empty');
+        return;
+    }
+    
     // Отправляем на сервер используя sendBeacon (работает даже при закрытии)
-    if (treeData && treeData.persons && Object.keys(treeData.persons).length > 0) {
+    if (personsCount > 0) {
         const blob = new Blob([JSON.stringify(treeData)], {type: 'application/json'});
         navigator.sendBeacon('/api/tree', blob);
-        console.log('[AUTO-SAVE] Sent to server via sendBeacon');
+        console.log('[AUTO-SAVE] Sent to server via sendBeacon:', personsCount, 'persons');
     }
 });
 
@@ -3197,6 +3241,14 @@ window.addEventListener('beforeunload', (e) => {
 document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'hidden') {
         console.log('[AUTO-SAVE] visibilitychange hidden at', new Date().toLocaleTimeString());
+        
+        // ЗАЩИТА: Не сохраняем пустое дерево!
+        const personsCount = treeData && treeData.persons ? Object.keys(treeData.persons).length : 0;
+        if (personsCount === 0) {
+            console.log('[AUTO-SAVE] Skipping save - tree is empty');
+            return;
+        }
+        
         // Пользователь свернул браузер или перешёл на другую вкладку
         if (treeData && treeData.persons) {
             // Сохраняем в localStorage
@@ -3211,7 +3263,7 @@ document.addEventListener('visibilitychange', async () => {
                     body: JSON.stringify(treeData),
                     keepalive: true  // Важно: запрос выполнится даже если страница закроется
                 });
-                console.log('[AUTO-SAVE] Sent to server');
+                console.log('[AUTO-SAVE] Sent to server:', personsCount, 'persons');
             } catch (e) {
                 console.warn('[AUTO-SAVE] Server save failed:', e);
             }
@@ -3221,7 +3273,14 @@ document.addEventListener('visibilitychange', async () => {
 
 // Периодическое автосохранение каждые 30 секунд
 setInterval(() => {
-    if (treeData && treeData.persons && Object.keys(treeData.persons).length > 0) {
+    const personsCount = treeData && treeData.persons ? Object.keys(treeData.persons).length : 0;
+    
+    // ЗАЩИТА: Не сохраняем пустое дерево!
+    if (personsCount === 0) {
+        return;
+    }
+    
+    if (treeData && treeData.persons && personsCount > 0) {
         // Сохраняем в localStorage
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
         
@@ -3232,7 +3291,7 @@ setInterval(() => {
             body: JSON.stringify(treeData),
             keepalive: true
         }).then(() => {
-            console.log('[AUTO-SAVE] Periodic save to server at', new Date().toLocaleTimeString());
+            console.log('[AUTO-SAVE] Periodic save to server at', new Date().toLocaleTimeString(), ':', personsCount, 'persons');
         }).catch(e => {
             console.warn('[AUTO-SAVE] Periodic save failed:', e);
         });
