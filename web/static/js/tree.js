@@ -173,49 +173,40 @@ async function loadTree() {
     const serverData = await r.json();
     const serverPersonsCount = Object.keys(serverData.persons || {}).length;
     const localPersonsCount = localData ? Object.keys(localData.persons || {}).length : 0;
-    
+
     console.log('[LOAD_TREE] Server:', serverPersonsCount, 'persons, Local:', localPersonsCount, 'persons');
-    
+
     // === ЛОГИКА СИНХРОНИЗАЦИИ ===
-    
-    // 1. Если сервер пустой, а локально есть данные - оставляем локальные
+
+    // 1. Если сервер пустой, а локально есть данные - НЕ перезаписываем локальные!
     if (serverPersonsCount === 0 && localPersonsCount > 0) {
-        console.log('[SYNC] Server empty, keeping local data');
+        console.log('[SYNC] Server empty, KEEPING local data (DO NOT OVERWRITE)');
         treeData = localData;
+        // Сохраняем обратно в localStorage чтобы не потерять
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
     // 2. Если локально пусто, а сервер вернул данные - используем сервер
     else if (serverPersonsCount > 0 && localPersonsCount === 0) {
         console.log('[SYNC] Local empty, using server data');
         treeData = serverData;
+        // Сохраняем в localStorage
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
-    // 3. Если есть и там и там - ОБЪЕДИНЯЕМ (добавляем недостающее с сервера)
+    // 3. Если есть и там и там - БЕРЁМ БОЛЬШЕЕ из двух
     else if (serverPersonsCount > 0 && localPersonsCount > 0) {
-        console.log('[SYNC] Merging data...');
+        console.log('[SYNC] Both have data, using LARGER dataset...');
         
-        // Берём сервер за основу
-        treeData = serverData;
-        
-        // Добавляем локальные персоны которых нет на сервере
-        let addedCount = 0;
-        for (const [localId, localPerson] of Object.entries(localData.persons)) {
-            if (!serverData.persons[localId]) {
-                treeData.persons[localId] = localPerson;
-                addedCount++;
-            }
+        // Выбираем где больше персон
+        if (localPersonsCount > serverPersonsCount) {
+            console.log('[SYNC] Local has more persons, using local data');
+            treeData = localData;
+        } else {
+            console.log('[SYNC] Server has more/equal persons, using server data');
+            treeData = serverData;
         }
         
-        // Добавляем локальные браки которых нет на сервере
-        if (localData.marriages && localData.marriages.length > 0) {
-            const serverMarriagesJson = JSON.stringify(serverData.marriages || []);
-            for (const marriage of (localData.marriages || [])) {
-                const marriageJson = JSON.stringify(marriage);
-                if (!serverMarriagesJson.includes(marriageJson)) {
-                    treeData.marriages.push(marriage);
-                }
-            }
-        }
-        
-        console.log('[SYNC] Added', addedCount, 'local persons to server data');
+        // Сохраняем выбранное в localStorage
+        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
     // 4. Если оба пустые - оставляем как есть
     else {
@@ -1369,7 +1360,7 @@ async function editPerson(pid) {
                         return `<div class="ed-family-item ed-spouse-row" data-spouse-id="${escapeHtml(String(s))}">
                             <span class="spouse-name">${escapeHtml(displayName(s))}</span>
                             <input type="text" class="spouse-date" placeholder="Дата брака (ДД.ММ.ГГГГ)" value="${escapeHtml(marriageDate)}" data-spouse="${escapeHtml(String(s))}">
-                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить связь">✕</button>
+                            <button type="button" class="btn-remove-spouse" data-spouse="${escapeHtml(String(s))}" title="Удалить с��язь">✕</button>
                         </div>`;
                     }).join("") || '<div class="muted">— Нет</div>'}</div>
                     <button type="button" class="btn-add-row" id="ed-add-spouse">+ Добавить супруга</button>
