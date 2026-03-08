@@ -890,13 +890,15 @@ def api_admin_toggle_user(user_id):
 
 @app.route("/api/admin/user/<int:user_id>/delete", methods=["POST"])
 def api_admin_delete_user(user_id):
-    """Удалить пользователя (только супер-админ admin)."""
+    """Удалить пользователя (только супер-админ)."""
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    # Только супер-админ может удалять
-    if username != "admin":
+    
+    # Только супер-админы могут удалять
+    SUPER_ADMINS = ["admin", "Андрей Емельянов"]
+    if username not in SUPER_ADMINS:
         return jsonify({"error": "Только супер-админ может удалять пользователей"}), 403
 
     server_token = session.get('server_token')
