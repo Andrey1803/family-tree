@@ -1049,25 +1049,30 @@ def api_admin_all_trees():
                         print(f"[ADMIN] Error loading tree for {user_login}: {e}")
                 
                 return jsonify({"trees": trees})
-                
+
         except Exception as e:
             print(f"[ADMIN] Error loading from sync server: {e}")
             # Fallback на локальные данные
 
     # Локальные данные (fallback)
+    print("[ADMIN] Loading local trees as fallback...")
     try:
         users = _load_users()
+        print(f"[ADMIN] Loaded {len(users)} local users: {list(users.keys())}")
         trees = []
 
         for user_login in users.keys():
             # Пропускаем admin - у него нет дерева
             if user_login == "admin":
                 continue
-                
+
             try:
                 tree_data = load_tree(user_login)
                 persons = tree_data.get("persons", {})
                 marriages = tree_data.get("marriages", [])
+                persons_count = len(persons) if persons else 0
+
+                print(f"[ADMIN] User {user_login}: {persons_count} persons, {len(marriages)} marriages")
 
                 trees.append({
                     "id": hash(user_login) % 10000,
@@ -1082,6 +1087,7 @@ def api_admin_all_trees():
             except Exception as e:
                 print(f"[ADMIN] Error loading local tree for {user_login}: {e}")
 
+        print(f"[ADMIN] Total local trees: {len(trees)}")
         return jsonify({"trees": trees})
     except Exception as e:
         print(f"[ADMIN] Error loading local trees: {e}")
