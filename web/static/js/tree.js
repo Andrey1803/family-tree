@@ -859,9 +859,11 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
     let pinchStartTime = 0;
 
+    // Важно: используем capture phase чтобы перехватить события до карточек
     panZoomWrapper.addEventListener("touchstart", (e) => {
-        console.log('[PINCH] touchstart on wrapper, touches:', e.touches.length);
+        console.log('[PINCH] touchstart on wrapper, touches:', e.touches.length, 'target:', e.target.className);
         if (e.touches.length === 2) {
+            e.preventDefault(); // Блокируем скролл
             pinchStartTime = Date.now();
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             zoom0 = treeZoom;
@@ -871,7 +873,7 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
             console.log('[PINCH] Started dist:', pinchDist0.toFixed(1), 'zoom:', zoom0.toFixed(2));
         }
-    }, { passive: true });
+    }, { passive: false, capture: true });
 
     panZoomWrapper.addEventListener("touchmove", (e) => {
         if (e.touches.length === 2 && pinchDist0) {
@@ -891,7 +893,15 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
             pinchDist0 = dist;
             zoom0 = treeZoom; // Используем актуальный treeZoom после применения зума
         }
-    }, { passive: false });
+    }, { passive: false, capture: true });
+
+    panZoomWrapper.addEventListener("touchend", (e) => {
+        if (e.touches.length < 2) {
+            // Сбрасываем pinch переменные
+            pinchDist0 = null;
+            console.log('[PINCH] Ended');
+        }
+    }, { passive: true, capture: true });
 
     panZoomWrapper.addEventListener("touchend", (e) => {
         // Сначала проверяем pinch — если был, не делаем double-tap
@@ -1121,6 +1131,12 @@ function showContextMenu(pid, x, y, persons) {
                     si.style.color = s.color;
                     si.style.fontWeight = "500";
                 }
+                // Поддержка и touch и click для разных устройств
+                si.addEventListener('touchend', (e) => {
+                    e.preventDefault(); // Предотвращаем двойное срабатывание
+                    s.action();
+                    closeContextMenu();
+                }, {passive: false});
                 si.onclick = () => { s.action(); closeContextMenu(); };
                 submenu.appendChild(si);
             });
@@ -1130,6 +1146,12 @@ function showContextMenu(pid, x, y, persons) {
             const item = document.createElement("div");
             item.className = "cm-item";
             item.textContent = it.label;
+            // Поддержка и touch и click для разных устройств
+            item.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                it.action();
+                closeContextMenu();
+            }, {passive: false});
             item.onclick = () => { it.action(); closeContextMenu(); };
             menu.appendChild(item);
         }
