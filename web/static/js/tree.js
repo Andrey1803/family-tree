@@ -1337,7 +1337,7 @@ function editPerson(pid) {
         const el = ov.querySelector("#ed-links-list");
         el.innerHTML = links.map((l, i) => `
             <div class="ed-row ed-links-row" data-idx="${i}">
-                <input type="text" class="ed-link-title" placeholder="Назва��ие" value="${escapeHtml(l.title)}">
+                <input type="text" class="ed-link-title" placeholder="Назва����ие" value="${escapeHtml(l.title)}">
                 <input type="text" class="ed-link-url" placeholder="URL" value="${escapeHtml(l.url)}">
                 <button type="button" class="btn-open-link" data-idx="${i}" title="Открыть">Открыть</button>
                 <button type="button" class="btn-remove" data-idx="${i}">✕</button>
@@ -3177,20 +3177,44 @@ let saveTimeout = null;
 
 // Сохраняем дерево при закрытии/обновлении страницы
 window.addEventListener('beforeunload', (e) => {
+    console.log('[AUTO-SAVE] beforeunload triggered at', new Date().toLocaleTimeString());
+    
     // Сохраняем в localStorage для быстрого восстановления
     if (treeData && treeData.persons) {
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
-        console.log('[AUTO-SAVE] Saved to localStorage at', new Date().toLocaleTimeString());
+        console.log('[AUTO-SAVE] Saved to localStorage');
+    }
+    
+    // Отправляем на сервер используя sendBeacon (работает даже при закрытии)
+    if (treeData && treeData.persons && Object.keys(treeData.persons).length > 0) {
+        const blob = new Blob([JSON.stringify(treeData)], {type: 'application/json'});
+        navigator.sendBeacon('/api/tree', blob);
+        console.log('[AUTO-SAVE] Sent to server via sendBeacon');
     }
 });
 
 // Сохранение при уходе в фон (mobile)
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'hidden') {
+        console.log('[AUTO-SAVE] visibilitychange hidden at', new Date().toLocaleTimeString());
         // Пользователь свернул браузер или перешёл на другую вкладку
         if (treeData && treeData.persons) {
+            // Сохраняем в localStorage
             localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
-            console.log('[AUTO-SAVE] Saved on visibilitychange at', new Date().toLocaleTimeString());
+            console.log('[AUTO-SAVE] Saved to localStorage');
+            
+            // Отправляем на сервер
+            try {
+                await fetch('/api/tree', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(treeData),
+                    keepalive: true  // Важно: запрос выполнится даже если страница закроется
+                });
+                console.log('[AUTO-SAVE] Sent to server');
+            } catch (e) {
+                console.warn('[AUTO-SAVE] Server save failed:', e);
+            }
         }
     }
 });
@@ -3198,7 +3222,19 @@ document.addEventListener('visibilitychange', () => {
 // Периодическое автосохранение каждые 30 секунд
 setInterval(() => {
     if (treeData && treeData.persons && Object.keys(treeData.persons).length > 0) {
+        // Сохраняем в localStorage
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
-        console.log('[AUTO-SAVE] Periodic save at', new Date().toLocaleTimeString());
+        
+        // Отправляем на сервер
+        fetch('/api/tree', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(treeData),
+            keepalive: true
+        }).then(() => {
+            console.log('[AUTO-SAVE] Periodic save to server at', new Date().toLocaleTimeString());
+        }).catch(e => {
+            console.warn('[AUTO-SAVE] Periodic save failed:', e);
+        });
     }
 }, 30000);
