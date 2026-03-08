@@ -435,6 +435,30 @@ function render() {
             if (card._longPressFired) return;
             setCenterAndSave(pid);
         };
+        
+        // Двойной тап для мобильных (открытие редактирования)
+        let lastTapTime = 0;
+        let lastTapX = 0, lastTapY = 0;
+        
+        card.addEventListener("touchend", (e) => {
+            const currentTime = Date.now();
+            const touch = e.changedTouches[0];
+            const tapX = touch.clientX;
+            const tapY = touch.clientY;
+            
+            // Проверяем, что это второй тап за 300мс в той же области
+            if (currentTime - lastTapTime < 300 && 
+                Math.abs(tapX - lastTapX) < 30 && 
+                Math.abs(tapY - lastTapY) < 30) {
+                e.preventDefault();
+                if (!window._treeDidPan) {
+                    editPerson(pid);
+                }
+            }
+            lastTapTime = currentTime;
+            lastTapX = tapX;
+            lastTapY = tapY;
+        });
         card.ondblclick = (e) => {
             e.preventDefault();
             if (window._treeDidPan) return;
@@ -450,23 +474,38 @@ function render() {
         // Долгий тап для мобильных (1 секунда)
         let longPressTimer;
         let touchStartTime;
+        let touchStartX = 0, touchStartY = 0;
+        let hasMoved = false;
         
         card.addEventListener("touchstart", (e) => {
             if (e.touches.length !== 1) return;
             card._longPressFired = false;
             const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
+            touchStartX = tx;
+            touchStartY = ty;
             touchStartTime = Date.now();
+            hasMoved = false;
             
             longPressTimer = setTimeout(() => {
                 const touchDuration = Date.now() - touchStartTime;
-                // Проверяем, что палец всё ещё на экране и не было панорамирования
-                if (window._treeDidPan || touchDuration < 900) return;
+                // Проверяем, что палец не двигался и не было панорамирования
+                if (hasMoved || window._treeDidPan || touchDuration < 900) return;
                 
                 card._longPressFired = true;
                 // Показываем меню с вибрацией (если поддерживается)
                 if (navigator.vibrate) navigator.vibrate(50);
                 showContextMenu(pid, tx, ty, persons);
             }, 1000); // 1 секунда для долгого тапа
+        }, { passive: true });
+        
+        // Отслеживаем движение пальца
+        card.addEventListener("touchmove", (e) => {
+            const touch = e.touches[0];
+            const moveDistance = Math.hypot(touch.clientX - touchStartX, touch.clientY - touchStartY);
+            if (moveDistance > 10) { // Если палец сдвинулся больше чем на 10px
+                hasMoved = true;
+                clearTimeout(longPressTimer);
+            }
         }, { passive: true });
 
         card.addEventListener("touchend", (e) => {
@@ -707,8 +746,11 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
 
     // Pinch zoom (mobile)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
+    let pinchStartTime = 0;
+    
     panZoomWrapper.addEventListener("touchstart", (e) => {
         if (e.touches.length === 2) {
+            pinchStartTime = Date.now();
             pinchDist0 = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
             zoom0 = treeZoom;
             const rect = viewport.getBoundingClientRect();
