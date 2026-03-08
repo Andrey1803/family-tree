@@ -1055,16 +1055,25 @@ function setCenterAndSave(pid) {
     render();
 }
 
-async function saveTree() {
+async function saveTree(showNotification = false) {
     // Сохраняем в localStorage сразу (для мобильных)
     if (treeData && treeData.persons) {
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+    }
+
+    // Проверяем, есть ли что сохранять
+    const personsCount = treeData && treeData.persons ? Object.keys(treeData.persons).length : 0;
+    if (personsCount === 0) {
+        console.log('[SAVE] Skipping - tree is empty');
+        return;
     }
 
     // Отправляем на сервер с повторной попыткой
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+            console.log('[SAVE] Attempt', attempt, 'at', new Date().toLocaleTimeString());
+            
             const response = await fetch("/api/tree", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1073,28 +1082,36 @@ async function saveTree() {
             });
             
             if (response.ok) {
-                console.log('[SAVE] Tree saved successfully at', new Date().toLocaleTimeString());
-                // Показываем уведомление на мобильных
-                if (window.innerWidth <= 480) {
+                console.log('[SAVE] ✅ Success at', new Date().toLocaleTimeString());
+                
+                // Показываем уведомление
+                if (showNotification || window.innerWidth <= 480) {
                     const msg = document.createElement('div');
-                    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-                    msg.textContent = '✅ Дерево сохранено!';
+                    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
+                    msg.textContent = '✅ Дерево сохранено на сервере!';
                     document.body.appendChild(msg);
-                    setTimeout(() => msg.remove(), 3000);
+                    setTimeout(() => msg.remove(), 4000);
                 }
                 return;  // Успех
             } else {
-                console.error('[SAVE] Server returned error:', response.status, 'attempt', attempt);
+                console.error('[SAVE] ❌ Server error:', response.status, 'attempt', attempt);
             }
         } catch (e) {
-            console.error('[SAVE] Error:', e, 'attempt', attempt);
+            console.error('[SAVE] ❌ Network error:', e, 'attempt', attempt);
             if (attempt < maxRetries) {
                 await new Promise(resolve => setTimeout(resolve, 1000));  // Ждём 1 секунду
             }
         }
     }
     
-    console.error('[SAVE] Failed after', maxRetries, 'attempts');
+    console.error('[SAVE] ❌ Failed after', maxRetries, 'attempts');
+    
+    // Показываем ошибку
+    const msg = document.createElement('div');
+    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e74c3c;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
+    msg.textContent = '❌ Ошибка сохранения! Проверьте интернет.';
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 5000);
 }
 
 function showContextMenu(pid, x, y, persons) {
@@ -1269,7 +1286,7 @@ function viewPerson(pid) {
     alert(info);
 }
 
-function editPerson(pid) {
+async function editPerson(pid) {
     const persons = treeData.persons;
     const p = persons[pid];
     if (!p) return;
@@ -1720,8 +1737,8 @@ function editPerson(pid) {
         if (spouseDates.length > 0) {
             p.spouse_dates = spouseDates;
         }
-        
-        saveTree();
+
+        await saveTree(true);  // Сохраняем с уведомлением
         ov.remove();
         render();
         const savedName = [p.name, p.patronymic, p.surname].filter(Boolean).join(" ");
@@ -1817,7 +1834,7 @@ function addFirstPerson() {
         treeData.current_center = newId;
         
         // Ждём сохранения перед закрытием
-        await saveTree();
+        await saveTree(true);  // Показываем уведомление
         ov.remove();
         render();
     };
