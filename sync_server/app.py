@@ -303,16 +303,17 @@ def login():
     data = request.get_json()
     login = data.get('login', '').strip()
     password = data.get('password', '')
-    
+
     db = get_db()
     user = db.execute('SELECT id, password_hash FROM users WHERE login = ? AND is_active = 1', (login,)).fetchone()
-    
+
     if not user or not _verify_password(login, password, user['password_hash']):
+        print(f"[AUTH_LOGIN] FAILED for login='{login}'")
         return jsonify({'error': 'Неверный логин или пароль'}), 401
-    
+
     # Обновление времени последнего входа
     db.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', (user['id'],))
-    
+
     # Создание сессии
     session_token = secrets.token_urlsafe(32)
     db.execute(
@@ -320,7 +321,9 @@ def login():
         (user['id'], session_token, request.remote_addr, request.user_agent.string)
     )
     db.commit()
-    
+
+    print(f"[AUTH_LOGIN] SUCCESS for login='{login}', user_id={user['id']}, token={session_token[:10]}...")
+
     return jsonify({
         'token': session_token,
         'user_id': user['id'],
@@ -513,6 +516,10 @@ def sync_download():
     """Скачивание данных дерева с сервера."""
     db = get_db()
     
+    # Логирование для отладки проблемы с загрузкой чужого дерева
+    user_info = db.execute('SELECT login FROM users WHERE id = ?', (g.current_user_id,)).fetchone()
+    print(f"[SYNC_DOWNLOAD] user_id={g.current_user_id}, login={user_info['login'] if user_info else 'UNKNOWN'}")
+
     tree = db.execute(
         'SELECT id, name FROM family_trees WHERE user_id = ?',
         (g.current_user_id,)

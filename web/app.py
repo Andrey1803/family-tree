@@ -468,6 +468,28 @@ def api_session():
     login = data.get('login')
 
     if token:
+        # ВАЖНО: Сначала проверяем, что токен соответствует указанному login
+        try:
+            me_req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/auth/me",
+                headers={'Authorization': f'Bearer {token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(me_req, timeout=5) as me_resp:
+                me_data = json.loads(me_resp.read().decode())
+                server_login = me_data.get('login', '')
+                
+                # Если логин на сервере не совпадает с тем, что прислали — это ошибка!
+                if server_login != login:
+                    print(f"[SESSION] SECURITY VIOLATION: server_login='{server_login}' != provided login='{login}'")
+                    print(f"[SESSION] Rejecting session")
+                    return jsonify({"error": "Несоответствие пользователя"}), 401
+                
+                print(f"[SESSION] Login verified: {server_login}")
+        except Exception as e:
+            print(f"[SESSION] Could not verify login: {e}")
+            # Не блокируем вход, если проверка не прошла — продолжаем с осторожностью
+        
         session['server_token'] = token
         session['server_user_id'] = user_id
         if login:
@@ -636,7 +658,8 @@ def service_worker():
 
 @app.route("/logout")
 def logout():
-    session.pop("username", None)
+    """Выход из системы — полная очистка сессии."""
+    session.clear()  # Очищаем ВСЮ сессию, включая server_token
     return redirect(url_for("login"))
 
 
