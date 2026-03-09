@@ -45,3 +45,44 @@ WHERE u.id IS NULL;
 
 -- 6. Удалить осиротелые деревья
 -- DELETE FROM family_trees WHERE user_id NOT IN (SELECT id FROM users);
+
+-- ============================================
+-- ИСПРАВЛЕНИЕ: У всех новых пользователей
+-- открывается дерево Андрея (проблема с user_id=1)
+-- ============================================
+
+-- 7. ПРОВЕРКА: Показать всех пользователей и их деревья
+SELECT 
+    u.id as user_id,
+    u.login,
+    ft.id as tree_id,
+    ft.name as tree_name,
+    COUNT(p.id) as person_count
+FROM users u
+LEFT JOIN family_trees ft ON u.id = ft.user_id
+LEFT JOIN persons p ON p.tree_id = ft.id
+GROUP BY u.id, u.login, ft.id, ft.name
+ORDER BY u.id;
+
+-- 8. ПРОВЕРКА: Найти пользователей БЕЗ дерева (проблема!)
+SELECT u.id, u.login 
+FROM users u
+LEFT JOIN family_trees ft ON u.id = ft.user_id
+WHERE ft.id IS NULL;
+
+-- 9. ИСПРАВЛЕНИЕ: Создать пустые деревья для всех пользователей без дерева
+INSERT INTO family_trees (user_id, name)
+SELECT u.id, 'Дерево ' || u.login
+FROM users u
+LEFT JOIN family_trees ft ON u.id = ft.user_id
+WHERE ft.id IS NULL;
+
+-- 10. ПРОВЕРКА: Убедиться, что у всех есть деревья
+SELECT 
+    u.id as user_id,
+    u.login,
+    ft.id as tree_id,
+    ft.name as tree_name
+FROM users u
+INNER JOIN family_trees ft ON u.id = ft.user_id
+ORDER BY u.id;
