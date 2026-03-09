@@ -236,6 +236,8 @@ def auth_check(login: str, password: str) -> bool:
                 # Сохраняем токен в сессии
                 session['server_token'] = data['token']
                 session['server_user_id'] = data.get('user_id')
+                # ВАЖНО: устанавливаем username сразу, чтобы избежать загрузки чужого дерева
+                session['username'] = login_clean
                 print(f"[AUTH] Server login OK: {login_clean}")
                 return True
             elif data.get('error'):
@@ -1108,6 +1110,11 @@ def api_tree():
     print(f"[API_TREE] username repr={repr(username)}")
     print(f"[API_TREE] has_token={server_token is not None}, user_id={server_user_id}")
 
+    # ВАЖНО: Проверяем, что username установлен корректно
+    if not username or username.strip() == "":
+        print(f"[API_TREE] ERROR: username is empty or not set in session!")
+        return jsonify({"error": "Пользователь не авторизован"}), 401
+
     if request.method == "GET":
         # Для админа: проверяем, запрашивает ли он дерево конкретного пользователя
         tree_owner = request.args.get('tree_owner')
@@ -1163,6 +1170,31 @@ def api_tree():
         if server_token:
             try:
                 print(f"[API_TREE] Downloading from sync server...")
+                
+                # ВАЖНО: Сначала проверяем, что токен соответствует текущему пользователю
+                # Запрашиваем информацию о пользователе на сервере
+                try:
+                    me_req = urllib.request.Request(
+                        f"{SYNC_SERVER_URL}/api/auth/me",
+                        headers={'Authorization': f'Bearer {server_token}'},
+                        method='GET'
+                    )
+                    with urllib.request.urlopen(me_req, timeout=5) as me_resp:
+                        me_data = json.loads(me_resp.read().decode())
+                        server_login = me_data.get('login', '')
+                        print(f"[API_TREE] Server login: {server_login}, session username: {username}")
+                        
+                        # Если логин на сервере не совпадает с сессией — это ошибка!
+                        if server_login != username:
+                            print(f"[API_TREE] SECURITY: Server login '{server_login}' != session username '{username}'")
+                            print(f"[API_TREE] Clearing session and forcing re-login")
+                            # Очищаем сессию и требуем повторный вход
+                            session.clear()
+                            return jsonify({"error": "Сессия недействительна. Войдите снова."}), 401
+                except Exception as e:
+                    print(f"[API_TREE] Could not verify server login: {e}")
+                    # Если не удалось проверить, продолжаем с осторожностью
+                
                 req = urllib.request.Request(
                     f"{SYNC_SERVER_URL}/api/sync/download",
                     headers={'Authorization': f'Bearer {server_token}'},

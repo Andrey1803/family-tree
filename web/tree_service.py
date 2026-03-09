@@ -16,7 +16,13 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_data_path(username):
     """Путь к файлу дерева пользователя."""
-    safe = (username or "Гость").replace("..", "").strip() or "Гость"
+    # Очищаем имя пользователя от опасных символов
+    safe = (username or "Гость").strip()
+    # Заменяем опасные символы на подчёркивание
+    for char in ['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|', '\n', '\r']:
+        safe = safe.replace(char, '_')
+    # Если после очистки пусто — используем "Гость"
+    safe = safe or "Гость"
     path = os.path.join(DATA_DIR, f"family_tree_{safe}.json")
     print(f"[TREE_SERVICE] get_data_path: username='{username}', safe='{safe}', path='{path}'")
     return path

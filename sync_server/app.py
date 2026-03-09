@@ -327,6 +327,25 @@ def login():
         'expires_in': 86400  # 24 часа
     })
 
+
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def get_current_user():
+    """Получить информацию о текущем пользователе по токену."""
+    db = get_db()
+    user = db.execute('SELECT id, login, email, is_admin FROM users WHERE id = ?', (g.current_user_id,)).fetchone()
+    
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 404
+    
+    return jsonify({
+        'id': user['id'],
+        'login': user['login'],
+        'email': user['email'],
+        'is_admin': bool(user['is_admin'])
+    })
+
+
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
 def logout():
