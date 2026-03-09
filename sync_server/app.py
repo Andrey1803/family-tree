@@ -268,38 +268,52 @@ def require_admin(f):
 # === API АУТЕНТИФИКАЦИИ ===
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """Регистрация нового пользователя."""
+    """Регистрация нового пользователя с автоматическим созданием дерева."""
     data = request.get_json()
     login = data.get('login', '').strip()
     password = data.get('password', '')
     email = data.get('email', '').strip()
-    
+
     if not login or len(login) < 3:
         return jsonify({'error': 'Логин должен быть не менее 3 символов'}), 400
-    
+
     if not password or len(password) < 6:
         return jsonify({'error': 'Пароль должен быть не менее 6 символов'}), 400
-    
+
     db = get_db()
-    
+
     # Проверка существования
     existing = db.execute('SELECT id FROM users WHERE login = ?', (login,)).fetchone()
     if existing:
         return jsonify({'error': 'Пользователь с таким логином уже существует'}), 409
-    
+
     # Создание пользователя
     password_hash = _password_hash(login, password)
-    db.execute(
+    cursor = db.execute(
         'INSERT INTO users (login, password_hash, email) VALUES (?, ?, ?)',
         (login, password_hash, email)
     )
+    user_id = cursor.lastrowid
     db.commit()
     
+    print(f"[REGISTER] User created: login='{login}', user_id={user_id}")
+    
+    # АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ПУСТОГО ДЕРЕВА
+    try:
+        db.execute(
+            'INSERT INTO family_trees (user_id, name) VALUES (?, ?)',
+            (user_id, f'Дерево {login}')
+        )
+        db.commit()
+        print(f"[REGISTER] Tree created for user_id={user_id}")
+    except Exception as e:
+        print(f"[REGISTER] Warning: Could not create tree: {e}")
+
     return jsonify({'message': 'Пользователь успешно зарегистрирован'}), 201
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """Вход в систему."""
+    """Вход в систему с проверкой наличия дерева."""
     data = request.get_json()
     login = data.get('login', '').strip()
     password = data.get('password', '')
@@ -314,6 +328,18 @@ def login():
     # Обновление времени последнего входа
     db.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', (user['id'],))
 
+    # ПРОВЕРКА: Есть ли у пользователя дерево?
+    tree = db.execute('SELECT id FROM family_trees WHERE user_id = ?', (user['id'],)).fetchone()
+    if not tree:
+        # АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ПУСТОГО ДЕРЕВА ПРИ ВХОДЕ
+        print(f"[AUTH_LOGIN] No tree for user_id={user['id']}, creating empty tree...")
+        db.execute(
+            'INSERT INTO family_trees (user_id, name) VALUES (?, ?)',
+            (user['id'], f'Дерево {login}')
+        )
+        db.commit()
+        print(f"[AUTH_LOGIN] Tree created for user_id={user['id']}")
+
     # Создание сессии
     session_token = secrets.token_urlsafe(32)
     db.execute(
@@ -327,7 +353,8 @@ def login():
     return jsonify({
         'token': session_token,
         'user_id': user['id'],
-        'expires_in': 86400  # 24 часа
+        'expires_in': 86400,  # 24 часа
+        'has_tree': True  # Теперь дерево точно есть
     })
 
 
