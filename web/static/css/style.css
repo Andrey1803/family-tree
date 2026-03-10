@@ -1322,9 +1322,30 @@ body {
   /* Вкладки редактирования */
   .tree-edit-tabs {
     gap: 1px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
   .tree-edit-tabs .tab-btn {
-    padding: 4px 6px;
-    font-size: 0.75rem;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    min-width: max-content;
+  }
+  .tree-edit-tabs .tab-btn.active {
+    border-bottom-color: var(--card-male);
+  }
+  
+  /* Прокрутка для вкладок на мобильном */
+  @media (max-width: 480px) {
+    .tree-edit-tabs {
+      padding-bottom: 4px;
+    }
+    .tree-edit-tabs::-webkit-scrollbar {
+      height: 4px;
+    }
+    .tree-edit-tabs::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 2px;
+    }
   }
 }
