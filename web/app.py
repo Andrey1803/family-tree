@@ -964,25 +964,42 @@ def api_admin_delete_user(user_id):
         return jsonify({"error": "Не авторизован"}), 401
 
     username = session["username"]
-    
+
     # Только супер-админы могут удалять
     SUPER_ADMINS = ["admin", "Андрей Емельянов"]
     if username not in SUPER_ADMINS:
         return jsonify({"error": "Только супер-админ может удалять пользователей"}), 403
 
     server_token = session.get('server_token')
+    target_login = None
+    
+    # Сначала пытаемся удалить на сервере
     if server_token:
         try:
+            # Сначала получим логин пользователя для удаления локального файла
+            users_req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/admin/users",
+                headers={'Authorization': f'Bearer {server_token}'},
+                method='GET'
+            )
+            with urllib.request.urlopen(users_req, timeout=10) as users_resp:
+                users_data = json.loads(users_resp.read().decode())
+                users_list = users_data.get('users', [])
+                target_user = next((u for u in users_list if u.get('id') == user_id), None)
+                if target_user:
+                    target_login = target_user.get('login')
+            
+            # Теперь удаляем пользователя на сервере (вместе с деревьями!)
             req = urllib.request.Request(
                 f"{SYNC_SERVER_URL}/api/admin/user/{user_id}/delete",
                 headers={'Authorization': f'Bearer {server_token}'},
                 method='POST'
             )
             with urllib.request.urlopen(req, timeout=10) as response:
-                return jsonify({"message": "Пользователь удалён"})
+                print(f"[ADMIN] User {user_id} deleted from sync server")
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return jsonify({"error": "Пользователь не найден на сервере"}), 404
+                print(f"[ADMIN] User {user_id} not found on server")
             elif e.code == 403:
                 return jsonify({"error": "Нет прав для удаления на сервере"}), 403
             else:
@@ -990,26 +1007,39 @@ def api_admin_delete_user(user_id):
         except Exception as e:
             print(f"[ADMIN] Delete failed: {e}")
 
-    # Локальное удаление (если пользователь в users.json)
+    # Локальное удаление пользователя (если пользователь в users.json)
     users = _load_users()
     # Находим пользователя по ID (хеш от login)
-    target_login = None
-    for login, data in users.items():
-        if login == "admin":
-            continue
-        # Для локальных пользователей просто проверяем наличие
-        if hash(login) % 10000 == user_id:
-            target_login = login
-            break
-    
+    if not target_login:
+        for login, data in users.items():
+            if login == "admin":
+                continue
+            # Для локальных пользователей просто проверяем наличие
+            if hash(login) % 10000 == user_id:
+                target_login = login
+                break
+
     if target_login and target_login in users:
         del users[target_login]
         if _save_users(users):
-            return jsonify({"message": "Пользователь удалён локально"})
+            print(f"[ADMIN] User {target_login} deleted from users.json")
         else:
-            return jsonify({"error": "Ошибка сохранения"}), 500
+            print(f"[ADMIN] Failed to save users.json after deletion")
 
-    return jsonify({"error": "Пользователь не найден. Удаление работает только через сервер синхронизации."}), 404
+    # === ВАЖНО: Удаляем локальный файл дерева пользователя ===
+    if target_login:
+        try:
+            from tree_service import get_data_path
+            tree_path = get_data_path(target_login)
+            if os.path.exists(tree_path):
+                os.remove(tree_path)
+                print(f"[ADMIN] Deleted local tree file: {tree_path}")
+            else:
+                print(f"[ADMIN] Local tree file not found: {tree_path}")
+        except Exception as e:
+            print(f"[ADMIN] Error deleting local tree file: {e}")
+
+    return jsonify({"message": "Пользователь удалён"})
 
 
 @app.route("/api/admin/user/<int:user_id>/trees", methods=["GET"])
