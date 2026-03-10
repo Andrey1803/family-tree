@@ -416,6 +416,26 @@ function render() {
         const p = persons[pid];
         const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
         const kids = p.collapsed_branches ? [] : sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
+        
+        // === ПОЗИЦИОНИРОВАНИЕ РОДИТЕЛЕЙ (выше текущей персоны) ===
+        const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr] && !coords[pr]);
+        if (visibleParents.length > 0 && !coords[pid]) {
+            // Родители ещё не спозиционированы — позиционируем их выше
+            const parentY = y - LEVEL_HEIGHT;
+            const parentWidths = visibleParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
+            let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
+            for (let i = 0; i < visibleParents.length - 1; i++) totalParentW += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
+            
+            let parentX = x - totalParentW / 2;
+            visibleParents.forEach((pr, i) => {
+                const pw = parentWidths[i];
+                layout(pr, parentX, parentY, pw);
+                parentX += pw + (i < visibleParents.length - 1 ? gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]) : 0);
+            });
+        }
+        
+        // Если координаты уже есть — не перерисовываем
+        if (coords[pid]) return { left: x, right: x + w, top: y, bottom: y + CARD_H };
 
         const blockWidth = blockWidthOnly(p);
         const allocatedWidth = Math.max(w, blockWidth);
