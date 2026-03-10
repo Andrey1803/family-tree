@@ -291,7 +291,10 @@ function render() {
         console.log('[RENDER] No persons, showing empty message');
         emptyMsg.style.display = "block";
         const btn = document.getElementById("btn-add-first");
-        if (btn) btn.onclick = () => addFirstPerson();
+        if (btn) btn.onclick = (e) => {
+            e.stopPropagation(); // Предотвращаем закрытие контекстного меню
+            addFirstPerson();
+        };
         updateStatusBar();
         return;
     }
@@ -1233,7 +1236,13 @@ function showContextMenu(pid, x, y, persons) {
     document.body.appendChild(menu);
     window._ctxMenu = menu;
 
-    const close = () => {
+    const close = (e) => {
+        // НЕ закрываем меню если клик был по меню или по модальному окну
+        if (e && e.target) {
+            if (e.target.closest('.tree-context-menu')) return;
+            if (e.target.closest('.tree-modal')) return;
+            if (e.target.closest('.tree-modal-overlay')) return;
+        }
         closeContextMenu();
     };
     const removeListeners = () => {
