@@ -1353,6 +1353,8 @@ def api_tree():
     marriages = j.get("marriages", [])
     current_center = j.get("current_center")
     
+    print(f"[API_TREE_POST] Saving tree for {username}: {len(persons)} persons, {len(marriages)} marriages")
+
     # Сохраняем на сервер синхронизации
     if server_token:
         try:
@@ -1368,15 +1370,21 @@ def api_tree():
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 result = json.loads(response.read().decode())
+                print(f"[API_TREE_POST] Sync server response: {result}")
                 if result.get('success') or result.get('message'):
+                    print(f"[API_TREE_POST] ✅ Saved to sync server")
                     return jsonify({"ok": True})
         except Exception as e:
-            print(f"[WEB] Upload to sync server failed: {e}")
-    
+            print(f"[API_TREE_POST] ❌ Upload to sync server failed: {e}")
+
     # Fallback на локальный файл
+    print(f"[API_TREE_POST] Saving to local file...")
     out = {"persons": persons, "marriages": marriages, "current_center": current_center}
     if save_tree(username, out):
+        print(f"[API_TREE_POST] ✅ Saved to local file")
         return jsonify({"ok": True})
+    
+    print(f"[API_TREE_POST] ❌ Failed to save locally")
     return jsonify({"error": "Ошибка сохранения"}), 500
 
 

@@ -1092,7 +1092,9 @@ function setCenterAndSave(pid) {
 async function saveTree(showNotification = false) {
     // Сохраняем в localStorage сразу (для мобильных)
     if (treeData && treeData.persons) {
-        localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
+        // Сохраняем с username для идентификации
+        const backupData = {...treeData, _username: localStorage.getItem('family_tree_username') || 'unknown'};
+        localStorage.setItem('family_tree_backup', JSON.stringify(backupData));
     }
 
     // Проверяем, есть ли что сохранять
@@ -1107,6 +1109,8 @@ async function saveTree(showNotification = false) {
 
     // Отправляем на сервер с повторной попыткой
     const maxRetries = 3;
+    let serverSaved = false;
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log('[SAVE] Attempt', attempt, 'at', new Date().toLocaleTimeString());
@@ -1119,13 +1123,21 @@ async function saveTree(showNotification = false) {
             });
 
             if (response.ok) {
-                console.log('[SAVE] ✅ Success at', new Date().toLocaleTimeString());
+                const result = await response.json();
+                console.log('[SAVE] Server response:', result);
+                
+                if (result.ok) {
+                    console.log('[SAVE] ✅ Success at', new Date().toLocaleTimeString());
+                    serverSaved = true;
+                } else {
+                    console.error('[SAVE] ❌ Server returned error:', result);
+                }
 
-                // Показываем уведомление
+                // Показываем уведомление только если сервер сохранил
                 if (showNotification || window.innerWidth <= 480) {
                     const msg = document.createElement('div');
                     msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
-                    msg.textContent = '✅ Дерево сохранено на сервере!';
+                    msg.textContent = serverSaved ? '✅ Дерево сохранено на сервере!' : '⚠️ Сохранено локально';
                     document.body.appendChild(msg);
                     setTimeout(() => msg.remove(), 4000);
                 }
