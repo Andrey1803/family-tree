@@ -1191,6 +1191,13 @@ function showContextMenu(pid, x, y, persons) {
             const mainItem = document.createElement("div");
             mainItem.className = "cm-item";
             mainItem.textContent = it.label;
+            // Обработка клика на родительском элементе подменю (для мобильного)
+            mainItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Переключаем видимость подменю
+                subWrap.classList.toggle('is-open');
+                console.log('[CONTEXT_MENU] submenu toggle:', subWrap.classList.contains('is-open'));
+            }, {passive: true});
             subWrap.appendChild(mainItem);
             const submenu = document.createElement("div");
             submenu.className = "cm-submenu tree-context-menu";
@@ -1203,18 +1210,13 @@ function showContextMenu(pid, x, y, persons) {
                     si.style.color = s.color;
                     si.style.fontWeight = "500";
                 }
-                // Поддержка и touch и click для разных устройств
-                si.addEventListener('touchend', (e) => {
-                    e.preventDefault(); // Предотвращаем двойное срабатывание
-                    console.log('[CONTEXT_MENU] touchend on', s.label);
-                    s.action();
-                    closeContextMenu();
-                }, {passive: false});
-                si.onclick = () => { 
-                    console.log('[CONTEXT_MENU] onclick on', s.label);
-                    s.action(); 
-                    closeContextMenu(); 
-                };
+                // Обработка клика для мобильных и десктопа
+                si.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Предотвращаем закрытие меню
+                    console.log('[CONTEXT_MENU] click on', s.label);
+                    closeContextMenu(); // Закрываем меню
+                    s.action(); // Выполняем действие
+                }, {passive: true});
                 submenu.appendChild(si);
             });
             subWrap.appendChild(submenu);
@@ -1223,13 +1225,12 @@ function showContextMenu(pid, x, y, persons) {
             const item = document.createElement("div");
             item.className = "cm-item";
             item.textContent = it.label;
-            // Поддержка и touch и click для разных устройств
-            item.addEventListener('touchend', (e) => {
-                e.preventDefault();
+            // Обработка клика для мобильных и десктопа
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
                 it.action();
                 closeContextMenu();
-            }, {passive: false});
-            item.onclick = () => { it.action(); closeContextMenu(); };
+            }, {passive: true});
             menu.appendChild(item);
         }
     });

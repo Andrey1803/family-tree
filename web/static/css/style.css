@@ -477,8 +477,10 @@ body {
   position: relative;
 }
 
+/* Показываем подменю при hover (десктоп) ИЛИ при добавлении класса is-open (мобильный) */
 .tree-context-menu .cm-sub:hover .cm-submenu,
-.tree-context-menu .cm-submenu:hover {
+.tree-context-menu .cm-submenu:hover,
+.tree-context-menu .cm-sub.is-open .cm-submenu {
   display: block;
 }
 
