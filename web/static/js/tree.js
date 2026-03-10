@@ -1953,7 +1953,11 @@ function addRelative(pid, relation) {
         if (relation === "father" || relation === "mother") {
             np.children = [pidStr];
             const par = treeData.persons[pidStr];
-            if (par) par.parents = [...(par.parents || []), newId];
+            if (par) {
+                // ВАЖНО: Добавляем как строку!
+                par.parents = [...(par.parents || []).map(String), String(newId)];
+                console.log('[ADD_RELATIVE] Added', relation, newId, 'to parents of', pidStr, ':', par.parents);
+            }
         } else if (relation === "son" || relation === "daughter") {
             np.parents = [pidStr];
             const par = treeData.persons[pidStr];
@@ -1979,8 +1983,12 @@ function addRelative(pid, relation) {
         }
         saveTree();
         ov.remove();
-        centerId = pid;
-        treeData.current_center = pid;
+        // После добавления родителя - делаем его центром для отображения
+        if (relation === "father" || relation === "mother") {
+            centerId = newId;
+            treeData.current_center = newId;
+            console.log('[ADD_RELATIVE] Set center to new parent:', newId);
+        }
         render();
     };
     document.body.appendChild(ov);
