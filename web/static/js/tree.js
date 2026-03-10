@@ -293,6 +293,7 @@ function render() {
         const btn = document.getElementById("btn-add-first");
         if (btn) btn.onclick = (e) => {
             e.stopPropagation(); // Предотвращаем закрытие контекстного меню
+            closeContextMenu(); // Закрываем контекстное меню перед открытием модального окна
             addFirstPerson();
         };
         updateStatusBar();
