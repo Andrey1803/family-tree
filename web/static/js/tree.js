@@ -871,15 +871,16 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
     };
 
-    // Wheel zoom (desktop + touchpad)
-    panZoomWrapper.addEventListener("wheel", (e) => {
+    // Wheel zoom (desktop + touchpad) - НА ВСЮ ОБЛАСТЬ ОКНА!
+    // Используем capture: true чтобы перехватывать события даже над карточками
+    viewport.addEventListener("wheel", (e) => {
         e.preventDefault();
         const rect = viewport.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         applyZoom(treeZoom * factor, cx, cy);
-    }, { passive: false });
+    }, { passive: false, capture: true });
 
     // Pinch zoom (mobile) - вешаем на panZoomWrapper (работает и на пустом поле)
     let pinchDist0, zoom0, pinchCenterX, pinchCenterY;
