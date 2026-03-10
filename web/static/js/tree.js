@@ -130,16 +130,31 @@ async function loadTree() {
     // Применяем палитру перед загрузкой
     loadPalette();
 
+    // === БЕЗОПАСНОСТЬ: Проверяем, что localStorage принадлежит текущему пользователю ===
+    const currentUsername = localStorage.getItem('family_tree_username') || '';
+    console.log('[LOAD_TREE] Current username from storage:', currentUsername);
+    
     // Загружаем backup из localStorage (локальная версия)
-    const backup = localStorage.getItem('family_tree_backup');
+    let backup = localStorage.getItem('family_tree_backup');
     let localData = null;
+    
+    // Если backup есть, проверяем, что он принадлежит текущему пользователю
     if (backup) {
         try {
-            localData = JSON.parse(backup);
-            if (localData && localData.persons && Object.keys(localData.persons).length > 0) {
-                console.log('[LOAD_TREE] Local backup:', Object.keys(localData.persons).length, 'persons');
-            } else {
+            const parsed = JSON.parse(backup);
+            const backupUsername = parsed._username || '';
+            
+            // Если пользователь сменился — НЕ используем старый backup!
+            if (backupUsername && backupUsername !== currentUsername) {
+                console.log('[LOAD_TREE] SECURITY: Backup belongs to different user!', backupUsername, '!=', currentUsername);
+                console.log('[LOAD_TREE] Clearing old backup');
+                localStorage.removeItem('family_tree_backup');
+                localStorage.removeItem('family_tree_username');
+                backup = null;
                 localData = null;
+            } else if (parsed.persons && Object.keys(parsed.persons).length > 0) {
+                localData = parsed;
+                console.log('[LOAD_TREE] Local backup:', Object.keys(localData.persons).length, 'persons');
             }
         } catch (e) {
             console.warn('[LOAD_TREE] Backup parse error:', e);
@@ -176,6 +191,17 @@ async function loadTree() {
 
     console.log('[LOAD_TREE] Server:', serverPersonsCount, 'persons, Local:', localPersonsCount, 'persons');
 
+    // === БЕЗОПАСНОСТЬ: Сохраняем имя пользователя в localStorage ===
+    // Получаем имя текущего пользователя (из login.html или session)
+    const username = localStorage.getItem('family_tree_username') || currentUsername;
+    if (!username) {
+        // Пытаемся получить username из страницы (если есть)
+        const usernameMeta = document.querySelector('meta[name="username"]');
+        if (usernameMeta) {
+            localStorage.setItem('family_tree_username', usernameMeta.content);
+        }
+    }
+
     // === ЛОГИКА СИНХРОНИЗАЦИИ ===
 
     // 1. Если сервер пустой, а локально есть данные - НЕ перезаписываем локальные!
@@ -183,6 +209,7 @@ async function loadTree() {
         console.log('[SYNC] Server empty, KEEPING local data (DO NOT OVERWRITE)');
         treeData = localData;
         // Сохраняем обратно в localStorage чтобы не потерять
+        treeData._username = username;
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
     // 2. Если локально пусто, а сервер вернул данные - используем сервер
@@ -190,12 +217,13 @@ async function loadTree() {
         console.log('[SYNC] Local empty, using server data');
         treeData = serverData;
         // Сохраняем в localStorage
+        treeData._username = username;
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
     // 3. Если есть и там и там - БЕРЁМ БОЛЬШЕЕ из двух
     else if (serverPersonsCount > 0 && localPersonsCount > 0) {
         console.log('[SYNC] Both have data, using LARGER dataset...');
-        
+
         // Выбираем где больше персон
         if (localPersonsCount > serverPersonsCount) {
             console.log('[SYNC] Local has more persons, using local data');
@@ -204,17 +232,20 @@ async function loadTree() {
             console.log('[SYNC] Server has more/equal persons, using server data');
             treeData = serverData;
         }
-        
+
         // Сохраняем выбранное в localStorage
+        treeData._username = username;
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     }
     // 4. Если оба пустые - оставляем как есть
     else {
         console.log('[SYNC] Both empty');
         treeData = {persons: {}, marriages: [], current_center: null};
+        treeData._username = username;
     }
-    
+
     // Сохраняем объединённые данные в backup
+    treeData._username = username;
     localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
     
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);

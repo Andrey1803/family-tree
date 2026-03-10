@@ -33,6 +33,11 @@
     </div>
 
     <script>
+    // === БЕЗОПАСНОСТЬ: Очищаем localStorage при загрузке страницы регистрации ===
+    console.log('[REGISTER] Clearing localStorage for security');
+    localStorage.removeItem('family_tree_backup');
+    localStorage.removeItem('family_tree_username');
+    
     const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
 
     const registerForm = document.getElementById('registerForm');

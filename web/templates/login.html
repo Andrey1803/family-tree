@@ -25,6 +25,12 @@
     </div>
     
     <script>
+    // === БЕЗОПАСНОСТЬ: Очищаем localStorage при загрузке страницы входа ===
+    // Это предотвращает утечку данных между пользователями
+    console.log('[LOGIN] Clearing localStorage for security');
+    localStorage.removeItem('family_tree_backup');
+    localStorage.removeItem('family_tree_username');
+    
     // URL сервера синхронизации
     const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
 
@@ -57,7 +63,7 @@
 
             if (response.ok && data.token) {
                 console.log('[LOGIN] Got token, saving session...');
-                
+
                 // Шаг 2: Сохраняем токен в сессии веб-приложения
                 const sessionResp = await fetch('/api/auth/session', {
                     method: 'POST',
@@ -74,6 +80,9 @@
 
                 if (sessionResp.ok) {
                     console.log('[LOGIN] Success! Redirecting...');
+                    // === БЕЗОПАСНОСТЬ: Сохраняем username в localStorage ===
+                    localStorage.setItem('family_tree_username', login);
+                    console.log('[LOGIN] Saved username to localStorage:', login);
                     // Полная перезагрузка для применения сессии
                     window.location.href = '/?login=success';
                 } else {
@@ -93,9 +102,12 @@
                 });
                 
                 const localData = await localResp.json();
-                
+
                 if (localResp.ok && localData.ok) {
                     console.log('[LOGIN] Local login success!');
+                    // === БЕЗОПАСНОСТЬ: Сохраняем username в localStorage ===
+                    localStorage.setItem('family_tree_username', login);
+                    console.log('[LOGIN] Saved username to localStorage:', login);
                     window.location.href = '/?login=success';
                 } else {
                     errorDiv.textContent = localData.error || 'Неверный логин или пароль';
