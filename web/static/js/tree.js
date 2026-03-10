@@ -3452,19 +3452,20 @@ document.addEventListener('visibilitychange', async () => {
     }
 });
 
-// Периодическое автосохранение каждые 30 секунд
+// Периодическое автосохранение каждые 60 секунд (1 минута)
+console.log('[AUTO-SAVE] Periodic save started: every 60 seconds');
 setInterval(() => {
     const personsCount = treeData && treeData.persons ? Object.keys(treeData.persons).length : 0;
-    
+
     // ЗАЩИТА: Не сохраняем пустое дерево!
     if (personsCount === 0) {
         return;
     }
-    
+
     if (treeData && treeData.persons && personsCount > 0) {
         // Сохраняем в localStorage
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
-        
+
         // Отправляем на сервер
         fetch('/api/tree', {
             method: 'POST',
@@ -3477,4 +3478,4 @@ setInterval(() => {
             console.warn('[AUTO-SAVE] Periodic save failed:', e);
         });
     }
-}, 30000);
+}, 60000);  // Автосохранение каждую минуту (60000 мс)
