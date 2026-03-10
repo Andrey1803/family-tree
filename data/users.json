@@ -1,1 +1,14 @@
-{"users": [{"username": "admin", "password": "admin", "role": "admin"}]} 
+{
+  "users": {
+    "admin": {
+      "password": "b6e499a550a43e6f11f1a535c8e5fd1b2fe0dcf2ac270af81653a8515edc46cd",
+      "is_admin": true,
+      "email": "admin@familytree.local"
+    },
+    "Андрей Емельянов": {
+      "password": "ac5d9ced7378beccde2e855f0522d86beeb1b50f073a209c7a61c2a502465a4c",
+      "is_admin": true,
+      "email": "andrey@familytree.local"
+    }
+  }
+}

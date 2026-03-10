@@ -29,22 +29,60 @@ def get_data_path(username):
 
 
 def load_tree(username):
-    """Загружает дерево из JSON. Возвращает {persons: {}, marriages: [], current_center}."""
+    """Загружает дерево из JSON. Возвращает {persons: {}, marriages: [], current_center}.
+    
+    Добавлена улучшенная обработка ошибок и валидация структуры данных.
+    """
     path = get_data_path(username)
     if not os.path.exists(path):
+        print(f"[TREE_SERVICE] File not found: {path}")
         return {"persons": {}, "marriages": [], "current_center": None}
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        
+        # Валидация структуры данных
+        if not isinstance(data, dict):
+            print(f"[TREE_SERVICE] ERROR: Invalid data type for {username}: expected dict, got {type(data)}")
+            return {"persons": {}, "marriages": [], "current_center": None}
+        
         persons = data.get("persons", {})
+        
+        # Проверяем, что persons - это dict, а не list или другой тип
+        if not isinstance(persons, dict):
+            print(f"[TREE_SERVICE] ERROR: 'persons' should be dict, got {type(persons)} for user {username}")
+            # Пытаемся исправить: если это list, конвертируем в dict
+            if isinstance(persons, list):
+                print(f"[TREE_SERVICE] Attempting to convert list to dict for {username}")
+                persons_dict = {}
+                for p in persons:
+                    if isinstance(p, dict) and "id" in p:
+                        persons_dict[str(p["id"])] = p
+                persons = persons_dict
+            else:
+                persons = {}
+        
         marriages_raw = data.get("marriages", [])
-        marriages = [tuple(p) for p in marriages_raw if len(p) == 2]
+        
+        # Валидация marriages
+        if not isinstance(marriages_raw, list):
+            print(f"[TREE_SERVICE] WARNING: 'marriages' should be list, got {type(marriages_raw)}")
+            marriages_raw = []
+        
+        marriages = [tuple(p) for p in marriages_raw if isinstance(p, (list, tuple)) and len(p) == 2]
+        
+        print(f"[TREE_SERVICE] Loaded {len(persons)} persons, {len(marriages)} marriages for {username}")
+        
         return {
             "persons": persons,
             "marriages": marriages,
             "current_center": data.get("current_center"),
         }
-    except Exception:
+    except json.JSONDecodeError as e:
+        print(f"[TREE_SERVICE] ERROR: JSON decode error for {username}: {e}")
+        return {"persons": {}, "marriages": [], "current_center": None}
+    except Exception as e:
+        print(f"[TREE_SERVICE] ERROR: Unexpected error loading tree for {username}: {type(e).__name__}: {e}")
         return {"persons": {}, "marriages": [], "current_center": None}
 
 

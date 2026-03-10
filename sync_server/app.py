@@ -940,11 +940,30 @@ def admin_get_all_trees():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Проверка здоровья приложения."""
-    return jsonify({
+    db_status = 'connected'
+    db_error = None
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT 1')
+        cursor.fetchone()
+    except Exception as e:
+        db_status = 'disconnected'
+        db_error = str(e)
+    
+    response = {
         'status': 'ok',
         'timestamp': datetime.now().isoformat(),
-        'database': 'connected' if get_db() else 'disconnected'
-    })
+        'database': {
+            'status': db_status,
+            'path': DATA_DIR
+        },
+        'version': '1.0.0'
+    }
+    
+    if db_error:
+        response['database']['error'] = db_error
+    
+    return jsonify(response)
 
 # === ИНИЦИАЛИЗАЦИЯ ===
 def initialize_database():

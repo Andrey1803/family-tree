@@ -44,3 +44,38 @@ EMAIL_TEMPLATE = """Здравствуйте!
 
 ---
 Семейное древо (Family Tree)"""
+
+
+def is_email_configured() -> bool:
+    """Проверяет, настроен ли email сервис."""
+    # Проверяем SendGrid
+    if SENDGRID_API_KEY and SENDGRID_FROM_EMAIL:
+        return True
+    # Проверяем SMTP
+    if SMTP_LOGIN and SMTP_PASSWORD and SMTP_SERVER:
+        return True
+    return False
+
+
+def get_email_config_status() -> dict:
+    """Возвращает статус конфигурации email."""
+    sendgrid_configured = bool(SENDGRID_API_KEY and SENDGRID_FROM_EMAIL)
+    smtp_configured = bool(SMTP_LOGIN and SMTP_PASSWORD and SMTP_SERVER)
+    
+    return {
+        "configured": sendgrid_configured or smtp_configured,
+        "sendgrid": {
+            "available": sendgrid_configured,
+            "api_key_set": bool(SENDGRID_API_KEY),
+            "from_email_set": bool(SENDGRID_FROM_EMAIL)
+        },
+        "smtp": {
+            "available": smtp_configured,
+            "server": SMTP_SERVER if smtp_configured else "not configured",
+            "port": SMTP_PORT if smtp_configured else 0,
+            "login_set": bool(SMTP_LOGIN),
+            "password_set": bool(SMTP_PASSWORD),
+            "use_tls": SMTP_USE_TLS
+        },
+        "email_from": EMAIL_FROM
+    }

@@ -2,7 +2,7 @@
 # Сборка веб-приложения (web/requirements.txt)
 
 [phases.setup]
-nixPkgs = ["python312"]
+nixPkgs = ["python311"]
 
 [phases.install]
 cmds = ["python -m pip install -r web/requirements.txt"]

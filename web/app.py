@@ -52,7 +52,17 @@ if _project_root not in sys.path:
 SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring-production-3656.up.railway.app"
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or "FamilyTreeApp_Fixed_Secret_Key_2026"
+
+# Генерация секретного ключа
+_secret_key = os.environ.get("SECRET_KEY")
+if not _secret_key:
+    # Генерируем случайный ключ при каждом запуске (для development)
+    # В production обязательно установите SECRET_KEY через переменную окружения!
+    import secrets
+    _secret_key = secrets.token_hex(32)
+    print("[WARNING] SECRET_KEY не установлен! Сгенерирован случайный ключ. Для production установите SECRET_KEY в переменных окружения.")
+app.secret_key = _secret_key
+
 app.config["JSON_AS_ASCII"] = False
 app.config["SESSION_COOKIE_SECURE"] = False  # Разрешить HTTP
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -384,12 +394,20 @@ def login():
     guest = request.form.get("guest")
     if guest:
         session["username"] = "Гость"
+        # Для гостя НЕ используем server_token
+        session.pop('server_token', None)
+        session.pop('server_user_id', None)
         return redirect(url_for("index"))
     if not login_val:
         return render_template("login.html", error="Введите логин.")
     if not password_val:
         return render_template("login.html", error="Введите пароль.", login=login_val)
     if auth_check(login_val, password_val):
+        # ВАЖНО: Очищаем старый server_token перед входом нового пользователя!
+        # Это предотвращает утечку данных между пользователями
+        session.pop('server_token', None)
+        session.pop('server_user_id', None)
+        
         session["username"] = login_val
         # Админу сразу перенаправляем на админ-панель
         if is_admin(login_val):
@@ -429,12 +447,15 @@ def register():
     err = auth_register(login_val, p1)
     if err:
         return render_template("register.html", error=err, login=login_val)
-    
+
     # После успешной регистрации — автоматически входим
     if auth_check(login_val, p1):
+        # ВАЖНО: Очищаем старый server_token перед входом нового пользователя!
+        session.pop('server_token', None)
+        session.pop('server_user_id', None)
         session["username"] = login_val
         return redirect(url_for("index"))
-    
+
     return redirect(url_for("login"))
 
 
