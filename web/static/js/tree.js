@@ -533,25 +533,28 @@ function render() {
         card.style.left = (pos.x + offsetX - CARD_W / 2) + "px";
         card.style.top = (pos.y + offsetY - CARD_H / 2) + "px";
 
+        // Клик по карточке — открытие контекстного меню (вместо setCenterAndSave)
         card.onclick = (e) => {
             if (window._treeDidPan) return;
             if (card._longPressFired) return;
-            setCenterAndSave(pid);
+            // Открываем контекстное меню в центре карточки
+            const rect = card.getBoundingClientRect();
+            showContextMenu(pid, rect.left + rect.width / 2, rect.top + rect.height / 2, persons);
         };
-        
+
         // Двойной тап для мобильных (открытие редактирования)
         let lastTapTime = 0;
         let lastTapX = 0, lastTapY = 0;
-        
+
         card.addEventListener("touchend", (e) => {
             const currentTime = Date.now();
             const touch = e.changedTouches[0];
             const tapX = touch.clientX;
             const tapY = touch.clientY;
-            
+
             // Проверяем, что это второй тап за 300мс в той же области
-            if (currentTime - lastTapTime < 300 && 
-                Math.abs(tapX - lastTapX) < 30 && 
+            if (currentTime - lastTapTime < 300 &&
+                Math.abs(tapX - lastTapX) < 30 &&
                 Math.abs(tapY - lastTapY) < 30) {
                 e.preventDefault();
                 if (!window._treeDidPan) {
