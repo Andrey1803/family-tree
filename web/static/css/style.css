@@ -1232,6 +1232,16 @@ body {
     right: 100%;
   }
   
+  /* На мобильном показываем подменю внутри основного меню */
+  @media (max-width: 480px) {
+    .tree-context-menu .cm-sub.is-open .cm-submenu {
+      position: static;
+      margin-top: 4px;
+      margin-left: 12px;
+      border-left: 2px solid #e2e8f0;
+    }
+  }
+  
   /* Улучшения для мобильного контекстного меню */
   @media (max-width: 480px) {
     .tree-context-menu {

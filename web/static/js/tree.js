@@ -1191,13 +1191,21 @@ function showContextMenu(pid, x, y, persons) {
             const mainItem = document.createElement("div");
             mainItem.className = "cm-item";
             mainItem.textContent = it.label;
-            // Обработка клика на родительском элементе подменю (для мобильного)
-            mainItem.addEventListener('click', (e) => {
-                e.stopPropagation();
+            mainItem.style.cursor = 'pointer';
+            
+            // Обработка для мобильного (touch) и десктопа (click)
+            const toggleSubmenu = (e) => {
+                if (e) e.stopPropagation();
                 // Переключаем видимость подменю
                 subWrap.classList.toggle('is-open');
                 console.log('[CONTEXT_MENU] submenu toggle:', subWrap.classList.contains('is-open'));
-            }, {passive: true});
+            };
+            
+            // Для мобильного - touchstart (срабатывает раньше click)
+            mainItem.addEventListener('touchstart', toggleSubmenu, {passive: true});
+            // Для десктопа - click
+            mainItem.addEventListener('click', toggleSubmenu, {passive: true});
+            
             subWrap.appendChild(mainItem);
             const submenu = document.createElement("div");
             submenu.className = "cm-submenu tree-context-menu";
@@ -1211,12 +1219,14 @@ function showContextMenu(pid, x, y, persons) {
                     si.style.fontWeight = "500";
                 }
                 // Обработка клика для мобильных и десктопа
-                si.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Предотвращаем закрытие меню
-                    console.log('[CONTEXT_MENU] click on', s.label);
-                    closeContextMenu(); // Закрываем меню
-                    s.action(); // Выполняем действие
-                }, {passive: true});
+                const handleItemClick = (e) => {
+                    if (e) e.stopPropagation();
+                    console.log('[CONTEXT_MENU] item click:', s.label);
+                    closeContextMenu();
+                    s.action();
+                };
+                si.addEventListener('touchstart', handleItemClick, {passive: true});
+                si.addEventListener('click', handleItemClick, {passive: true});
                 submenu.appendChild(si);
             });
             subWrap.appendChild(submenu);
@@ -1225,12 +1235,16 @@ function showContextMenu(pid, x, y, persons) {
             const item = document.createElement("div");
             item.className = "cm-item";
             item.textContent = it.label;
-            // Обработка клика для мобильных и десктопа
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
+            item.style.cursor = 'pointer';
+            
+            // Обработка для мобильных и десктопа
+            const handleItemClick = (e) => {
+                if (e) e.stopPropagation();
                 it.action();
                 closeContextMenu();
-            }, {passive: true});
+            };
+            item.addEventListener('touchstart', handleItemClick, {passive: true});
+            item.addEventListener('click', handleItemClick, {passive: true});
             menu.appendChild(item);
         }
     });
