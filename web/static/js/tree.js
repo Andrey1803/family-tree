@@ -286,6 +286,7 @@ function render() {
     console.log('[RENDER] persons count:', ids.length);
     console.log('[RENDER] centerId:', centerId);
     console.log('[RENDER] treeData:', treeData);
+    console.log('[RENDER] persons:', treeData.persons);
 
     if (ids.length === 0) {
         console.log('[RENDER] No persons, showing empty message');
@@ -307,7 +308,11 @@ function render() {
         if (!pid || relatedRaw.has(pid)) return;
         relatedRaw.add(pid);
         const p = persons[pid];
-        if (!p) return;
+        if (!p) {
+            console.log('[RENDER] Person not found:', pid);
+            return;
+        }
+        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'parents=', p.parents);
         if (includeParents) (p.parents || []).forEach(pr => collect(pr, true));
         (p.children || []).forEach(c => collect(c, true));
         (p.spouse_ids || []).forEach(s => collect(s, true));
@@ -1077,22 +1082,25 @@ async function saveTree(showNotification = false) {
         return;
     }
 
+    console.log('[SAVE] Saving tree with', personsCount, 'persons');
+    console.log('[SAVE] treeData:', JSON.parse(JSON.stringify(treeData)));
+
     // Отправляем на сервер с повторной попыткой
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log('[SAVE] Attempt', attempt, 'at', new Date().toLocaleTimeString());
-            
+
             const response = await fetch("/api/tree", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(treeData),
                 keepalive: true  // Важно для мобильных
             });
-            
+
             if (response.ok) {
                 console.log('[SAVE] ✅ Success at', new Date().toLocaleTimeString());
-                
+
                 // Показываем уведомление
                 if (showNotification || window.innerWidth <= 480) {
                     const msg = document.createElement('div');
@@ -1112,9 +1120,9 @@ async function saveTree(showNotification = false) {
             }
         }
     }
-    
+
     console.error('[SAVE] ❌ Failed after', maxRetries, 'attempts');
-    
+
     // Показываем ошибку
     const msg = document.createElement('div');
     msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e74c3c;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
