@@ -2208,9 +2208,8 @@ async function editPerson(pid) {
                     <label>Главное фото</label>
                     <div class="ed-photo-row">
                         <input type="text" id="ed-photo" value="${escapeHtml(p.photo_path || "")}" placeholder="Путь или base64">
-                        <label class="btn-browse">Обзор...
-                            <input type="file" id="ed-photo-file" accept="image/*" style="display:none">
-                        </label>
+                        <button type="button" class="btn-browse" id="ed-photo-browse-btn">Обзор...</button>
+                        <input type="file" id="ed-photo-file" accept="image/*" style="display:none">
                         <button type="button" class="btn-remove-photo" id="ed-photo-clear" title="Удалить фото">Удалить</button>
                     </div>
                     <div id="ed-photo-preview" class="ed-photo-preview"></div>
@@ -2523,6 +2522,12 @@ async function editPerson(pid) {
     }
     ov.querySelector("#ed-photo").oninput = updatePhotoPreview;
     updatePhotoPreview();
+    
+    // Обработчик кнопки "Обзор"
+    ov.querySelector("#ed-photo-browse-btn").onclick = () => {
+        ov.querySelector("#ed-photo-file").click();
+    };
+    
     ov.querySelector("#ed-photo-file").onchange = (e) => {
         const file = e.target.files?.[0];
         if (!file || !file.type.startsWith("image/")) return;
