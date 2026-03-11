@@ -1123,19 +1123,15 @@ function setCenterAndSave(pid) {
         return;
     }
     
-    // Вычисляем центр карточки относительно viewport
-    // pos.x и pos.y — это координаты центра карточки в пространстве дерева
-    // treePanX и treePanY — текущее смещение дерева
-    // treeZoom — текущий зум
-    const cardCenterX = pos.x * treeZoom + treePanX;
-    const cardCenterY = pos.y * treeZoom + treePanY;
-    
+    // pos.x и pos.y — это координаты центра карточки в пространстве дерева (без учёта pan/zoom)
+    // Нам нужно сместить дерево так, чтобы эта точка оказалась в центре viewport
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
-    // Вычисляем, насколько нужно сместить дерево
-    const targetPanX = (viewportWidth / 2) - cardCenterX;
-    const targetPanY = (viewportHeight / 2) - cardCenterY;
+    // Целевая точка панорамирования: центр экрана минус координаты персоны
+    // С учётом зума: делим координаты на зум
+    const targetPanX = (viewportWidth / 2) - (pos.x * treeZoom);
+    const targetPanY = (viewportHeight / 2) - (pos.y * treeZoom);
     
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
@@ -1152,8 +1148,8 @@ function setCenterAndSave(pid) {
         const progress = Math.min(elapsed / duration, 1);
         const easedProgress = easeInOutCubic(progress);
         
-        treePanX = startX + targetPanX * easedProgress;
-        treePanY = startY + targetPanY * easedProgress;
+        treePanX = startX + (targetPanX - startX) * easedProgress;
+        treePanY = startY + (targetPanY - startY) * easedProgress;
         
         const panZoomWrapper = document.querySelector('.tree-pan-zoom');
         if (panZoomWrapper) {
