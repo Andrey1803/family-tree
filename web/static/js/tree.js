@@ -533,13 +533,20 @@ function render() {
         card.style.left = (pos.x + offsetX - CARD_W / 2) + "px";
         card.style.top = (pos.y + offsetY - CARD_H / 2) + "px";
 
-        // Клик по карточке — открытие контекстного меню (вместо setCenterAndSave)
+        // Клик по карточке — разное поведение для десктопа и мобильного
         card.onclick = (e) => {
             if (window._treeDidPan) return;
             if (card._longPressFired) return;
-            // Открываем контекстное меню в центре карточки
-            const rect = card.getBoundingClientRect();
-            showContextMenu(pid, rect.left + rect.width / 2, rect.top + rect.height / 2, persons);
+            
+            // На мобильном — контекстное меню
+            if (window.innerWidth <= 480) {
+                const rect = card.getBoundingClientRect();
+                showContextMenu(pid, rect.left + rect.width / 2, rect.top + rect.height / 2, persons);
+            } 
+            // На десктопе — сделать центром
+            else {
+                setCenterAndSave(pid);
+            }
         };
 
         // Двойной тап для мобильных (открытие редактирования)
