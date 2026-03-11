@@ -1129,9 +1129,17 @@ function setCenterAndSave(pid) {
     const viewportHeight = window.innerHeight;
     
     // Целевая точка панорамирования: центр экрана минус координаты персоны
-    // С учётом зума: делим координаты на зум
+    // С учётом зума: умножаем координаты на зум
     const targetPanX = (viewportWidth / 2) - (pos.x * treeZoom);
     const targetPanY = (viewportHeight / 2) - (pos.y * treeZoom);
+    
+    console.log('[CENTER] ======');
+    console.log('[CENTER] pid:', pid);
+    console.log('[CENTER] pos.x:', pos.x, 'pos.y:', pos.y);
+    console.log('[CENTER] treeZoom:', treeZoom);
+    console.log('[CENTER] viewport:', viewportWidth, 'x', viewportHeight);
+    console.log('[CENTER] targetPanX:', targetPanX, 'targetPanY:', targetPanY);
+    console.log('[CENTER] current treePanX:', treePanX, 'treePanY:', treePanY);
     
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
@@ -1159,6 +1167,8 @@ function setCenterAndSave(pid) {
         if (progress < 1) {
             requestAnimationFrame(animate);
         } else {
+            console.log('[CENTER] Animation complete!');
+            console.log('[CENTER] Final treePanX:', treePanX, 'treePanY:', treePanY);
             // Анимация завершена — сохраняем и устанавливаем центр
             centerId = pid;
             treeData.current_center = pid;
