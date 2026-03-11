@@ -1225,6 +1225,7 @@ function setCenterAndSave(pid) {
 
 /**
  * Рассчитывает степень родства для каждой персоны относительно centerId
+ * Использует улучшенный алгоритм на основе desktop-версии
  * @returns {Object} Объект { pid: "степень родства" }
  */
 function calculateKinship() {
@@ -1234,77 +1235,290 @@ function calculateKinship() {
 
     if (!center) return kinship;
 
-    // BFS для расчёта степени родства
+    // Центральная персона
+    kinship[centerId] = "Это вы";
+
+    // BFS для расчёта родства через предков
     const visited = new Set();
-    const queue = [[centerId, 0]]; // [pid, поколение]
+    const queue = [[centerId, 0, null]]; // [pid, generation, relation]
     visited.add(String(centerId));
 
     while (queue.length > 0) {
-        const [pid, generation] = queue.shift();
+        const [pid, gen, relation] = queue.shift();
         const p = persons[pid];
         if (!p) continue;
 
-        // Определяем степень родства
-        if (pid === centerId) {
-            kinship[pid] = "Это вы";
-        } else if (generation === -1) {
-            kinship[pid] = "Родитель";
-        } else if (generation === -2) {
-            kinship[pid] = "Дед/Бабушка";
-        } else if (generation < -2) {
-            kinship[pid] = "Предок";
-        } else if (generation === 1) {
-            kinship[pid] = "Ребёнок";
-        } else if (generation === 2) {
-            kinship[pid] = "Внук/Внучка";
-        } else if (generation > 2) {
-            kinship[pid] = "Потомок";
-        } else if (generation === 0 && pid !== centerId) {
-            // Супруги и братья/сёстры
-            if (p.spouse_ids && p.spouse_ids.includes(centerId)) {
-                kinship[pid] = "Супруг(а)";
-            } else {
-                kinship[pid] = "Брат/Сестра";
-            }
-        } else {
-            kinship[pid] = "Родственник";
-        }
+        // Если ещё не установлено родство
+        if (!kinship[pid] || pid === centerId) continue;
 
-        // Добавляем родителей
+        // Добавляем родственников в очередь
+        // Родители (-1 поколение)
         if (p.parents) {
             for (const parentId of p.parents) {
                 const pidStr = String(parentId);
                 if (!visited.has(pidStr) && persons[parentId]) {
                     visited.add(pidStr);
-                    queue.push([parentId, generation - 1]);
+                    queue.push([parentId, gen - 1, 'ancestor']);
                 }
             }
         }
 
-        // Добавляем детей
+        // Дети (+1 поколение)
         if (p.children) {
             for (const childId of p.children) {
                 const pidStr = String(childId);
                 if (!visited.has(pidStr) && persons[childId]) {
                     visited.add(pidStr);
-                    queue.push([childId, generation + 1]);
+                    queue.push([childId, gen + 1, 'descendant']);
                 }
             }
         }
 
-        // Добавляем супругов
+        // Супруги (то же поколение)
         if (p.spouse_ids) {
             for (const spouseId of p.spouse_ids) {
                 const pidStr = String(spouseId);
                 if (!visited.has(pidStr) && persons[spouseId]) {
                     visited.add(pidStr);
-                    queue.push([spouseId, generation]);
+                    queue.push([spouseId, gen, 'spouse']);
                 }
             }
         }
     }
 
+    // Второй проход — расчёт конкретного родства
+    for (const pid of Object.keys(persons)) {
+        if (pid === centerId) continue;
+        
+        const rel = getKinshipTerm(persons, centerId, pid);
+        if (rel) {
+            kinship[pid] = rel;
+        }
+    }
+
     return kinship;
+}
+
+/**
+ * Определяет термин родства для персоны
+ */
+function getKinshipTerm(persons, centerId, personId) {
+    const center = persons[centerId];
+    const person = persons[personId];
+    
+    if (!center || !person) return null;
+
+    // === 1. ПРЯМЫЕ СВЯЗИ ===
+    
+    // Родители
+    if (center.parents && center.parents.includes(personId)) {
+        return person.gender === "Мужской" ? "Отец" : "Мать";
+    }
+    
+    // Дети
+    if (person.parents && person.parents.includes(centerId)) {
+        return person.gender === "Мужской" ? "Сын" : "Дочь";
+    }
+    
+    // Супруги
+    if ((center.spouse_ids && center.spouse_ids.includes(personId)) ||
+        (person.spouse_ids && person.spouse_ids.includes(centerId))) {
+        return person.gender === "Мужской" ? "Супруг" : "Супруга";
+    }
+
+    // === 2. ПРЕДКИ (деды, прадеды) ===
+    const centerAncestors = getAncestors(persons, centerId);
+    const personAncestors = getAncestors(persons, personId);
+    
+    // Проверяем, является ли person предком center
+    if (centerAncestors[personId]) {
+        const level = centerAncestors[personId];
+        if (level === 1) return person.gender === "Мужской" ? "Отец" : "Мать";
+        if (level === 2) return person.gender === "Мужской" ? "Дед" : "Бабушка";
+        if (level === 3) return person.gender === "Мужской" ? "Прадед" : "Прабабушка";
+        return person.gender === "Мужской" ? `Дед ${level}-го колена` : `Бабушка ${level}-го колена`;
+    }
+
+    // === 3. ПОТОМКИ (внуки, правнуки) ===
+    const centerDescendants = getDescendants(persons, centerId);
+    if (centerDescendants[personId]) {
+        const level = centerDescendants[personId];
+        if (level === 1) return person.gender === "Мужской" ? "Сын" : "Дочь";
+        if (level === 2) return person.gender === "Мужской" ? "Внук" : "Внучка";
+        if (level === 3) return person.gender === "Мужской" ? "Правнук" : "Правнучка";
+        return person.gender === "Мужской" ? `Внук ${level}-го колена` : `Внучка ${level}-го колена`;
+    }
+
+    // === 4. КРОВНОЕ РОДСТВО (через общих предков) ===
+    const commonAncestors = Object.keys(centerAncestors).filter(a => personAncestors[a]);
+    
+    if (commonAncestors.length > 0) {
+        // Находим ближайшего общего предка
+        let bestAncestor = null;
+        let minDistance = Infinity;
+        
+        for (const ancestor of commonAncestors) {
+            const distance = centerAncestors[ancestor] + personAncestors[ancestor];
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestAncestor = ancestor;
+            }
+        }
+        
+        if (bestAncestor) {
+            const cLevel = centerAncestors[bestAncestor];
+            const pLevel = personAncestors[bestAncestor];
+            
+            return getByLevels(person.gender, pLevel, cLevel);
+        }
+    }
+
+    // === 5. СВОЙСТВЕННИКИ ===
+    // Через супруга center
+    if (center.spouse_ids) {
+        for (const spouseId of center.spouse_ids) {
+            if (spouseId === personId) continue;
+            const spouse = persons[spouseId];
+            if (!spouse) continue;
+            
+            // Родители супруга
+            if (spouse.parents && spouse.parents.includes(personId)) {
+                return person.gender === "Мужской" ? "Тесть" : "Теща";
+            }
+            
+            // Братья/сёстры супруга
+            for (const spouseParentId of spouse.parents || []) {
+                const spouseParent = persons[spouseParentId];
+                if (spouseParent && spouseParent.children && 
+                    Array.from(spouseParent.children).some(c => String(c) === String(personId) && String(c) !== String(spouseId))) {
+                    return person.gender === "Мужской" ? "Шурин" : "Золовка";
+                }
+            }
+        }
+    }
+
+    return "Родственник";
+}
+
+/**
+ * Возвращает предков с уровнями: {id: level}
+ */
+function getAncestors(persons, personId) {
+    const ancestors = {};
+    const queue = [[personId, 0]];
+    const visited = new Set([String(personId)]);
+
+    while (queue.length > 0) {
+        const [currentId, level] = queue.shift();
+        const current = persons[currentId];
+        if (!current || !current.parents) continue;
+
+        for (const parentId of current.parents) {
+            const pidStr = String(parentId);
+            if (!visited.has(pidStr) && persons[parentId]) {
+                visited.add(pidStr);
+                ancestors[parentId] = level + 1;
+                queue.push([parentId, level + 1]);
+            }
+        }
+    }
+
+    return ancestors;
+}
+
+/**
+ * Возвращает потомков с уровнями: {id: level}
+ */
+function getDescendants(persons, personId) {
+    const descendants = {};
+    const queue = [[personId, 0]];
+    const visited = new Set([String(personId)]);
+
+    while (queue.length > 0) {
+        const [currentId, level] = queue.shift();
+        const current = persons[currentId];
+        if (!current || !current.children) continue;
+
+        for (const childId of current.children) {
+            const cidStr = String(childId);
+            if (!visited.has(cidStr) && persons[childId]) {
+                visited.add(cidStr);
+                descendants[childId] = level + 1;
+                queue.push([childId, level + 1]);
+            }
+        }
+    }
+
+    return descendants;
+}
+
+/**
+ * Определяет родство по уровням до общего предка
+ */
+function getByLevels(gender, personLevel, centerLevel) {
+    const diff = Math.abs(personLevel - centerLevel);
+
+    // Один уровень = братья/сёстры
+    if (personLevel === centerLevel) {
+        if (personLevel === 1) {
+            return gender === "Мужской" ? "Брат" : "Сестра";
+        } else if (personLevel === 2) {
+            return gender === "Мужской" ? "Двоюродный брат" : "Двоюродная сестра";
+        } else if (personLevel === 3) {
+            return gender === "Мужской" ? "Троюродный брат" : "Троюродная сестра";
+        }
+        return gender === "Мужской" ? `Двоюродный брат ${personLevel - 1}-го колена` : `Двоюродная сестра ${personLevel - 1}-го колена`;
+    }
+
+    // Разница 1 поколение
+    if (diff === 1) {
+        if (personLevel < centerLevel) {
+            // person старше
+            if (personLevel === 1 && centerLevel === 2) {
+                return gender === "Мужской" ? "Дядя" : "Тётя";
+            }
+            if (personLevel === 1) {
+                return gender === "Мужской" ? "Двоюродный дядя" : "Двоюродная тётя";
+            }
+            if (personLevel === 2 && centerLevel === 3) {
+                return gender === "Мужской" ? "Двоюродный дядя" : "Двоюродная тётя";
+            }
+            return gender === "Мужской" ? "Дед" : "Бабушка";
+        } else {
+            // person младше
+            if (centerLevel === 1 && personLevel === 2) {
+                return gender === "Мужской" ? "Племянник" : "Племянница";
+            }
+            if (centerLevel === 2 && personLevel === 3) {
+                return gender === "Мужской" ? "Двоюродный племянник" : "Двоюродная племянница";
+            }
+            return gender === "Мужской" ? "Племянник" : "Племянница";
+        }
+    }
+
+    // Разница 2+ поколения
+    if (personLevel < centerLevel) {
+        // person старше
+        if (personLevel === 1 && centerLevel === 2) {
+            return gender === "Мужской" ? "Дед" : "Бабушка";
+        }
+        if (personLevel === 1) {
+            return gender === "Мужской" ? "Двоюродный дед" : "Двоюродная бабушка";
+        }
+        return gender === "Мужской" ? "Прадед" : "Прабабушка";
+    } else {
+        // person младше
+        if (centerLevel === 1 && personLevel === 2) {
+            return gender === "Мужской" ? "Внук" : "Внучка";
+        }
+        if (centerLevel === 1) {
+            return gender === "Мужской" ? "Правнук" : "Правнучка";
+        }
+        if (centerLevel === 2 && personLevel === 3) {
+            return gender === "Мужской" ? "Внук" : "Внучка";
+        }
+        return gender === "Мужской" ? "Правнук" : "Правнучка";
+    }
 }
 
 // === МОДАЛЬНОЕ ОКНО ДЛЯ РОДСТВЕННИКОВ (МОБИЛЬНЫЙ) ===
