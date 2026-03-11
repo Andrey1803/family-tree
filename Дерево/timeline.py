@@ -605,10 +605,10 @@ class TimelineWindow:
                 
                 # Даём время на отрисовку
                 self.app.canvas.update_idletasks()
-                
+
                 # Теперь центрируем холст на персоне
-                self.app.center_tree_on_person(person_id)
-                
+                self.app.center_canvas_on_person(person_id)
+
                 print(f"  current_center={self.app.model.current_center}")
                 print(f"OK - переход выполнен на {person.display_name()}")
             else:
@@ -635,42 +635,14 @@ class TimelineWindow:
         """Обработка клика на персону."""
         # Закрываем Timeline
         self.window.destroy()
-        
+
         # Устанавливаем центр на выбранную персону
-        self.model.current_center = person.id
-        
+        self.app.model.current_center = person.id
+
         # Обновляем главное окно
         if hasattr(self, 'parent') and hasattr(self.parent, 'refresh_view'):
             self.parent.refresh_view()
 
-
-
-    def on_person_double_click_by_id(self, person_id):
-        """Обработка двойного клика по ID."""
-        try:
-            print(f"on_person_double_click_by_id: {person_id}")
-            person = self.app.model.get_person(person_id)
-            if person:
-                print(f"  Персона найдена: {person.display_name()}")
-                
-                # Устанавливаем центр
-                self.app.model.current_center = person_id
-                self.app.last_selected_person_id = person_id
-                self.app.center_label.config(text=f"Центр: {person.display_name()}")
-                
-                # Перерисовываем и центрируем
-                self.app.refresh_view(skip_layout=False)
-                self.app.center_tree_on_person(person_id)
-                
-                # Закрываем окно через 100мс
-                self.window.after(100, self.window.destroy)
-                
-                print(f"  current_center={self.app.model.current_center}")
-                print(f"OK - переход выполнен на {person.display_name()}")
-            else:
-                print(f"Персона {person_id} не найдена")
-        except Exception as e:
-            print(f"Error: {e}")
 
 def open_timeline(parent, model):
     """Открывает окно временной шкалы."""

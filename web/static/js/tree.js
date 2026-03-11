@@ -480,9 +480,10 @@ function render() {
     // Вычисляем размеры на основе реальных размеров дерева
     const totalW = bounds.right - bounds.left + PAD * 2;
     const totalH = bounds.bottom - bounds.top + PAD * 2;
-    
-    // ✅ Сохраняем координаты для setCenterAndSave
+
+    // ✅ Сохраняем координаты и bounds для setCenterAndSave
     treeData._coords = coords;
+    treeData._bounds = bounds;
 
     // Создаём структуру для дерева
     const panZoomWrapper = document.createElement("div");
@@ -1097,6 +1098,8 @@ function setupPan(wrap, panZoomWrapper) {
 }
 
 function setCenterAndSave(pid) {
+    console.log('[SET_CENTER] Called with pid:', pid);
+    
     // Если это не десктоп — просто сохраняем и рендерим
     if (window.innerWidth <= 480) {
         centerId = pid;
@@ -1105,16 +1108,20 @@ function setCenterAndSave(pid) {
         render();
         return;
     }
-    
+
     // На десктопе — плавная анимация перемещения в центр
     const persons = treeData.persons;
     const p = persons[pid];
-    if (!p) return;
-    
+    if (!p) {
+        console.log('[SET_CENTER] Person not found:', pid);
+        return;
+    }
+
     // Получаем текущие координаты персоны из render()
     const coords = treeData._coords || {};
     const pos = coords[pid];
     if (!pos) {
+        console.log('[SET_CENTER] Coords not found for pid:', pid);
         // Если координат нет, просто устанавливаем центр
         centerId = pid;
         treeData.current_center = pid;
@@ -1122,30 +1129,57 @@ function setCenterAndSave(pid) {
         render();
         return;
     }
-    
+
+    console.log('[SET_CENTER] Person found, starting animation...');
+
     // pos.x и pos.y — это координаты центра карточки в пространстве дерева (без учёта pan/zoom)
     // Нам нужно сместить дерево так, чтобы эта точка оказалась в центре viewport
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+
+    // === ИСПРАВЛЕНИЕ: учитываем offsetX/offsetY из render() ===
+    // Вычисляем bounds как в render()
+    const bounds = treeData._bounds || { left: 0, right: 0, top: 0, bottom: 0 };
+    const offsetX = Math.max(0, -bounds.left) + 60;  // PAD = 60
+    const offsetY = Math.max(0, -bounds.top) + 60;
     
-    // Целевая точка панорамирования: центр экрана минус координаты персоны
-    // С учётом зума: умножаем координаты на зум
-    const targetPanX = (viewportWidth / 2) - (pos.x * treeZoom);
-    const targetPanY = (viewportHeight / 2) - (pos.y * treeZoom);
+    // Реальные координаты карточки на холсте с учётом offset и зума
+    // pos.x/pos.y — это центр карточки в логических координатах
+    const realX = (pos.x + offsetX) * treeZoom;
+    const realY = (pos.y + offsetY) * treeZoom;
     
+    // Целевая точка панорамирования: центр экрана минус реальные координаты карточки
+    const targetPanX = (viewportWidth / 2) - realX;
+    const targetPanY = (viewportHeight / 2) - realY;
+
     console.log('[CENTER] ======');
     console.log('[CENTER] pid:', pid);
     console.log('[CENTER] pos.x:', pos.x, 'pos.y:', pos.y);
+    console.log('[CENTER] offsetX:', offsetX, 'offsetY:', offsetY);
+    console.log('[CENTER] realX:', realX, 'realY:', realY);
     console.log('[CENTER] treeZoom:', treeZoom);
     console.log('[CENTER] viewport:', viewportWidth, 'x', viewportHeight);
     console.log('[CENTER] targetPanX:', targetPanX, 'targetPanY:', targetPanY);
     console.log('[CENTER] current treePanX:', treePanX, 'treePanY:', treePanY);
-    
+
+    // Проверяем, нужно ли вообще перемещать
+    const dx = Math.abs(targetPanX - treePanX);
+    const dy = Math.abs(targetPanY - treePanY);
+    if (dx < 1 && dy < 1) {
+        console.log('[CENTER] Already centered, skipping animation');
+        centerId = pid;
+        treeData.current_center = pid;
+        saveTree();
+        return;
+    }
+
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
     const startTime = performance.now();
     const startX = treePanX;
     const startY = treePanY;
+
+    console.log('[CENTER] Starting animation, duration:', duration, 'ms');
     
     function easeInOutCubic(t) {
         return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -1155,15 +1189,15 @@ function setCenterAndSave(pid) {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const easedProgress = easeInOutCubic(progress);
-        
+
         treePanX = startX + (targetPanX - startX) * easedProgress;
         treePanY = startY + (targetPanY - startY) * easedProgress;
-        
+
         const panZoomWrapper = document.querySelector('.tree-pan-zoom');
         if (panZoomWrapper) {
             panZoomWrapper.style.transform = `translate(${treePanX}px, ${treePanY}px)`;
         }
-        
+
         if (progress < 1) {
             requestAnimationFrame(animate);
         } else {
@@ -1173,6 +1207,10 @@ function setCenterAndSave(pid) {
             centerId = pid;
             treeData.current_center = pid;
             saveTree();
+            // Обновляем класс .center на карточках без полного рендера
+            document.querySelectorAll('.tree-card').forEach(card => {
+                card.classList.toggle('center', card.getAttribute('data-pid') === String(pid));
+            });
         }
     }
     

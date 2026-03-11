@@ -2568,6 +2568,34 @@ class FamilyTreeApp:
                 self.coords[pid] = (sx, y_pos)
                 self.level_structure.setdefault(int((y_pos - 50) / LEVEL_HEIGHT), []).append(pid)
 
+            # === РАЗМЕЩЕНИЕ РОДИТЕЛЕЙ (выше текущей персоны) ===
+            parent_y = y_pos - LEVEL_HEIGHT
+            visible_parents = []
+            for parent_id in (person.parents or []):
+                pk = _key_in_filtered(parent_id)
+                if pk is not None and pk not in self.coords:
+                    visible_parents.append(pk)
+            
+            if visible_parents:
+                parent_widths = []
+                for pk in visible_parents:
+                    w = get_subtree_width(pk)
+                    min_w = _block_width_only(filtered_persons[pk])
+                    parent_widths.append(max(w, min_w))
+                
+                total_parent_w = sum(parent_widths)
+                for i in range(len(visible_parents) - 1):
+                    total_parent_w += _gap_between_siblings(visible_parents[i], visible_parents[i + 1])
+                
+                parent_x = block_x + (block_width - total_parent_w) / 2
+                for i, pk in enumerate(visible_parents):
+                    pw = parent_widths[i]
+                    place_subtree(pk, parent_x, parent_y, pw)
+                    parent_x += pw
+                    if i < len(visible_parents) - 1:
+                        parent_x += _gap_between_siblings(visible_parents[i], visible_parents[i + 1])
+            # === /РАЗМЕЩЕНИЕ РОДИТЕЛЕЙ ===
+
             child_y = y_pos + LEVEL_HEIGHT
             child_keys = [k for cid in (person.children or []) if (k := _key_in_filtered(cid)) is not None
                          and not getattr(filtered_persons.get(k), 'collapsed_branches', False)]
@@ -2641,32 +2669,18 @@ class FamilyTreeApp:
                     return subtree_left, subtree_right
             return block_x, block_x + block_width
 
-        # === ШАГ 6: НАХОЖДЕНИЕ КОРНЯ ДЕРЕВА (всегда работаем с ключами из filtered_persons) ===
+        # === ШАГ 6: НАХОЖДЕНИЕ КОРНЯ ДЕРЕВА ===
+        # ИСПРАВЛЕНО: дерево строится ОТ выбранной персоны, а не от старшего предка
         root_key = _key_in_filtered(center_pid)
         if root_key is None:
             root_key = next(iter(filtered_persons), None)
         if root_key is None:
             return
-        top_ancestor_key = root_key
-        visited_anc = {top_ancestor_key}
-        queue = collections.deque([top_ancestor_key])
-
-        while queue:
-            pk = queue.popleft()
-            person = filtered_persons.get(pk)
-            if not person:
-                continue
-            for parent_id in (person.parents or []):
-                p_parent = _key_in_filtered(parent_id)
-                if p_parent is not None and p_parent not in visited_anc:
-                    visited_anc.add(p_parent)
-                    queue.append(p_parent)
-                    top_ancestor_key = p_parent
-
-        # === ШАГ 7: ЗАПУСК РАЗМЕЩЕНИЯ ОТ КОРНЯ ===
+        
+        # === ШАГ 7: ЗАПУСК РАЗМЕЩЕНИЯ ОТ КОРНЯ (выбранная персона) ===
         root_y = 50
-        root_width = max(canvas_width, get_subtree_width(top_ancestor_key))
-        place_subtree(top_ancestor_key, 0, root_y, root_width)
+        root_width = max(canvas_width, get_subtree_width(root_key))
+        place_subtree(root_key, 0, root_y, root_width)
 
         # === ШАГ 7.5: ДОРАЗМЕЩЕНИЕ ВСЕХ БЕЗ КООРДИНАТ по списку браков и spouse_ids ===
         gap_fill = self.CARD_WIDTH * SPOUSE_SPACING
