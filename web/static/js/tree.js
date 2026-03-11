@@ -2566,9 +2566,16 @@ async function editPerson(pid) {
     ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
     ov.querySelector(".tree-edit-modal").onclick = (e) => e.stopPropagation();
     ov.querySelector(".cancel").onclick = () => ov.remove();
+    
+    // Обработчик кнопки "Сохранить"
     ov.querySelector(".save").onclick = () => {
+        console.log('[EDIT_PERSON] Save button clicked');
+        
         const name = ov.querySelector("#ed-name").value.trim();
         const surname = ov.querySelector("#ed-surname").value.trim();
+        
+        console.log('[EDIT_PERSON] Name:', name, 'Surname:', surname);
+        
         if (!name) { alert("Имя обязательно."); return; }
         if (!surname) { alert("Фамилия обязательна."); return; }
         const birthDate = ov.querySelector("#ed-birth").value.trim();
