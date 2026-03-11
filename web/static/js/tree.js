@@ -480,6 +480,9 @@ function render() {
     // Вычисляем размеры на основе реальных размеров дерева
     const totalW = bounds.right - bounds.left + PAD * 2;
     const totalH = bounds.bottom - bounds.top + PAD * 2;
+    
+    // ✅ Сохраняем координаты для setCenterAndSave
+    treeData._coords = coords;
 
     // Создаём структуру для дерева
     const panZoomWrapper = document.createElement("div");
@@ -507,6 +510,7 @@ function render() {
         if (!p) return;
         const card = document.createElement("div");
         card.className = "tree-card";
+        card.setAttribute("data-pid", pid);  // ✅ Добавляем data-pid для поиска
         if ((p.gender || "") === "Мужской") card.classList.add("male");
         else card.classList.add("female");
         if (p.is_deceased) card.classList.add("deceased");
@@ -1107,10 +1111,11 @@ function setCenterAndSave(pid) {
     const p = persons[pid];
     if (!p) return;
     
-    // Получаем текущие координаты персоны
-    const card = document.querySelector(`[data-pid="${pid}"]`);
-    if (!card) {
-        // Если карточки нет в DOM, просто устанавливаем центр
+    // Получаем текущие координаты персоны из render()
+    const coords = treeData._coords || {};
+    const pos = coords[pid];
+    if (!pos) {
+        // Если координат нет, просто устанавливаем центр
         centerId = pid;
         treeData.current_center = pid;
         saveTree();
@@ -1118,13 +1123,18 @@ function setCenterAndSave(pid) {
         return;
     }
     
-    const cardRect = card.getBoundingClientRect();
+    // Вычисляем текущее положение карточки на экране
+    const cardScreenX = pos.x + offsetX - CARD_W / 2;
+    const cardScreenY = pos.y + offsetY - CARD_H / 2;
+    const cardCenterX = cardScreenX + CARD_W / 2;
+    const cardCenterY = cardScreenY + CARD_H / 2;
+    
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
     // Вычисляем, насколько нужно сместить дерево
-    const targetX = (viewportWidth / 2) - (cardRect.left + cardRect.width / 2);
-    const targetY = (viewportHeight / 2) - (cardRect.top + cardRect.height / 2);
+    const targetPanX = (viewportWidth / 2) - cardCenterX + treePanX;
+    const targetPanY = (viewportHeight / 2) - cardCenterY + treePanY;
     
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
@@ -1141,8 +1151,8 @@ function setCenterAndSave(pid) {
         const progress = Math.min(elapsed / duration, 1);
         const easedProgress = easeInOutCubic(progress);
         
-        treePanX = startX + targetX * easedProgress;
-        treePanY = startY + targetY * easedProgress;
+        treePanX = startX + targetPanX * easedProgress;
+        treePanY = startY + targetPanY * easedProgress;
         
         const panZoomWrapper = document.querySelector('.tree-pan-zoom');
         if (panZoomWrapper) {
