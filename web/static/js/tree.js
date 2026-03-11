@@ -1173,6 +1173,18 @@ async function saveTree(showNotification = false) {
     setTimeout(() => msg.remove(), 5000);
 }
 
+// === ИСПРАВЛЕНИЕ СКРОЛЛА НА МОБИЛЬНОМ ===
+// Добавляем обработчик для принудительной прокрутки в модальных окнах
+document.addEventListener('DOMContentLoaded', function() {
+    // Разрешаем скролл в модальных окнах на мобильном
+    document.addEventListener('touchmove', function(e) {
+        // Если скролл внутри модального окна — разрешаем
+        if (e.target.closest('.tree-modal-overlay') || e.target.closest('.tree-edit-overlay')) {
+            e.stopPropagation();
+        }
+    }, {passive: true});
+});
+
 function showContextMenu(pid, x, y, persons) {
     closeContextMenu(); // снимает предыдущее меню и его document listener
     const p = persons[pid];

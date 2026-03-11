@@ -1304,6 +1304,14 @@ body {
     overflow: auto !important;
     -webkit-overflow-scrolling: touch !important;
     padding: 10px;
+    /* Разрешаем скролл и зум внутри модального окна */
+    touch-action: auto !important;
+  }
+  
+  /* Блокируем наследование touch-action: none от родителя */
+  .tree-modal-overlay *,
+  .tree-edit-overlay * {
+    touch-action: auto !important;
   }
   
   .tree-modal,
@@ -1316,6 +1324,8 @@ body {
     overflow: visible !important;
     position: relative !important;
     flex-shrink: 1 !important;
+    /* Разрешаем скролл внутри модального окна */
+    touch-action: pan-x pan-y !important;
   }
   .tree-modal h3,
   .tree-edit-modal h3 {
@@ -1341,6 +1351,9 @@ body {
     min-width: fit-content !important;
     width: 100%;
     position: relative !important;
+    /* Принудительно разрешаем скролл */
+    touch-action: pan-x pan-y !important;
+    -ms-touch-action: pan-x pan-y !important;
   }
   
   /* Вкладки sticky */
@@ -1351,6 +1364,9 @@ body {
     z-index: 10;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    /* Разрешаем горизонтальный скролл вкладок */
+    touch-action: pan-x !important;
+    -ms-touch-action: pan-x !important;
   }
 
   /* Кнопки в модальных окнах */
