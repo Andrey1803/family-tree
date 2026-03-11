@@ -68,11 +68,61 @@ function createBackup() {
             backups.shift();
         }
         
+        // Проверяем размер перед сохранением
+        const backupsStr = JSON.stringify(backups);
+        const estimatedSize = backupsStr.length;
+        
+        // localStorage имеет лимит ~5MB, оставляем запас
+        if (estimatedSize > 4 * 1024 * 1024) {
+            console.warn('[BACKUP] Skipping - estimated size', estimatedSize, 'exceeds limit');
+            
+            // Удаляем самый старый бэкап и пробуем снова
+            if (backups.length > 1) {
+                backups.shift();
+                const newSize = JSON.stringify(backups).length;
+                if (newSize > 4 * 1024 * 1024) {
+                    console.warn('[BACKUP] Still too large, clearing old backups');
+                    backups.splice(0, Math.floor(backups.length / 2));
+                }
+            }
+        }
+        
         localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
         console.log('[BACKUP] Created backup #' + backups.length);
         
         return true;
     } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            console.error('[BACKUP] Quota exceeded! Clearing old backups...');
+            
+            // Очищаем старые бэкапы
+            const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+            if (backups.length > 0) {
+                // Оставляем только последний
+                const lastBackup = backups[backups.length - 1];
+                localStorage.setItem(BACKUP_KEY, JSON.stringify([lastBackup]));
+                console.log('[BACKUP] Cleared old backups, kept only last one');
+            }
+            
+            // Пробуем сохранить ещё раз
+            try {
+                const backup = {
+                    timestamp: Date.now(),
+                    date: new Date().toLocaleString('ru-RU'),
+                    data: JSON.parse(JSON.stringify(treeData)),
+                    personsCount: Object.keys(treeData.persons || {}).length,
+                    size: JSON.stringify(treeData).length
+                };
+                localStorage.setItem(BACKUP_KEY, JSON.stringify([backup]));
+                console.log('[BACKUP] Saved single backup after cleanup');
+                return true;
+            } catch (e2) {
+                console.error('[BACKUP] Still cannot save:', e2);
+                showStatusMessage('⚠️ Превышена квота хранилища');
+                return false;
+            }
+        }
+        
         console.error('[BACKUP] Error:', e);
         return false;
     }
@@ -1856,8 +1906,15 @@ function showRelativesModal(pid, relatives) {
 }
 
 async function saveTree(showNotification = false) {
-    // Создаём бэкап перед сохранением
-    createBackup();
+    // Создаём бэкап только если прошло 5 минут с последнего ИЛИ это первое сохранение
+    const lastBackupTime = parseInt(localStorage.getItem('last_backup_time') || '0');
+    const now = Date.now();
+    const shouldCreateBackup = (now - lastBackupTime) > 5 * 60 * 1000; // 5 минут
+    
+    if (shouldCreateBackup) {
+        createBackup();
+        localStorage.setItem('last_backup_time', now.toString());
+    }
     
     // Сохраняем в localStorage сразу (для мобильных)
     if (treeData && treeData.persons) {
