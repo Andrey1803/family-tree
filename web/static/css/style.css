@@ -1296,6 +1296,9 @@ body {
   .tree-modal,
   .tree-edit-modal {
     padding: 12px;
+    min-width: auto !important;
+    max-width: 95vw !important;
+    width: 95vw;
   }
   .tree-modal h3,
   .tree-edit-modal h3 {
@@ -1308,6 +1311,12 @@ body {
   .tree-edit-content textarea {
     font-size: 0.9rem;
     padding: 6px 10px;
+  }
+  
+  /* Горизонтальный скролл для содержимого модального окна */
+  .tree-edit-content {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   /* Кнопки в модальных окнах */
