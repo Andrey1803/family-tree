@@ -1093,10 +1093,73 @@ function setupPan(wrap, panZoomWrapper) {
 }
 
 function setCenterAndSave(pid) {
-    centerId = pid;
-    treeData.current_center = pid;
-    saveTree();
-    render();
+    // Если это не десктоп — просто сохраняем и рендерим
+    if (window.innerWidth <= 480) {
+        centerId = pid;
+        treeData.current_center = pid;
+        saveTree();
+        render();
+        return;
+    }
+    
+    // На десктопе — плавная анимация перемещения в центр
+    const persons = treeData.persons;
+    const p = persons[pid];
+    if (!p) return;
+    
+    // Получаем текущие координаты персоны
+    const card = document.querySelector(`[data-pid="${pid}"]`);
+    if (!card) {
+        // Если карточки нет в DOM, просто устанавливаем центр
+        centerId = pid;
+        treeData.current_center = pid;
+        saveTree();
+        render();
+        return;
+    }
+    
+    const cardRect = card.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Вычисляем, насколько нужно сместить дерево
+    const targetX = (viewportWidth / 2) - (cardRect.left + cardRect.width / 2);
+    const targetY = (viewportHeight / 2) - (cardRect.top + cardRect.height / 2);
+    
+    // Анимация с ускорением и замедлением (ease-in-out)
+    const duration = 600; // мс
+    const startTime = performance.now();
+    const startX = treePanX;
+    const startY = treePanY;
+    
+    function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    
+    function animate(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easedProgress = easeInOutCubic(progress);
+        
+        treePanX = startX + targetX * easedProgress;
+        treePanY = startY + targetY * easedProgress;
+        
+        const panZoomWrapper = document.querySelector('.tree-pan-zoom');
+        if (panZoomWrapper) {
+            panZoomWrapper.style.transform = `translate(${treePanX}px, ${treePanY}px)`;
+        }
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Анимация завершена — сохраняем и устанавливаем центр
+            centerId = pid;
+            treeData.current_center = pid;
+            saveTree();
+        }
+    }
+    
+    requestAnimationFrame(animate);
 }
 
 async function saveTree(showNotification = false) {
