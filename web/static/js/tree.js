@@ -1983,10 +1983,13 @@ async function saveTree(showNotification = false) {
 
     console.error('[SAVE] ❌ Failed after', maxRetries, 'attempts');
 
-    // Показываем ошибку
+    // Данные УЖЕ сохранены в localStorage (см. выше), показываем предупреждение
+    console.warn('[SAVE] ⚠️ Saved locally only (server unavailable)');
+    
+    // Показываем уведомление
     const msg = document.createElement('div');
-    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e74c3c;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
-    msg.textContent = '❌ Ошибка сохранения! Проверьте интернет.';
+    msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#f39c12;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
+    msg.textContent = '⚠️ Сохранено локально (сервер недоступен)';
     document.body.appendChild(msg);
     setTimeout(() => msg.remove(), 5000);
 }
