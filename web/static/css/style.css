@@ -1295,39 +1295,55 @@ body {
   /* Уменьшаем модальные окна */
   .tree-modal,
   .tree-edit-modal {
-    padding: 12px;
-    min-width: auto !important;
+    padding: 10px !important;
+    min-width: 0 !important;
     max-width: 95vw !important;
-    width: 95vw;
+    width: 95vw !important;
+    max-height: 90vh !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   .tree-modal h3,
   .tree-edit-modal h3 {
     font-size: 1rem;
+    word-wrap: break-word;
   }
   .tree-modal input,
   .tree-modal select,
   .tree-edit-content input,
   .tree-edit-content select,
   .tree-edit-content textarea {
-    font-size: 0.9rem;
-    padding: 6px 10px;
+    font-size: 16px;  /* Защита от зума на iOS */
+    padding: 8px 10px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
-  
-  /* Горизонтальный скролл для содержимого модального окна */
+
+  /* Горизонтальный и вертикальный скролл для содержимого модального окна */
   .tree-edit-content {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    min-width: min-content;
   }
   
+  /* Вкладки sticky */
+  .tree-edit-tabs {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+  }
+
   /* Кнопки в модальных окнах */
   .tree-modal-btns {
     flex-direction: column;
     gap: 8px;
   }
   .tree-modal-btns button {
-    width: 100%;
+    width: 100% !important;
   }
-  
+
   /* Вкладки редактирования */
   .tree-edit-tabs {
     gap: 1px;
@@ -1337,24 +1353,19 @@ body {
   }
   .tree-edit-tabs .tab-btn {
     padding: 6px 10px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     min-width: max-content;
   }
   .tree-edit-tabs .tab-btn.active {
     border-bottom-color: var(--card-male);
   }
-  
-  /* Прокрутка для вкладок на мобильном */
-  @media (max-width: 480px) {
-    .tree-edit-tabs {
-      padding-bottom: 4px;
-    }
-    .tree-edit-tabs::-webkit-scrollbar {
-      height: 4px;
-    }
-    .tree-edit-tabs::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 2px;
-    }
+
+  /* Прокрутка для вкладок */
+  .tree-edit-tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+  .tree-edit-tabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
   }
 }
