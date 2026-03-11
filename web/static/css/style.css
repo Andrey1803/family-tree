@@ -419,6 +419,14 @@ body {
 
 .tree-card .name { font-weight: bold; margin-bottom: 1px; font-size: 11px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-card .dates { font-size: 9px; opacity: 0.9; }
+.tree-card .kinship { 
+    font-size: 8px; 
+    opacity: 0.8; 
+    margin-top: 2px; 
+    padding-top: 2px; 
+    border-top: 1px solid rgba(255,255,255,0.2);
+    font-style: italic;
+}
 
 .empty-tree {
   text-align: center;

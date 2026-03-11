@@ -505,6 +505,9 @@ function render() {
     setupPan(wrap, panZoomWrapper);
     setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH);
 
+    // Рассчитываем степень родства для всех персон
+    const kinship = calculateKinship();
+
     // Сначала рисуем карточки
     Object.entries(coords).forEach(([pid, pos]) => {
         const p = persons[pid];
@@ -528,12 +531,17 @@ function render() {
 
         const name = [p.name, p.patronymic, p.surname].filter(Boolean).join(" ");
         const dates = [p.birth_date, p.death_date].filter(Boolean).join(" — ");
+        const kinshipText = kinship[pid] || "";
 
         const photoHtml = photoSrc
             ? `<div class="card-photo"><img src="${photoSrc}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-photo')"><span class="photo-placeholder">📷</span></div>`
             : `<div class="card-photo no-photo"><span class="photo-placeholder">📷</span></div>`;
 
-        card.innerHTML = photoHtml + `<div class="card-info"><div class="name">${escapeHtml(name)}</div><div class="dates">${escapeHtml(dates)}</div></div>`;
+        card.innerHTML = photoHtml + `<div class="card-info">
+            <div class="name">${escapeHtml(name)}</div>
+            <div class="dates">${escapeHtml(dates)}</div>
+            ${kinshipText ? `<div class="kinship">${escapeHtml(kinshipText)}</div>` : ''}
+        </div>`;
 
         card.style.left = (pos.x + offsetX - CARD_W / 2) + "px";
         card.style.top = (pos.y + offsetY - CARD_H / 2) + "px";
@@ -1207,14 +1215,96 @@ function setCenterAndSave(pid) {
             centerId = pid;
             treeData.current_center = pid;
             saveTree();
-            // Обновляем класс .center на карточках без полного рендера
-            document.querySelectorAll('.tree-card').forEach(card => {
-                card.classList.toggle('center', card.getAttribute('data-pid') === String(pid));
-            });
+            // Перерисовываем дерево от новой центральной персоны
+            render();
         }
     }
-    
+
     requestAnimationFrame(animate);
+}
+
+/**
+ * Рассчитывает степень родства для каждой персоны относительно centerId
+ * @returns {Object} Объект { pid: "степень родства" }
+ */
+function calculateKinship() {
+    const persons = treeData.persons || {};
+    const center = persons[centerId];
+    const kinship = {};
+
+    if (!center) return kinship;
+
+    // BFS для расчёта степени родства
+    const visited = new Set();
+    const queue = [[centerId, 0]]; // [pid, поколение]
+    visited.add(String(centerId));
+
+    while (queue.length > 0) {
+        const [pid, generation] = queue.shift();
+        const p = persons[pid];
+        if (!p) continue;
+
+        // Определяем степень родства
+        if (pid === centerId) {
+            kinship[pid] = "Это вы";
+        } else if (generation === -1) {
+            kinship[pid] = "Родитель";
+        } else if (generation === -2) {
+            kinship[pid] = "Дед/Бабушка";
+        } else if (generation < -2) {
+            kinship[pid] = "Предок";
+        } else if (generation === 1) {
+            kinship[pid] = "Ребёнок";
+        } else if (generation === 2) {
+            kinship[pid] = "Внук/Внучка";
+        } else if (generation > 2) {
+            kinship[pid] = "Потомок";
+        } else if (generation === 0 && pid !== centerId) {
+            // Супруги и братья/сёстры
+            if (p.spouse_ids && p.spouse_ids.includes(centerId)) {
+                kinship[pid] = "Супруг(а)";
+            } else {
+                kinship[pid] = "Брат/Сестра";
+            }
+        } else {
+            kinship[pid] = "Родственник";
+        }
+
+        // Добавляем родителей
+        if (p.parents) {
+            for (const parentId of p.parents) {
+                const pidStr = String(parentId);
+                if (!visited.has(pidStr) && persons[parentId]) {
+                    visited.add(pidStr);
+                    queue.push([parentId, generation - 1]);
+                }
+            }
+        }
+
+        // Добавляем детей
+        if (p.children) {
+            for (const childId of p.children) {
+                const pidStr = String(childId);
+                if (!visited.has(pidStr) && persons[childId]) {
+                    visited.add(pidStr);
+                    queue.push([childId, generation + 1]);
+                }
+            }
+        }
+
+        // Добавляем супругов
+        if (p.spouse_ids) {
+            for (const spouseId of p.spouse_ids) {
+                const pidStr = String(spouseId);
+                if (!visited.has(pidStr) && persons[spouseId]) {
+                    visited.add(pidStr);
+                    queue.push([spouseId, generation]);
+                }
+            }
+        }
+    }
+
+    return kinship;
 }
 
 // === МОДАЛЬНОЕ ОКНО ДЛЯ РОДСТВЕННИКОВ (МОБИЛЬНЫЙ) ===
