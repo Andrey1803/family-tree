@@ -2600,11 +2600,12 @@ async function editPerson(pid) {
             p.spouse_dates = spouseDates;
         }
 
+        // Сохраняем дерево
         saveTree(true).then(() => {
             ov.remove();
             render();
             const savedName = [p.name, p.patronymic, p.surname].filter(Boolean).join(" ");
-            alert(`Данные персоны «${savedName}» сохранены.`);
+            showStatusMessage(`✅ Сохранено: ${savedName}`);
         });
     };
     document.body.appendChild(ov);
