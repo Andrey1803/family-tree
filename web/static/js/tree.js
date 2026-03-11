@@ -33,12 +33,187 @@ let autoSaveTimer = null;
 let lastSavedState = null;
 const AUTO_SAVE_INTERVAL = 5 * 60 * 1000; // 5 минут
 
+// === БЭКАПЫ ===
+const MAX_BACKUPS = 10;
+const BACKUP_KEY = 'family_tree_backups';
+
 /**
  * Проверяет, есть ли несохранённые изменения
  */
 function hasUnsavedChanges() {
     const current = JSON.stringify(treeData);
     return current !== lastSavedState;
+}
+
+/**
+ * Создаёт резервную копию текущего состояния
+ */
+function createBackup() {
+    try {
+        const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+        
+        // Добавляем новый бэкап
+        const backup = {
+            timestamp: Date.now(),
+            date: new Date().toLocaleString('ru-RU'),
+            data: JSON.parse(JSON.stringify(treeData)),
+            personsCount: Object.keys(treeData.persons || {}).length,
+            size: JSON.stringify(treeData).length
+        };
+        
+        backups.push(backup);
+        
+        // Удаляем старые бэкапы если больше MAX_BACKUPS
+        while (backups.length > MAX_BACKUPS) {
+            backups.shift();
+        }
+        
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+        console.log('[BACKUP] Created backup #' + backups.length);
+        
+        return true;
+    } catch (e) {
+        console.error('[BACKUP] Error:', e);
+        return false;
+    }
+}
+
+/**
+ * Показывает диалог управления бэкапами
+ */
+function showBackupManager() {
+    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'tree-modal-overlay';
+    overlay.innerHTML = `
+        <div class="tree-modal" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <h3>📦 Резервные копии</h3>
+            <p style="color: #64748b; font-size: 14px; margin-bottom: 16px;">
+                Хранится последних ${backups.length} из ${MAX_BACKUPS} бэкапов
+            </p>
+            ${backups.length === 0 ? `
+                <p style="text-align: center; color: #94a3b8; padding: 40px;">
+                    Нет сохранённых бэкапов
+                </p>
+            ` : `
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${backups.map((b, i) => `
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 12px 16px;
+                            background: ${i === backups.length - 1 ? '#f0fdf4' : '#f8fafc'};
+                            border: 1px solid ${i === backups.length - 1 ? '#22c55e' : '#e2e8f0'};
+                            border-radius: 8px;
+                        ">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #1e293b;">
+                                    ${i === backups.length - 1 ? '✅ ' : '📦 '} ${b.date}
+                                </div>
+                                <div style="font-size: 13px; color: #64748b;">
+                                    Персон: ${b.personsCount} | Размер: ${(b.size / 1024).toFixed(1)} KB
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="restoreBackup(${i})" class="btn-primary" style="padding: 6px 12px;">
+                                    Восстановить
+                                </button>
+                                <button onclick="downloadBackup(${i})" class="btn-secondary" style="padding: 6px 12px;">
+                                    Скачать
+                                </button>
+                                <button onclick="deleteBackup(${i})" class="btn-danger" style="padding: 6px 12px;">
+                                    Удалить
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `}
+            <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="this.closest('.tree-modal-overlay').remove()" class="btn-secondary">
+                    Закрыть
+                </button>
+                ${backups.length > 0 ? `
+                    <button onclick="clearAllBackups()" class="btn-danger">
+                        Удалить все
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.querySelector('.tree-modal-overlay').onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+}
+
+/**
+ * Восстанавливает бэкап по индексу
+ */
+function restoreBackup(index) {
+    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+    if (index < 0 || index >= backups.length) return;
+    
+    if (!confirm(`Восстановить дерево из бэкапа ${backups[index].date}?\\n\\nТекущие данные будут заменены.`)) {
+        return;
+    }
+    
+    treeData = JSON.parse(JSON.stringify(backups[index].data));
+    treeData._username = localStorage.getItem('family_tree_username') || 'unknown';
+    
+    saveTree();
+    render();
+    
+    alert('✅ Дерево восстановлено!');
+    document.querySelectorAll('.tree-modal-overlay').forEach(el => el.remove());
+}
+
+/**
+ * Скачивает бэкап как JSON файл
+ */
+function downloadBackup(index) {
+    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+    if (index < 0 || index >= backups.length) return;
+    
+    const backup = backups[index];
+    const dataStr = JSON.stringify(backup.data, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `family_tree_backup_${new Date(backup.timestamp).toISOString().slice(0,10)}.json`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Удаляет бэкап по индексу
+ */
+function deleteBackup(index) {
+    const backups = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]');
+    if (index < 0 || index >= backups.length) return;
+    
+    if (!confirm(`Удалить бэкап ${backups[index].date}?`)) return;
+    
+    backups.splice(index, 1);
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+    
+    showBackupManager();
+}
+
+/**
+ * Удаляет все бэкапы
+ */
+function clearAllBackups() {
+    if (!confirm('Удалить ВСЕ резервные копии?')) return;
+    
+    localStorage.removeItem(BACKUP_KEY);
+    showBackupManager();
 }
 
 /**
@@ -1681,6 +1856,9 @@ function showRelativesModal(pid, relatives) {
 }
 
 async function saveTree(showNotification = false) {
+    // Создаём бэкап перед сохранением
+    createBackup();
+    
     // Сохраняем в localStorage сразу (для мобильных)
     if (treeData && treeData.persons) {
         // Сохраняем с username для идентификации
@@ -3456,6 +3634,8 @@ loadTree();
                 openColorPaletteDialog();
             } else if (act === "timeline") {
                 openTimeline();
+            } else if (act === "backups") {
+                showBackupManager();
             } else if (act === "search") {
                 openSearchDialog();
             } else if (act === "stats") {
