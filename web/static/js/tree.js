@@ -1169,6 +1169,55 @@ function setCenterAndSave(pid) {
     requestAnimationFrame(animate);
 }
 
+// === МОДАЛЬНОЕ ОКНО ДЛЯ РОДСТВЕННИКОВ (МОБИЛЬНЫЙ) ===
+function showRelativesModal(pid, relatives) {
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal" style="max-width: 90vw; width: 90vw;">
+            <h3>Добавить родственника</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${relatives.map(r => `
+                    <button type="button" class="relatives-btn" style="
+                        padding: 12px 16px;
+                        text-align: left;
+                        font-size: 16px;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 8px;
+                        background: #fff;
+                        cursor: pointer;
+                        color: ${r.color || '#1e293b'};
+                        font-weight: ${r.color ? '600' : '400'};
+                    ">
+                        ${r.label}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel" style="width: 100%;">Отмена</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(ov);
+    
+    // Обработчики кнопок
+    ov.querySelectorAll(".relatives-btn").forEach((btn, idx) => {
+        btn.onclick = () => {
+            relatives[idx].action();
+            ov.remove();
+        };
+    });
+    
+    // Закрытие по клику вне окна
+    ov.onclick = (e) => {
+        if (e.target === ov) ov.remove();
+    };
+    
+    // Кнопка отмены
+    ov.querySelector(".cancel").onclick = () => ov.remove();
+}
+
 async function saveTree(showNotification = false) {
     // Сохраняем в localStorage сразу (для мобильных)
     if (treeData && treeData.persons) {
@@ -1324,20 +1373,29 @@ function showContextMenu(pid, x, y, persons) {
             mainItem.className = "cm-item";
             mainItem.textContent = it.label;
             mainItem.style.cursor = 'pointer';
-            
+
             // Обработка для мобильного (touch) и десктопа (click)
             const toggleSubmenu = (e) => {
                 if (e) e.stopPropagation();
-                // Переключаем видимость подменю
+                
+                // На мобильном — открываем модальное окно вместо подменю
+                if (window.innerWidth <= 480) {
+                    e.preventDefault();
+                    closeContextMenu();  // Закрываем контекстное меню
+                    showRelativesModal(pid, subItems);  // Открываем модальное окно
+                    return;
+                }
+                
+                // На десктопе — переключаем подменю
                 subWrap.classList.toggle('is-open');
                 console.log('[CONTEXT_MENU] submenu toggle:', subWrap.classList.contains('is-open'));
             };
-            
+
             // Для мобильного - touchstart (срабатывает раньше click)
-            mainItem.addEventListener('touchstart', toggleSubmenu, {passive: true});
+            mainItem.addEventListener('touchstart', toggleSubmenu, {passive: false});
             // Для десктопа - click
             mainItem.addEventListener('click', toggleSubmenu, {passive: true});
-            
+
             subWrap.appendChild(mainItem);
             const submenu = document.createElement("div");
             submenu.className = "cm-submenu tree-context-menu";
