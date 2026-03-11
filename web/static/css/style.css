@@ -1293,15 +1293,29 @@ body {
   }
   
   /* Уменьшаем модальные окна */
+  .tree-modal-overlay,
+  .tree-edit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 10px;
+  }
+  
   .tree-modal,
   .tree-edit-modal {
-    padding: 10px !important;
+    padding: 15px !important;
     min-width: 0 !important;
     max-width: 95vw !important;
     width: 95vw !important;
-    max-height: 90vh !important;
-    overflow: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    max-height: 85vh !important;
+    overflow: visible !important;
+    position: relative !important;
+    flex-shrink: 1 !important;
   }
   .tree-modal h3,
   .tree-edit-modal h3 {
@@ -1321,10 +1335,12 @@ body {
 
   /* Горизонтальный и вертикальный скролл для содержимого модального окна */
   .tree-edit-content {
-    overflow-x: auto !important;
+    overflow-x: scroll !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    min-width: min-content;
+    min-width: fit-content !important;
+    width: 100%;
+    position: relative !important;
   }
   
   /* Вкладки sticky */
@@ -1333,6 +1349,8 @@ body {
     top: 0;
     background: #fff;
     z-index: 10;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* Кнопки в модальных окнах */
