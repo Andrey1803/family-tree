@@ -363,6 +363,7 @@ class FamilyTreeApp:
         # Горячие клавиши для часто используемых действий
         self.root.bind("<Control-s>", lambda e: self.save_file())
         self.root.bind("<Control-e>", lambda e: self.edit_person())
+        self.root.bind("<Control-t>", lambda e: self.open_timeline())  # Временная шкала
         self.root.bind("<Delete>", lambda e: self.delete_person())
         self.root.bind("<F2>", lambda e: self.edit_person())
         self.root.bind("<F3>", lambda e: self.open_search_dialog())
