@@ -468,6 +468,9 @@ class FamilyTreeApp:
         if not already_placed:
             self._skip_centering_once = True
         self.refresh_view(skip_layout=already_placed)
+        
+        # Плавное центрирование на персоне (как в web-версии)
+        self.center_canvas_on_person_animated(pid)
 
     def on_person_double_click(self, pid):
         """Двойной клик по персоне: выбор и открытие редактора."""
@@ -482,6 +485,76 @@ class FamilyTreeApp:
             self.center_label.config(text=f"Центр: {center_person.display_name()}")
         self.edit_person()
 
+    def center_canvas_on_person_animated(self, pid, duration=600):
+        """
+        Плавное центрирование холста на персоне (как в web-версии).
+        
+        Args:
+            pid: ID персоны
+            duration: Длительность анимации в мс
+        """
+        if pid is None or str(pid) not in self.coords:
+            return
+        
+        # Получаем координаты персоны
+        x, y = self.coords[str(pid)]
+        
+        # Получаем размеры холста и контента
+        try:
+            canvas_width = self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+            bbox = self.canvas.bbox("all")
+            
+            if not bbox:
+                return
+            
+            bbox_x0, bbox_y0, bbox_x2, bbox_y2 = bbox
+            content_width = bbox_x2 - bbox_x0
+            content_height = bbox_y2 - bbox_y0
+            
+            if content_width <= 0 or content_height <= 0:
+                return
+            
+            # Вычисляем целевую позицию
+            target_scroll_x = ((x - bbox_x0) - canvas_width / 2) / content_width
+            target_scroll_y = ((y - bbox_y0) - canvas_height / 2) / content_height
+            
+            # Ограничиваем [0, 1]
+            target_scroll_x = max(0, min(1, target_scroll_x))
+            target_scroll_y = max(0, min(1, target_scroll_y))
+            
+            # Текущая позиция
+            start_scroll_x = self.canvas.xview()[0]
+            start_scroll_y = self.canvas.yview()[0]
+            
+            # Проверяем, нужно ли перемещать
+            if abs(target_scroll_x - start_scroll_x) < 0.01 and abs(target_scroll_y - start_scroll_y) < 0.01:
+                return
+            
+            # Анимация
+            start_time = self.root.tk.call('clock', 'milliseconds')
+            
+            def animate():
+                current_time = self.root.tk.call('clock', 'milliseconds')
+                elapsed = current_time - start_time
+                progress = min(elapsed / duration, 1.0)
+                
+                # Ease-in-out cubic
+                eased = 4 * progress * progress * progress if progress < 0.5 else 1 - pow(-2 * progress + 2, 3) / 2
+                
+                current_scroll_x = start_scroll_x + (target_scroll_x - start_scroll_x) * eased
+                current_scroll_y = start_scroll_y + (target_scroll_y - start_scroll_y) * eased
+                
+                self.canvas.xview_moveto(current_scroll_x)
+                self.canvas.yview_moveto(current_scroll_y)
+                
+                if progress < 1.0:
+                    self.root.after(16, animate)  # ~60 FPS
+            
+            animate()
+            
+        except Exception as e:
+            print(f"[ANIMATION] Error: {e}")
 
     def check_first_run(self):
         """Если дерево пустое (новый пользователь после входа) — предлагаем заполнить свои данные."""
