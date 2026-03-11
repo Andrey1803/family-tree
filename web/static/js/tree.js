@@ -1123,18 +1123,19 @@ function setCenterAndSave(pid) {
         return;
     }
     
-    // Вычисляем текущее положение карточки на экране
-    const cardScreenX = pos.x + offsetX - CARD_W / 2;
-    const cardScreenY = pos.y + offsetY - CARD_H / 2;
-    const cardCenterX = cardScreenX + CARD_W / 2;
-    const cardCenterY = cardScreenY + CARD_H / 2;
+    // Вычисляем центр карточки относительно viewport
+    // pos.x и pos.y — это координаты центра карточки в пространстве дерева
+    // treePanX и treePanY — текущее смещение дерева
+    // treeZoom — текущий зум
+    const cardCenterX = pos.x * treeZoom + treePanX;
+    const cardCenterY = pos.y * treeZoom + treePanY;
     
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
     // Вычисляем, насколько нужно сместить дерево
-    const targetPanX = (viewportWidth / 2) - cardCenterX + treePanX;
-    const targetPanY = (viewportHeight / 2) - cardCenterY + treePanY;
+    const targetPanX = (viewportWidth / 2) - cardCenterX;
+    const targetPanY = (viewportHeight / 2) - cardCenterY;
     
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
