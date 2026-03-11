@@ -28,6 +28,109 @@ let activeFilters = { gender: "Все", status: "Все", photos_only: false, ch
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 
+// === АВТОСОХРАНЕНИЕ ===
+let autoSaveTimer = null;
+let lastSavedState = null;
+const AUTO_SAVE_INTERVAL = 5 * 60 * 1000; // 5 минут
+
+/**
+ * Проверяет, есть ли несохранённые изменения
+ */
+function hasUnsavedChanges() {
+    const current = JSON.stringify(treeData);
+    return current !== lastSavedState;
+}
+
+/**
+ * Запускает автосохранение
+ */
+function startAutoSave() {
+    if (autoSaveTimer) clearInterval(autoSaveTimer);
+    
+    autoSaveTimer = setInterval(() => {
+        if (hasUnsavedChanges()) {
+            console.log('[AUTO_SAVE] Saving...');
+            saveTree();
+            showStatusMessage('Автосохранение выполнено');
+        }
+    }, AUTO_SAVE_INTERVAL);
+    
+    console.log('[AUTO_SAVE] Started (5 min interval)');
+}
+
+/**
+ * Показывает сообщение в статус-баре
+ */
+function showStatusMessage(msg) {
+    const statusEl = document.getElementById('status-msg');
+    if (statusEl) {
+        statusEl.textContent = msg;
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+}
+
+/**
+ * Настраивает горячие клавиши
+ */
+function setupHotkeys() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+S — Сохранить
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            saveTree(true);
+            showStatusMessage('✅ Сохранено');
+        }
+        
+        // Ctrl+Z — Отменить
+        if (e.ctrlKey && e.key === 'z') {
+            e.preventDefault();
+            if (window.undoManager && window.undoManager.undo()) {
+                showStatusMessage('Отменено');
+            }
+        }
+        
+        // Ctrl+Y — Повторить
+        if (e.ctrlKey && e.key === 'y') {
+            e.preventDefault();
+            if (window.undoManager && window.undoManager.redo()) {
+                showStatusMessage('Повторено');
+            }
+        }
+        
+        // Ctrl+F — Режим фокуса
+        if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            toggleFocusMode();
+            showStatusMessage(`Фокус: ${focusModeActive ? 'вкл' : 'выкл'}`);
+        }
+        
+        // Ctrl+T — Временная шкала
+        if (e.ctrlKey && e.key === 't') {
+            e.preventDefault();
+            openTimeline();
+        }
+        
+        // Delete — Удалить персону (если выбрана)
+        if (e.key === 'Delete' && !e.ctrlKey && !e.altKey) {
+            const selectedCard = document.querySelector('.tree-card.selected');
+            if (selectedCard) {
+                const pid = selectedCard.getAttribute('data-pid');
+                if (pid) deletePerson(pid);
+            }
+        }
+    });
+    
+    console.log('[HOTKEYS] Setup complete: Ctrl+S, Z, Y, F, T, Delete');
+}
+
+/**
+ * Переключает режим фокуса (показывает только предков/потомков)
+ */
+function toggleFocusMode() {
+    focusModeActive = !focusModeActive;
+    render();
+}
+
 /**
  * Рассчитывает возраст по дате рождения.
  * @param {string} birthDateStr - Дата рождения в формате "ДД.ММ.ГГГГ"
@@ -273,6 +376,13 @@ async function loadTree() {
             }
         }
     }, 100);
+    
+    // === ЗАПУСК АВТОСОХРАНЕНИЯ ===
+    lastSavedState = JSON.stringify(treeData);
+    startAutoSave();
+    
+    // === ГОРЯЧИЕ КЛАВИШИ ===
+    setupHotkeys();
 }
 
 function render() {
@@ -1576,6 +1686,8 @@ async function saveTree(showNotification = false) {
         // Сохраняем с username для идентификации
         const backupData = {...treeData, _username: localStorage.getItem('family_tree_username') || 'unknown'};
         localStorage.setItem('family_tree_backup', JSON.stringify(backupData));
+        // Сохраняем состояние для автосохранения
+        lastSavedState = JSON.stringify(treeData);
     }
 
     // Проверяем, есть ли что сохранять
