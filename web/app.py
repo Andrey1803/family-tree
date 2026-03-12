@@ -23,15 +23,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Импортируем общие утилиты аутентификации
-from auth_utils import (
-    SUPER_ADMINS,
-    _password_hash,
-    _verify_password,
-    _load_users,
-    _save_users,
-    is_super_admin,
-    auth_check_local
-)
+# Используем относительный импорт для совместимости с Railway
+try:
+    from auth_utils import (
+        SUPER_ADMINS,
+        _password_hash,
+        _verify_password,
+        _load_users,
+        _save_users,
+        is_super_admin,
+        auth_check_local
+    )
+except ImportError:
+    # Fallback: импортируем из родительской директории
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from auth_utils import (
+        SUPER_ADMINS,
+        _password_hash,
+        _verify_password,
+        _load_users,
+        _save_users,
+        is_super_admin,
+        auth_check_local
+    )
 
 # Переопределяем BCRYPT_AVAILABLE для web-версии
 try:
