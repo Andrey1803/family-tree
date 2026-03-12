@@ -23,7 +23,7 @@ def _password_hash(login: str, password: str) -> str:
     """
     Хеширует пароль.
 
-    Если bcrypt доступны — использует bcrypt.
+    Если bcrypt доступен — использует bcrypt.
     Иначе — fallback на SHA256 (для обратной совместимости).
     """
     if BCRYPT_AVAILABLE:
