@@ -22,30 +22,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Импортируем общие утилиты аутентификации
-# Используем относительный импорт для совместимости с Railway
-try:
-    from auth_utils import (
-        SUPER_ADMINS,
-        _password_hash,
-        _verify_password,
-        _save_users,
-        is_super_admin,
-        auth_check_local
-    )
-except ImportError:
-    # Fallback: импортируем из родительской директории
-    import sys
-    import os
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from auth_utils import (
-        SUPER_ADMINS,
-        _password_hash,
-        _verify_password,
-        _save_users,
-        is_super_admin,
-        auth_check_local
-    )
+# Импортируем общие утилиты аутентификации из корня проекта
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from auth_utils import (
+    SUPER_ADMINS,
+    _password_hash,
+    _verify_password,
+    _save_users,
+    is_super_admin,
+    auth_check_local
+)
 
 # Переопределяем BCRYPT_AVAILABLE для web-версии
 try:
@@ -122,8 +108,11 @@ print(f"[CONFIG] USERS_FILE={USERS_FILE}")
 
 # Проверяем, есть ли файл, если нет — пробуем в корне проекта
 if not os.path.exists(USERS_FILE):
-    print(f"[CONFIG] File not found, trying /app/data/users.json")
-    USERS_FILE = "/app/data/users.json"
+    print(f"[CONFIG] File not found, trying alternate path...")
+    alt_path = os.path.normpath(os.path.join(_web_dir, "..", "data", "users.json"))
+    if os.path.exists(alt_path):
+        USERS_FILE = alt_path
+        print(f"[CONFIG] Found users.json at {USERS_FILE}")
 
 # Создаём папку и файл users.json, если их нет (для Railway)
 if not os.path.exists(USERS_FILE):
@@ -277,9 +266,6 @@ def auth_register(login: str, password: str, email: str = ""):
         return f"Ошибка сервера: {e.code}"
     except Exception as e:
         return f"Ошибка подключения к серверу: {str(e)}"
-    if not _save_users(users):
-        return "Ошибка сохранения."
-    return None
 
 
 from tree_service import load_tree, save_tree, DATA_DIR
@@ -468,8 +454,9 @@ def api_session():
                 print(f"[SESSION] Login verified: {server_login}")
         except Exception as e:
             print(f"[SESSION] Could not verify login: {e}")
-            # Не блокируем вход, если проверка не прошла — продолжаем с осторожностью
-        
+            # Блокируем вход если проверка не прошла
+            return jsonify({"error": "Не удалось проверить пользователя"}), 401
+
         session['server_token'] = token
         session['server_user_id'] = user_id
         if login:

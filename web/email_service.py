@@ -393,12 +393,16 @@ def send_verification_code(email: str) -> Optional[str]:
 
 def cleanup_expired_codes():
     """Очистить истёкшие коды."""
+    codes = _load_verification_codes()
     now = datetime.now()
-    expired = [email for email, data in _verification_codes.items() 
+    expired = [email for email, data in codes.items()
                if now > data['expiry']]
-    
+
     for email in expired:
-        del _verification_codes[email]
+        del codes[email]
     
+    # Сохраняем обратно
+    _save_verification_codes(codes)
+
     if expired:
         print(f"[EMAIL] Очищено {len(expired)} истёкших кодов")
