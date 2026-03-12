@@ -607,6 +607,12 @@ async function loadTreeFromServer() {
             const serverData = await r.json();
             treeData = serverData;
             centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
+            
+            // Сбрасываем зум и панорамирование
+            treeZoom = 0.5;
+            treePanX = 0;
+            treePanY = 0;
+            
             console.log('[LOAD_TREE_FROM_SERVER] Loaded', Object.keys(treeData.persons).length, 'persons');
             render();
             return true;
@@ -4080,12 +4086,17 @@ window.undoManager = new UndoManager(50);
 const urlParamsCheck = new URLSearchParams(window.location.search);
 const isAdminViewCheck = urlParamsCheck.get('admin_view') === '1';
 
+console.log('[TREE.JS] URL:', window.location.search);
+console.log('[TREE.JS] isAdminViewCheck:', isAdminViewCheck);
+
 // Вызываем ПОСЛЕ загрузки DOM
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('[TREE.JS] DOMContentLoaded - calling initApp()');
         initApp();
     });
 } else {
+    console.log('[TREE.JS] DOM already loaded - calling initApp()');
     initApp();
 }
 
