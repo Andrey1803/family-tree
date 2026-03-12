@@ -1996,7 +1996,7 @@ async function saveTree(showNotification = false) {
                     document.body.appendChild(msg);
                     setTimeout(() => msg.remove(), 4000);
                 }
-                return;  // Успех
+                return true;  // Успех
             } else {
                 console.error('[SAVE] ❌ Server error:', response.status, 'attempt', attempt);
             }
@@ -2742,15 +2742,10 @@ async function deletePerson(pid) {
         treeData.current_center = centerId;
     }
     
-    // Сохраняем и ждём
-    const saved = await saveTree();
+    // Сохраняем
+    await saveTree();
     
-    // Если сервер не ответил - пробуем загрузить заново
-    if (!saved) {
-        console.log('[DELETE] Server did not respond, reloading tree...');
-        await loadTreeFromServer();
-    }
-    
+    // Перерисовываем (не перезагружаем с сервера!)
     render();
 }
 
