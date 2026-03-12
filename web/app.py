@@ -178,9 +178,10 @@ def is_admin(username: str) -> bool:
     # Используем общую функцию
     if is_super_admin(username):
         return True
-    
+
     # Проверяем флаг is_admin в локальных пользователях
-    users = _load_users(USERS_FILE)
+    # Используем локальную функцию _load_users() без аргументов
+    users = _load_users()
     user_data = users.get(username, {})
     return isinstance(user_data, dict) and user_data.get("is_admin")
 
