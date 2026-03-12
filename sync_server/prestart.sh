@@ -68,6 +68,34 @@ try:
 except Exception as e:
     print(f'⚠️  Миграция photo_full: {e}')
 
+# Миграция: добавляем created_at и updated_at если нет
+print('\n🔧 Проверка миграции timestamps...')
+try:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(persons)")
+    columns = [row[1] for row in cursor.fetchall()]
+    
+    if 'created_at' not in columns:
+        print('🔧 Добавление колонки created_at...')
+        cursor.execute('ALTER TABLE persons ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+        conn.commit()
+        print('✅ created_at добавлена!')
+    else:
+        print('✅ created_at уже существует')
+    
+    if 'updated_at' not in columns:
+        print('🔧 Добавление колонки updated_at...')
+        cursor.execute('ALTER TABLE persons ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+        conn.commit()
+        print('✅ updated_at добавлена!')
+    else:
+        print('✅ updated_at уже существует')
+    
+    conn.close()
+except Exception as e:
+    print(f'⚠️  Миграция timestamps: {e}')
+
 print(f'📦 Files in {DATA_DIR}: {os.listdir(DATA_DIR) if os.path.exists(DATA_DIR) else "DIR NOT FOUND"}')
 PYTHON_SCRIPT
 
