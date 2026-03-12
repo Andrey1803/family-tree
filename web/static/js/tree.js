@@ -461,17 +461,17 @@ async function loadTree() {
     // === БЕЗОПАСНОСТЬ: Проверяем, что localStorage принадлежит текущему пользователю ===
     const currentUsername = localStorage.getItem('family_tree_username') || '';
     console.log('[LOAD_TREE] Current username from storage:', currentUsername);
-    
+
     // Загружаем backup из localStorage (локальная версия)
     let backup = localStorage.getItem('family_tree_backup');
     let localData = null;
-    
+
     // Если backup есть, проверяем, что он принадлежит текущему пользователю
     if (backup) {
         try {
             const parsed = JSON.parse(backup);
             const backupUsername = parsed._username || '';
-            
+
             // Если пользователь сменился — НЕ используем старый backup!
             if (backupUsername && backupUsername !== currentUsername) {
                 console.log('[LOAD_TREE] SECURITY: Backup belongs to different user!', backupUsername, '!=', currentUsername);
@@ -512,7 +512,7 @@ async function loadTree() {
         }
         return;
     }
-    
+
     const serverData = await r.json();
     const serverPersonsCount = Object.keys(serverData.persons || {}).length;
     const localPersonsCount = localData ? Object.keys(localData.persons || {}).length : 0;
@@ -575,7 +575,7 @@ async function loadTree() {
     // Сохраняем объединённые данные в backup
     treeData._username = username;
     localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
-    
+
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId, 'total persons:', Object.keys(treeData.persons).length);
 
@@ -593,6 +593,29 @@ async function loadTree() {
         if (wrap) {
             const rootRect = root.getBoundingClientRect();
             const wrapRect = wrap.getBoundingClientRect();
+            centerOnPerson(centerId);
+        }
+    }, 100);
+}
+
+// Принудительная перезагрузка дерева с сервера (после удаления)
+async function loadTreeFromServer() {
+    console.log('[LOAD_TREE_FROM_SERVER] Reloading tree from server...');
+    try {
+        const r = await fetch("/api/tree");
+        if (r.ok) {
+            const serverData = await r.json();
+            treeData = serverData;
+            centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
+            console.log('[LOAD_TREE_FROM_SERVER] Loaded', Object.keys(treeData.persons).length, 'persons');
+            render();
+            return true;
+        }
+    } catch (e) {
+        console.error('[LOAD_TREE_FROM_SERVER] Error:', e);
+    }
+    return false;
+}
             treePanX = (rootRect.width - wrapRect.width * treeZoom) / 2;
             treePanY = (rootRect.height - wrapRect.height * treeZoom) / 2;
             const panZoomWrapper = root.querySelector(".tree-pan-zoom");
@@ -1953,10 +1976,14 @@ async function saveTree(showNotification = false) {
             if (response.ok) {
                 const result = await response.json();
                 console.log('[SAVE] Server response:', result);
-                
+
                 if (result.ok) {
                     console.log('[SAVE] ✅ Success at', new Date().toLocaleTimeString());
                     serverSaved = true;
+                    // Обновляем treeData из ответа сервера если есть
+                    if (result.tree) {
+                        treeData = result.tree;
+                    }
                 } else {
                     console.error('[SAVE] ❌ Server returned error:', result);
                 }
@@ -1985,13 +2012,16 @@ async function saveTree(showNotification = false) {
 
     // Данные УЖЕ сохранены в localStorage (см. выше), показываем предупреждение
     console.warn('[SAVE] ⚠️ Saved locally only (server unavailable)');
-    
+
     // Показываем уведомление
     const msg = document.createElement('div');
     msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#f39c12;color:white;padding:12px 24px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:16px;font-weight:bold;';
     msg.textContent = '⚠️ Сохранено локально (сервер недоступен)';
     document.body.appendChild(msg);
     setTimeout(() => msg.remove(), 5000);
+    
+    // Возвращаем false чтобы вызвать перезагрузку
+    return false;
 }
 
 // === ИСПРАВЛЕНИЕ СКРОЛЛА НА МОБИЛЬНОМ ===
@@ -2712,8 +2742,15 @@ async function deletePerson(pid) {
         treeData.current_center = centerId;
     }
     
-    // Ждём сохранения перед перерисовкой
-    await saveTree();
+    // Сохраняем и ждём
+    const saved = await saveTree();
+    
+    // Если сервер не ответил - пробуем загрузить заново
+    if (!saved) {
+        console.log('[DELETE] Server did not respond, reloading tree...');
+        await loadTreeFromServer();
+    }
+    
     render();
 }
 
