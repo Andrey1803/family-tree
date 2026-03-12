@@ -42,6 +42,8 @@ def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DB_FILE)
         g.db.row_factory = sqlite3.Row
+        # Включаем проверку FOREIGN KEY
+        g.db.execute('PRAGMA foreign_keys = ON')
     return g.db
 
 @app.teardown_appcontext
@@ -512,12 +514,15 @@ def sync_upload():
     
     except Exception as e:
         db.rollback()
+        print(f"[SYNC_UPLOAD] ERROR: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         db.execute('''
             INSERT INTO sync_logs (user_id, action, status, error_message)
             VALUES (?, ?, ?, ?)
         ''', (g.current_user_id, 'upload', 'error', str(e)))
         db.commit()
-        
+
         return jsonify({'error': f'Ошибка синхронизации: {str(e)}'}), 500
 
 @app.route('/api/sync/download', methods=['GET'])
