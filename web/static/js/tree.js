@@ -622,22 +622,6 @@ async function loadTreeFromServer() {
     }
     return false;
 }
-            treePanX = (rootRect.width - wrapRect.width * treeZoom) / 2;
-            treePanY = (rootRect.height - wrapRect.height * treeZoom) / 2;
-            const panZoomWrapper = root.querySelector(".tree-pan-zoom");
-            if (panZoomWrapper) {
-                panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
-            }
-        }
-    }, 100);
-    
-    // === ЗАПУСК АВТОСОХРАНЕНИЯ ===
-    lastSavedState = JSON.stringify(treeData);
-    startAutoSave();
-    
-    // === ГОРЯЧИЕ КЛАВИШИ ===
-    setupHotkeys();
-}
 
 function render() {
     const root = document.getElementById("tree-root");
