@@ -1453,7 +1453,7 @@ def download_desktop():
 
 @app.route("/api/photo/<person_id>")
 def api_photo(person_id):
-    """Возвращает фото персоны: из base64 или из photo_path."""
+    """Возвращает миниатюру фото персоны из base64 (для карточки)."""
     if "username" not in session:
         return "", 401
     username = session["username"]
@@ -1463,7 +1463,7 @@ def api_photo(person_id):
     if not p:
         return "", 404
     pd = p if isinstance(p, dict) else (getattr(p, "__dict__", {}) or {})
-    photo_b64 = pd.get("photo")
+    photo_b64 = pd.get("photo")  # Это миниатюра
     photo_path = pd.get("photo_path", "")
     if photo_b64 and isinstance(photo_b64, str) and photo_b64.strip():
         import base64
@@ -1484,6 +1484,48 @@ def api_photo(person_id):
                 return send_file(path, mimetype=mime)
             except Exception:
                 return "", 404
+    return "", 404
+
+
+@app.route("/api/photo/<person_id>/full")
+def api_photo_full(person_id):
+    """
+    Возвращает полное фото персоны (увеличенное, не миниатюру).
+    Для desktop-версии: запрашивает фото у локального сервера desktop.
+    Для веб-версии: возвращает из base64 если доступно.
+    """
+    if "username" not in session:
+        return "", 401
+    username = session["username"]
+    data = load_tree(username)
+    persons = data.get("persons", {})
+    p = persons.get(str(person_id)) or persons.get(person_id)
+    if not p:
+        return "", 404
+    pd = p if isinstance(p, dict) else (getattr(p, "__dict__", {}) or {})
+    
+    # Пробуем получить полное фото из photo_full (если есть)
+    photo_full_b64 = pd.get("photo_full")
+    if photo_full_b64 and isinstance(photo_full_b64, str) and photo_full_b64.strip():
+        import base64
+        try:
+            raw = base64.b64decode(photo_full_b64.strip())
+            mt = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
+            return Response(raw, mimetype=mt)
+        except Exception:
+            pass
+    
+    # Если нет полного, возвращаем миниатюру
+    photo_b64 = pd.get("photo")
+    if photo_b64 and isinstance(photo_b64, str) and photo_b64.strip():
+        import base64
+        try:
+            raw = base64.b64decode(photo_b64.strip())
+            mt = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
+            return Response(raw, mimetype=mt)
+        except Exception:
+            pass
+    
     return "", 404
 
 

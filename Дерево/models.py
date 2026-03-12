@@ -30,7 +30,8 @@ class Person:
                  birth_place="", biography="", burial_place="", burial_date="",
                  photo_album=None, links=None, occupation="", education="", address="", notes="",
                  significant_events=None, phone="", email="", social_media=None, blood_type="", medical_info=None,
-                 vk="", telegram="", whatsapp="", rh_factor="", allergies="", chronic_conditions=""):
+                 vk="", telegram="", whatsapp="", rh_factor="", allergies="", chronic_conditions="",
+                 photo_full=None):
         self.id = None
         self.name = name
         self.surname = surname
@@ -39,6 +40,7 @@ class Person:
         self.gender = gender
         self.photo = photo
         self.photo_path = photo_path or ""
+        self.photo_full = photo_full  # Полное фото (сжатое) для веб-версии
         self.is_deceased = is_deceased
         self.death_date = death_date or ""
         self.maiden_name = maiden_name or ""
@@ -367,6 +369,7 @@ class FamilyTreeModel:
                         "birth_date": p.birth_date, "gender": p.gender,
                         "photo": p.photo if p.photo and isinstance(p.photo, str) and p.photo.strip() else None,
                         "photo_path": getattr(p, "photo_path", "") or "",
+                        "photo_full": getattr(p, "photo_full", None),
                         "is_deceased": p.is_deceased, "death_date": p.death_date,
                         "maiden_name": getattr(p, "maiden_name", "") or "",
                         "parents": list(p.parents), "children": list(p.children),
@@ -428,6 +431,7 @@ class FamilyTreeModel:
                     gender=pdata.get("gender", ""),
                     photo=pdata.get("photo", None),
                     photo_path=pdata.get("photo_path", ""),
+                    photo_full=pdata.get("photo_full", None),
                     is_deceased=pdata.get("is_deceased", False) in (True, 1, "1", "true", "True"),
                     death_date=pdata.get("death_date", ""),
                     maiden_name=pdata.get("maiden_name", ""),

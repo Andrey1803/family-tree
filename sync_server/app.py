@@ -92,6 +92,7 @@ def init_db():
             gender TEXT,
             photo_path TEXT,
             photo BLOB,
+            photo_full BLOB,
             birth_place TEXT,
             biography TEXT,
             burial_place TEXT,
@@ -456,12 +457,12 @@ def sync_upload():
             db.execute('''
                 INSERT INTO persons (
                     id, tree_id, name, surname, patronymic, birth_date, death_date,
-                    is_deceased, gender, photo_path, photo, birth_place, biography,
+                    is_deceased, gender, photo_path, photo, photo_full, birth_place, biography,
                     burial_place, burial_date, occupation, education, address, notes,
                     phone, email, vk, telegram, whatsapp, blood_type, rh_factor,
                     allergies, chronic_conditions, links, photo_album, parents,
                     children, spouse_ids, collapsed_branches
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 pid, tree_id,
                 pdata.get('name', ''),
@@ -473,6 +474,7 @@ def sync_upload():
                 pdata.get('gender', ''),
                 pdata.get('photo_path', ''),
                 pdata.get('photo'),
+                pdata.get('photo_full'),
                 pdata.get('birth_place', ''),
                 pdata.get('biography', ''),
                 pdata.get('burial_place', ''),
@@ -571,6 +573,7 @@ def sync_download():
             'gender': row['gender'] or '',
             'photo_path': row['photo_path'] or '',
             'photo': row['photo'],
+            'photo_full': row['photo_full'],
             'birth_place': row['birth_place'] or '',
             'biography': row['biography'] or '',
             'burial_place': row['burial_place'] or '',

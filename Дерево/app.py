@@ -3102,9 +3102,20 @@ class FamilyTreeApp:
 
             # Обработка фото: если указан путь к файлу и он существует - сохраняем путь
             photo_data = None
+            photo_full_data = None
             actual_photo_path = ""
             if photo_path and os.path.exists(photo_path):
                 actual_photo_path = photo_path
+                # Создаём миниатюру и полное фото через photo_service
+                try:
+                    from services.photo_service import get_photo_data
+                    photo_data_dict = get_photo_data(photo_path, include_full=True)
+                    if photo_data_dict:
+                        photo_data = photo_data_dict.get('thumbnail')  # Миниатюра для сервера
+                        photo_full_data = photo_data_dict.get('full')  # Полное фото для веба
+                        print(f"[PHOTO] Добавление: миниатюра {len(photo_data) if photo_data else 0} симв., полное {len(photo_full_data) if photo_full_data else 0} симв.")
+                except Exception as e:
+                    print(f"[PHOTO] Ошибка создания фото: {e}")
             elif photo_path:
                 # Попытка загрузить как файл (возможно, относительный путь)
                 try:
@@ -3121,6 +3132,7 @@ class FamilyTreeApp:
                 birth_date=birth_date,
                 gender=gender,
                 photo=photo_data,
+                photo_full=photo_full_data,  # ← ДОБАВЛЕНО: полное фото
                 is_deceased=is_deceased,
                 death_date=death_date,
                 maiden_name=maiden_name,
@@ -3975,13 +3987,29 @@ class FamilyTreeApp:
             person.gender = gender_var.get()
             person.maiden_name = maiden_name_var.get().strip() if gender_var.get() == "Женский" else ""
 
+            # === ОБРАБОТКА ФОТО: миниатюра для сервера + полное фото локально ===
             photo_path = photo_path_var.get().strip()
             if photo_path and os.path.exists(photo_path):
                 person.photo_path = photo_path
-                person.photo = None
+                # Создаём миниатюру для синхронизации (с сервером)
+                try:
+                    from services.photo_service import get_photo_data
+                    photo_data = get_photo_data(photo_path, include_full=True)
+                    if photo_data:
+                        person.photo = photo_data.get('thumbnail')  # Миниатюра для сервера
+                        person.photo_full = photo_data.get('full')  # Полное фото для веба
+                        print(f"[PHOTO] Миниатюра: {len(person.photo) if person.photo else 0} символов, Полное: {len(person.photo_full) if person.photo_full else 0} символов")
+                    else:
+                        person.photo = None
+                        person.photo_full = None
+                except Exception as e:
+                    print(f"[PHOTO] Ошибка создания фото: {e}")
+                    person.photo = None
+                    person.photo_full = None
             elif not photo_path:
                 person.photo_path = ""
                 person.photo = None
+                person.photo_full = None
 
             person.biography = bio_text.get("1.0", tk.END).strip()
             person.burial_place = burial_place_var.get().strip()
@@ -4495,6 +4523,28 @@ class FamilyTreeApp:
                 messagebox.showerror("Ошибка", "Имя и фамилия обязательны для заполнения.")
                 return
 
+            # === Обработка фото через photo_service ===
+            photo_data = None
+            photo_full_data = None
+            actual_photo_path = ""
+            if photo_path and os.path.exists(photo_path):
+                actual_photo_path = photo_path
+                try:
+                    from services.photo_service import get_photo_data
+                    photo_data_dict = get_photo_data(photo_path, include_full=True)
+                    if photo_data_dict:
+                        photo_data = photo_data_dict.get('thumbnail')
+                        photo_full_data = photo_data_dict.get('full')
+                        print(f"[PHOTO] Брат/сестра: миниатюра {len(photo_data) if photo_data else 0} симв., полное {len(photo_full_data) if photo_full_data else 0} симв.")
+                except Exception as e:
+                    print(f"[PHOTO] Ошибка: {e}")
+            elif photo_path:
+                try:
+                    with open(photo_path, "rb") as img_file:
+                        photo_data = base64.b64encode(img_file.read()).decode('utf-8')
+                except Exception:
+                    pass
+
             # === Добавляем персону ===
             sibling_id, error = self.model.add_person(
                 name=name,
@@ -4504,7 +4554,9 @@ class FamilyTreeApp:
                 death_date=death_date if is_deceased else "",
                 is_deceased=is_deceased,
                 gender=gender,
-                photo_path=photo_path
+                photo=photo_data,
+                photo_full=photo_full_data,
+                photo_path=actual_photo_path
             )
             if error:
                 messagebox.showerror("Ошибка", error)
