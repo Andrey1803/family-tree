@@ -11,5 +11,4 @@ cmds = ["python -m pip install -r web/requirements.txt"]
 cmds = ["mkdir -p /app/data", "cp data/users.json /app/data/users.json 2>/dev/null || echo 'No users.json to copy'"]
 
 [start]
-# Добавляем корень в PYTHONPATH чтобы auth_utils был доступен
-cmd = "PYTHONPATH=/app:$PYTHONPATH cd web && gunicorn -b 0.0.0.0:$PORT app:app"
+cmd = "gunicorn -b 0.0.0.0:$PORT web.app:app"
