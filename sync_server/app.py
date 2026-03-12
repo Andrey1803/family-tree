@@ -933,7 +933,7 @@ def health_check():
     except Exception as e:
         db_status = 'disconnected'
         db_error = str(e)
-    
+
     response = {
         'status': 'ok',
         'timestamp': datetime.now().isoformat(),
@@ -943,11 +943,66 @@ def health_check():
         },
         'version': '1.0.0'
     }
-    
+
     if db_error:
         response['database']['error'] = db_error
-    
+
     return jsonify(response)
+
+@app.route('/api/admin/migrate', methods=['GET', 'POST'])
+def admin_migrate():
+    """Выполнить миграцию БД (добавить photo_full)."""
+    import sqlite3
+    
+    results = []
+    
+    try:
+        DB_PATH = os.environ.get('DATA_DIR', '/data') + '/family_tree.db'
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Проверяем колонки
+        cursor.execute("PRAGMA table_info(persons)")
+        columns = [row[1] for row in cursor.fetchall()]
+        results.append(f"Найдено колонок: {len(columns)}")
+        
+        migrations = []
+        if 'photo_full' not in columns:
+            migrations.append('photo_full')
+        if 'created_at' not in columns:
+            migrations.append('created_at')
+        if 'updated_at' not in columns:
+            migrations.append('updated_at')
+        
+        if not migrations:
+            results.append("✅ Все миграции уже применены")
+        else:
+            results.append(f"Нужно добавить: {', '.join(migrations)}")
+            
+            for col in migrations:
+                try:
+                    if col == 'photo_full':
+                        cursor.execute("ALTER TABLE persons ADD COLUMN photo_full BLOB")
+                    elif col == 'created_at':
+                        cursor.execute("ALTER TABLE persons ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                    elif col == 'updated_at':
+                        cursor.execute("ALTER TABLE persons ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                    conn.commit()
+                    results.append(f"✅ Добавлена колонка: {col}")
+                except Exception as e:
+                    results.append(f"⚠️ Ошибка добавления {col}: {e}")
+        
+        # Проверяем результат
+        cursor.execute("PRAGMA table_info(persons)")
+        columns = [row[1] for row in cursor.fetchall()]
+        results.append(f"Итого колонок: {len(columns)}")
+        
+        conn.close()
+        
+    except Exception as e:
+        results.append(f"❌ Ошибка: {e}")
+    
+    return jsonify({'migrations': results})
 
 # === ИНИЦИАЛИЗАЦИЯ ===
 def initialize_database():
