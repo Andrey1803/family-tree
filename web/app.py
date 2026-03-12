@@ -22,11 +22,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Импортируем общие утилиты аутентификации
+from auth_utils import (
+    SUPER_ADMINS,
+    _password_hash,
+    _verify_password,
+    _load_users,
+    _save_users,
+    is_super_admin,
+    auth_check_local
+)
+
+# Переопределяем BCRYPT_AVAILABLE для web-версии
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
 except ImportError:
     BCRYPT_AVAILABLE = False
+
+# Константы
+AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
 # Попытка импорта reportlab для PDF
 try:
@@ -134,95 +149,24 @@ def _load_users():
         return {}
 
 
-def _save_users(users):
-    try:
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"users": users}, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception:
-        return False
-
-
 def is_admin(username: str) -> bool:
     """Проверяет, является ли пользователь администратором локально.
 
     Проверяет только локальный файл users.json.
     Для проверки через сервер используйте check_admin_access().
-    
+
     Супер-админы (имеют полные права):
     - admin (по умолчанию)
     - Андрей Емельянов (персональный супер-админ)
     """
-    if not username:
-        return False
-    
-    # Супер-админы по имени
-    SUPER_ADMINS = ["admin", "Андрей Емельянов"]
-    if username in SUPER_ADMINS:
+    # Используем общую функцию
+    if is_super_admin(username):
         return True
-
+    
     # Проверяем флаг is_admin в локальных пользователях
-    users = _load_users()
-    print(f"[IS_ADMIN] username='{username}', users_file={USERS_FILE}, exists={os.path.exists(USERS_FILE)}")
-    print(f"[IS_ADMIN] loaded users: {list(users.keys())}")
-    print(f"[IS_ADMIN] username repr={repr(username)}")
+    users = _load_users(USERS_FILE)
     user_data = users.get(username, {})
-    print(f"[IS_ADMIN] user_data={user_data}, type={type(user_data)}")
-    is_admin_result = isinstance(user_data, dict) and user_data.get("is_admin")
-    print(f"[IS_ADMIN] is_admin_result={is_admin_result}")
-    return is_admin_result
-
-
-def _password_hash(login: str, password: str) -> str:
-    """
-    Хеширует пароль.
-    
-    Если bcrypt доступен — использует bcrypt.
-    Иначе — fallback на SHA256 (для обратной совместимости).
-    """
-    if BCRYPT_AVAILABLE:
-        salt = bcrypt.gensalt(rounds=12)
-        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-    else:
-        # Fallback для обратной совместимости
-        import hashlib
-        raw = (AUTH_SALT + login + password).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
-
-
-def _get_user_password_hash(user_data):
-    """Извлекает хеш пароля из данных пользователя."""
-    if isinstance(user_data, dict):
-        return user_data.get("password", "")
-    return user_data  # Старый формат - просто строка с хешем
-
-
-def _verify_password(login: str, password: str, stored_data) -> bool:
-    """
-    Проверяет пароль против хеша.
-
-    Автоматически определяет тип хеша (bcrypt или legacy SHA256).
-    stored_data может быть строкой (старый формат) или словарём (новый формат).
-    """
-    # Извлекаем хеш из данных пользователя
-    stored_hash = _get_user_password_hash(stored_data)
-    
-    if stored_hash.startswith("$2"):
-        # bcrypt хеш
-        if BCRYPT_AVAILABLE:
-            try:
-                return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
-            except Exception:
-                return False
-        else:
-            # bcrypt недоступен, но хеш bcrypt — не можем проверить
-            return False
-    else:
-        # Legacy SHA256 хеш
-        import hashlib
-        raw = (AUTH_SALT + login + password).encode("utf-8")
-        computed = hashlib.sha256(raw).hexdigest()
-        return computed == stored_hash
+    return isinstance(user_data, dict) and user_data.get("is_admin")
 
 
 def auth_check(login: str, password: str) -> bool:
@@ -231,7 +175,7 @@ def auth_check(login: str, password: str) -> bool:
         return False
 
     login_clean = (login or "").strip()
-    
+
     # 1. Пробуем сервер синхронизации
     try:
         req = urllib.request.Request(
@@ -965,9 +909,8 @@ def api_admin_delete_user(user_id):
 
     username = session["username"]
 
-    # Только супер-админы могут удалять
-    SUPER_ADMINS = ["admin", "Андрей Емельянов"]
-    if username not in SUPER_ADMINS:
+    # Только супер-админы могут удалять (используем общую константу)
+    if not is_super_admin(username):
         return jsonify({"error": "Только супер-админ может удалять пользователей"}), 403
 
     server_token = session.get('server_token')

@@ -1,0 +1,1343 @@
+{
+  "persons": {
+    "1": {
+      "name": "Андрей",
+      "surname": "Емельянов",
+      "patronymic": "Николаевич",
+      "birth_date": "18.03.1981",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "2",
+        "3"
+      ],
+      "children": [
+        "5"
+      ],
+      "spouse_ids": [
+        "4"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [
+        {
+          "title": "Однокласники",
+          "url": "https://ok.ru/"
+        }
+      ],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "2": {
+      "name": "Николаей",
+      "surname": "Емельянов",
+      "patronymic": "Андреевич",
+      "birth_date": "05.01.1942",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "D:/Мои документы/Изображения/Мои сканированные изображения/2025-03 (мар)/сканирование0003.jpg",
+      "is_deceased": true,
+      "death_date": "01.04.2024",
+      "maiden_name": "",
+      "parents": [
+        "8",
+        "10"
+      ],
+      "children": [
+        "25",
+        "26",
+        "1",
+        "12"
+      ],
+      "spouse_ids": [
+        "3"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "3": {
+      "name": "Тамара",
+      "surname": "Емельянов",
+      "patronymic": "Флоровна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "D:/Мои документы/Рабочий стол/hobby/Projects/Дерево/photos/i.jpg",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "40",
+        "41"
+      ],
+      "children": [
+        "25",
+        "26",
+        "1",
+        "12"
+      ],
+      "spouse_ids": [
+        "2"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "4": {
+      "name": "Наталья",
+      "surname": "Емельянова",
+      "patronymic": "Юрьевна",
+      "birth_date": "18.06.1988",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "Юркевич",
+      "parents": [
+        "6",
+        "7"
+      ],
+      "children": [
+        "5"
+      ],
+      "spouse_ids": [
+        "1"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "5": {
+      "name": "Максим",
+      "surname": "Емельянов",
+      "patronymic": "Андрейевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "1",
+        "4"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "6": {
+      "name": "Юра",
+      "surname": "Юркевич",
+      "patronymic": "Тимофеевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "13",
+        "14"
+      ],
+      "children": [
+        "4"
+      ],
+      "spouse_ids": [
+        "7"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "7": {
+      "name": "Светлана",
+      "surname": "Юркевич",
+      "patronymic": "Владимировна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "4"
+      ],
+      "spouse_ids": [
+        "6"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "8": {
+      "name": "Андрей",
+      "surname": "Емельянов",
+      "patronymic": "Иванович",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "11"
+      ],
+      "children": [
+        "9",
+        "39",
+        "2",
+        "38"
+      ],
+      "spouse_ids": [
+        "10"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "9": {
+      "name": "Егор",
+      "surname": "Емельянов",
+      "patronymic": "Андрейевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "1",
+      "maiden_name": "",
+      "parents": [
+        "8",
+        "10"
+      ],
+      "children": [
+        "21"
+      ],
+      "spouse_ids": [
+        "20"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "10": {
+      "name": "Ганна",
+      "surname": "Емельянов",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "Бедик",
+      "parents": [],
+      "children": [
+        "9",
+        "39",
+        "2",
+        "38"
+      ],
+      "spouse_ids": [
+        "8"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "11": {
+      "name": "Ивана",
+      "surname": "Емельянов",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "8"
+      ],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "12": {
+      "name": "Сергей",
+      "surname": "Емельянов",
+      "patronymic": "Николаейевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "2",
+        "3"
+      ],
+      "children": [
+        "24",
+        "23"
+      ],
+      "spouse_ids": [
+        "22"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "13": {
+      "name": "Тимофеей",
+      "surname": "Юркевич",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "15",
+        "6"
+      ],
+      "spouse_ids": [
+        "14"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "14": {
+      "name": "Анна-Галина",
+      "surname": "Юркевич",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "15",
+        "6"
+      ],
+      "spouse_ids": [
+        "13"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "15": {
+      "name": "Анна",
+      "surname": "Фёдорова",
+      "patronymic": "Тимофеевна",
+      "birth_date": "22.07.1958",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "Юркевич",
+      "parents": [
+        "13",
+        "14"
+      ],
+      "children": [
+        "18",
+        "19"
+      ],
+      "spouse_ids": [
+        "17",
+        "16"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "16": {
+      "name": "Александр",
+      "surname": "Федоров",
+      "patronymic": "Николаевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "19"
+      ],
+      "spouse_ids": [
+        "15"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "17": {
+      "name": "Владимир",
+      "surname": "Юшкевич",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "18"
+      ],
+      "spouse_ids": [
+        "15"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "18": {
+      "name": "Александр",
+      "surname": "Юшкевич",
+      "patronymic": "Владимирович",
+      "birth_date": "05.05.1983",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "15",
+        "17"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "19": {
+      "name": "Егор",
+      "surname": "Фёдоров",
+      "patronymic": "Александровия",
+      "birth_date": "05.06.1992",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "15",
+        "16"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "20": {
+      "name": "Галина",
+      "surname": "Емельянова",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "21"
+      ],
+      "spouse_ids": [
+        "9"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "21": {
+      "name": "Галина",
+      "surname": "Емельянова",
+      "patronymic": "Егоровна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "9",
+        "20"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "22": {
+      "name": "Галина",
+      "surname": "Емельянова",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "Муравьева",
+      "parents": [],
+      "children": [
+        "24",
+        "23"
+      ],
+      "spouse_ids": [
+        "12"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "23": {
+      "name": "Юрий",
+      "surname": "Емельянов",
+      "patronymic": "Сергейевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "12",
+        "22"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "24": {
+      "name": "Ирина",
+      "surname": "Емельянов",
+      "patronymic": "Сергейевич",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "12",
+        "22"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "25": {
+      "name": "Виктор",
+      "surname": "Емельянов",
+      "patronymic": "Николаейевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "2",
+        "3"
+      ],
+      "children": [
+        "32",
+        "30",
+        "31"
+      ],
+      "spouse_ids": [
+        "29"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "26": {
+      "name": "Ирина",
+      "surname": "Баглай",
+      "patronymic": "Николаейевна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "Емельянова",
+      "parents": [
+        "2",
+        "3"
+      ],
+      "children": [
+        "33",
+        "28",
+        "34"
+      ],
+      "spouse_ids": [
+        "27"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "27": {
+      "name": "Николай",
+      "surname": "Баглай",
+      "patronymic": "Анатольевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "33",
+        "28",
+        "34"
+      ],
+      "spouse_ids": [
+        "26"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "28": {
+      "name": "Юлия",
+      "surname": "Баглай",
+      "patronymic": "Николаевна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "26",
+        "27"
+      ],
+      "children": [
+        "36"
+      ],
+      "spouse_ids": [
+        "35"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "29": {
+      "name": "Светлана",
+      "surname": "Емельянова",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "32",
+        "30",
+        "31"
+      ],
+      "spouse_ids": [
+        "25"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "30": {
+      "name": "Денис",
+      "surname": "Емельянов",
+      "patronymic": "Виктоович",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "25",
+        "29"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "31": {
+      "name": "Инна",
+      "surname": "Емельянова",
+      "patronymic": "Виктоовна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "25",
+        "29"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "32": {
+      "name": "Виктория",
+      "surname": "Емельянова",
+      "patronymic": "Виктоовна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "25",
+        "29"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "33": {
+      "name": "Артем",
+      "surname": "Баглай",
+      "patronymic": "Николаевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "26",
+        "27"
+      ],
+      "children": [],
+      "spouse_ids": [
+        "37"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "34": {
+      "name": "Ольга",
+      "surname": "Баглай",
+      "patronymic": "Николаевна",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "26",
+        "27"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "35": {
+      "name": "Дмитрий",
+      "surname": "Звонкович",
+      "patronymic": "Владимирович",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "36"
+      ],
+      "spouse_ids": [
+        "28"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "36": {
+      "name": "Даниил",
+      "surname": "Звонкович",
+      "patronymic": "Дмитриевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "35",
+        "28"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "37": {
+      "name": "Евгения",
+      "surname": "Баглай",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [],
+      "spouse_ids": [
+        "33"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "38": {
+      "name": "Валентин",
+      "surname": "Емельянов",
+      "patronymic": "Андреевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "8",
+        "10"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "39": {
+      "name": "Евгений",
+      "surname": "Емельянов",
+      "patronymic": "Андреевич",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": true,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [
+        "8",
+        "10"
+      ],
+      "children": [],
+      "spouse_ids": [],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "40": {
+      "name": "Флор",
+      "surname": "Емельянов",
+      "patronymic": "Адамович",
+      "birth_date": "",
+      "gender": "Мужской",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "3"
+      ],
+      "spouse_ids": [
+        "41"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    },
+    "41": {
+      "name": "Клавдия",
+      "surname": "Дешкович",
+      "patronymic": "",
+      "birth_date": "",
+      "gender": "Женский",
+      "photo": null,
+      "photo_path": "",
+      "is_deceased": false,
+      "death_date": "",
+      "maiden_name": "",
+      "parents": [],
+      "children": [
+        "3"
+      ],
+      "spouse_ids": [
+        "40"
+      ],
+      "collapsed_branches": false,
+      "birth_place": "",
+      "biography": "",
+      "burial_place": "",
+      "burial_date": "",
+      "photo_album": [],
+      "links": [],
+      "occupation": "",
+      "education": "",
+      "address": "",
+      "notes": ""
+    }
+  },
+  "marriages": [
+    [
+      "2",
+      "3"
+    ],
+    [
+      "28",
+      "35"
+    ],
+    [
+      "20",
+      "9"
+    ],
+    [
+      "33",
+      "37"
+    ],
+    [
+      "10",
+      "8"
+    ],
+    [
+      "12",
+      "22"
+    ],
+    [
+      "15",
+      "17"
+    ],
+    [
+      "1",
+      "4"
+    ],
+    [
+      "6",
+      "7"
+    ],
+    [
+      "15",
+      "16"
+    ],
+    [
+      "25",
+      "29"
+    ],
+    [
+      "26",
+      "27"
+    ],
+    [
+      "40",
+      "41"
+    ],
+    [
+      "13",
+      "14"
+    ]
+  ],
+  "current_center": "5"
+}

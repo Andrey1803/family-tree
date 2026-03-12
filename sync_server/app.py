@@ -13,6 +13,10 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
+# Импортируем общие утилиты аутентификации
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from auth_utils import SUPER_ADMINS, _password_hash, _verify_password
+
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
@@ -196,28 +200,6 @@ def init_db():
     db.commit()
     db.close()
 
-def _password_hash(login: str, password: str) -> str:
-    """Создать хеш пароля."""
-    if BCRYPT_AVAILABLE:
-        salt = bcrypt.gensalt(rounds=12)
-        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-    else:
-        raw = f"FamilyTreeApp_v1{login}{password}".encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
-
-def _verify_password(login: str, password: str, stored_hash: str) -> bool:
-    """Проверить пароль."""
-    if stored_hash.startswith("$2"):
-        if BCRYPT_AVAILABLE:
-            try:
-                return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
-            except:
-                return False
-        return False
-    else:
-        raw = f"FamilyTreeApp_v1{login}{password}".encode("utf-8")
-        return hashlib.sha256(raw).hexdigest() == stored_hash
-
 # === ДЕКОРАТОРЫ ===
 def require_auth(f):
     """Требует аутентификацию."""
@@ -243,7 +225,7 @@ def require_auth(f):
 
 def require_admin(f):
     """Требует права администратора.
-    
+
     Супер-админы (имеют полные права всегда):
     - admin (по умолчанию)
     - Андрей Емельянов (персональный супер-админ)
@@ -254,11 +236,10 @@ def require_admin(f):
         db = get_db()
         user = db.execute('SELECT login, is_admin FROM users WHERE id = ?', (g.current_user_id,)).fetchone()
 
-        # Супер-админы всегда имеют доступ
-        SUPER_ADMINS = ["admin", "Андрей Емельянов"]
+        # Супер-админы всегда имеют доступ (используем общую константу)
         if user and user['login'] in SUPER_ADMINS:
             return f(*args, **kwargs)
-        
+
         # Проверяем флаг is_admin для остальных
         if not user or not user['is_admin']:
             return jsonify({'error': 'Требуется права администратора'}), 403
