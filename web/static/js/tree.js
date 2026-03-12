@@ -869,8 +869,8 @@ function render() {
         const kinshipText = kinship[pid] || "";
 
         const photoHtml = photoSrc
-            ? `<div class="card-photo"><img src="${photoSrc}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-photo')"><span class="photo-placeholder">📷</span></div>`
-            : `<div class="card-photo no-photo"><span class="photo-placeholder">📷</span></div>`;
+            ? `<div class="card-photo" onclick="event.stopPropagation(); openPhotoModal('${pid}', '${escapeHtml(name)}')" title="Нажмите чтобы загрузить фото"><img src="${photoSrc}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-photo')"><span class="photo-placeholder">📷</span></div>`
+            : `<div class="card-photo no-photo" onclick="event.stopPropagation(); openPhotoModal('${pid}', '${escapeHtml(name)}')" title="Нажмите чтобы добавить фото"><span class="photo-placeholder">📷</span></div>`;
 
         card.innerHTML = photoHtml + `<div class="card-info">
             <div class="name">${escapeHtml(name)}</div>
