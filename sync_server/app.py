@@ -417,9 +417,7 @@ def sync_upload():
 
         if tree:
             tree_id = tree['id']
-            # Сначала удаляем ВСЕ данные этого пользователя
-            db.execute('DELETE FROM marriages WHERE tree_id = ?', (tree_id,))
-            db.execute('DELETE FROM persons WHERE tree_id = ?', (tree_id,))
+            # Обновляем время обновления дерева
             db.execute('UPDATE family_trees SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (tree_id,))
         else:
             cursor = db.execute(
@@ -427,8 +425,8 @@ def sync_upload():
                 (g.current_user_id, tree_name)
             )
             tree_id = cursor.lastrowid
-        
-        # Вставляем персоны (INSERT OR REPLACE чтобы избежать конфликтов ID)
+
+        # Вставляем персоны (INSERT OR REPLACE обновляет существующие)
         persons = tree_data.get('persons', {})
         for pid, pdata in persons.items():
             links_json = json.dumps(pdata.get('links', []))
