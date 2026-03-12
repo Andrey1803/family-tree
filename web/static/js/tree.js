@@ -588,12 +588,8 @@ async function loadTree() {
 
     // Центрируем дерево после рендеринга
     setTimeout(() => {
-        const root = document.getElementById("tree-root");
-        const wrap = root.querySelector(".tree-wrap");
-        if (wrap) {
-            const rootRect = root.getBoundingClientRect();
-            const wrapRect = wrap.getBoundingClientRect();
-            centerOnPerson(centerId);
+        if (centerId) {
+            setCenterAndSave(centerId);
         }
     }, 100);
 }
@@ -2726,7 +2722,18 @@ async function deletePerson(pid) {
         if (sp) sp.spouse_ids = (sp.spouse_ids || []).filter(s => s !== pid && String(s) !== pid);
     });
     delete persons[pid];
-    treeData.marriages = (treeData.marriages || []).filter(([a, b]) => a !== pid && b !== pid && String(a) !== pid && String(b) !== pid);
+    // Фильтруем браки - поддерживаем оба формата: [a,b] и {persons: [a,b]}
+    treeData.marriages = (treeData.marriages || []).filter(m => {
+        let a, b;
+        if (Array.isArray(m)) {
+            [a, b] = m;
+        } else if (m && m.persons && Array.isArray(m.persons)) {
+            [a, b] = m.persons;
+        } else {
+            return false; // Неверный формат - удаляем
+        }
+        return a !== pid && b !== pid && String(a) !== pid && String(b) !== pid;
+    });
     if (centerId === pid || String(centerId) === pid) {
         centerId = Object.keys(persons)[0] || null;
         treeData.current_center = centerId;
