@@ -29,7 +29,6 @@ try:
         SUPER_ADMINS,
         _password_hash,
         _verify_password,
-        _load_users,
         _save_users,
         is_super_admin,
         auth_check_local
@@ -43,7 +42,6 @@ except ImportError:
         SUPER_ADMINS,
         _password_hash,
         _verify_password,
-        _load_users,
         _save_users,
         is_super_admin,
         auth_check_local
