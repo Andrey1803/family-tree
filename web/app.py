@@ -1488,6 +1488,79 @@ def api_photo_full(person_id):
     return "", 404
 
 
+@app.route("/api/photo/<person_id>", methods=["PUT"])
+def api_photo_upload(person_id):
+    """Загрузка фото для персоны (через base64)."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+
+    username = session["username"]
+    data = load_tree(username)
+    persons = data.get("persons", {})
+    
+    # Находим персону
+    p = persons.get(str(person_id)) or persons.get(person_id)
+    if not p:
+        return jsonify({"error": "Персона не найдена"}), 404
+    
+    # Получаем фото из запроса
+    req_data = request.get_json() or {}
+    photo_base64 = req_data.get("photo")
+    photo_path = req_data.get("photo_path", "")
+    
+    if not photo_base64:
+        return jsonify({"error": "Фото не предоставлено"}), 400
+    
+    # Проверяем формат base64
+    try:
+        # Декодируем для проверки
+        raw = base64.b64decode(photo_base64.strip())
+        if len(raw) < 100:
+            return jsonify({"error": "Слишком маленькое фото"}), 400
+        if len(raw) > 5 * 1024 * 1024:
+            return jsonify({"error": "Фото слишком большое (макс. 5MB)"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Неверный формат фото: {e}"}), 400
+    
+    # Сохраняем в дерево
+    p["photo"] = photo_base64.strip()
+    if photo_path:
+        p["photo_path"] = photo_path
+    
+    # Сохраняем дерево
+    save_tree(username, data)
+    
+    # Синхронизируем с сервером если есть токен
+    server_token = session.get('server_token')
+    if server_token:
+        try:
+            # Загружаем всё дерево на сервер синхронизации
+            upload_req = urllib.request.Request(
+                f"{SYNC_SERVER_URL}/api/sync/upload",
+                data=json.dumps({
+                    "tree": data,
+                    "tree_name": f"Дерево {username}"
+                }).encode(),
+                headers={
+                    "Authorization": f"Bearer {server_token}",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(upload_req, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+                logger.info(f"[PHOTO_UPLOAD] Synced to server: {result}")
+        except Exception as e:
+            logger.warning(f"[PHOTO_UPLOAD] Sync failed: {e}")
+    
+    logger.info(f"[PHOTO_UPLOAD] Photo uploaded for person {person_id} by {username}")
+    
+    return jsonify({
+        "message": "Фото сохранено",
+        "size": len(photo_base64) // 1024,  # KB
+    })
+
+
 @app.route("/api/export/pdf")
 def api_export_pdf():
     """Экспорт дерева в PDF."""
