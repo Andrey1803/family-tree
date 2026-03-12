@@ -484,17 +484,21 @@ def sync_upload():
         # Вставляем браки (INSERT OR REPLACE чтобы избежать конфликтов)
         marriages = tree_data.get('marriages', [])
         if isinstance(marriages, list):
+            # СНАЧАЛА удаляем все старые браки этого дерева
+            db.execute('DELETE FROM marriages WHERE tree_id = ?', (tree_id,))
+            
+            # Потом вставляем новые
             for marriage in marriages:
                 if isinstance(marriage, dict):
                     persons_list = marriage.get('persons', [])
                     if len(persons_list) >= 2:
                         db.execute('''
-                            INSERT OR REPLACE INTO marriages (tree_id, person1_id, person2_id, marriage_date)
+                            INSERT INTO marriages (tree_id, person1_id, person2_id, marriage_date)
                             VALUES (?, ?, ?, ?)
                         ''', (tree_id, persons_list[0], persons_list[1], marriage.get('date', '')))
                 elif isinstance(marriage, (list, tuple)) and len(marriage) >= 2:
                     db.execute('''
-                        INSERT OR REPLACE INTO marriages (tree_id, person1_id, person2_id)
+                        INSERT INTO marriages (tree_id, person1_id, person2_id)
                         VALUES (?, ?, ?)
                     ''', (tree_id, marriage[0], marriage[1]))
         
