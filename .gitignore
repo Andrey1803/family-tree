@@ -40,3 +40,24 @@ __pycache__/
 # ОС
 Thumbs.db
 .DS_Store
+
+# Сборки и старые версии (не добавлять в репозиторий)
+FamilyTree_v*/
+_old_versions/
+exe_builds/
+dist/
+build/
+*.exe
+*.spec
+
+# Базы данных и кэш
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Локальные конфиги и настройки
+login_remember.json
+window_settings.json
+theme_settings.json
+sync_config.json
