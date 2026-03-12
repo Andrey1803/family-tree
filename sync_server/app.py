@@ -428,7 +428,7 @@ def sync_upload():
             )
             tree_id = cursor.lastrowid
         
-        # Вставляем персоны
+        # Вставляем персоны (INSERT OR REPLACE чтобы избежать конфликтов ID)
         persons = tree_data.get('persons', {})
         for pid, pdata in persons.items():
             links_json = json.dumps(pdata.get('links', []))
@@ -436,9 +436,9 @@ def sync_upload():
             parents_json = json.dumps(list(pdata.get('parents', [])))
             children_json = json.dumps(list(pdata.get('children', [])))
             spouse_ids_json = json.dumps(list(pdata.get('spouse_ids', [])))
-            
+
             db.execute('''
-                INSERT INTO persons (
+                INSERT OR REPLACE INTO persons (
                     id, tree_id, name, surname, patronymic, birth_date, death_date,
                     is_deceased, gender, photo_path, photo, photo_full, birth_place, biography,
                     burial_place, burial_date, occupation, education, address, notes,
@@ -483,7 +483,7 @@ def sync_upload():
                 1 if pdata.get('collapsed_branches') else 0
             ))
         
-        # Вставляем браки
+        # Вставляем браки (INSERT OR REPLACE чтобы избежать конфликтов)
         marriages = tree_data.get('marriages', [])
         if isinstance(marriages, list):
             for marriage in marriages:
@@ -491,12 +491,12 @@ def sync_upload():
                     persons_list = marriage.get('persons', [])
                     if len(persons_list) >= 2:
                         db.execute('''
-                            INSERT INTO marriages (tree_id, person1_id, person2_id, marriage_date)
+                            INSERT OR REPLACE INTO marriages (tree_id, person1_id, person2_id, marriage_date)
                             VALUES (?, ?, ?, ?)
                         ''', (tree_id, persons_list[0], persons_list[1], marriage.get('date', '')))
                 elif isinstance(marriage, (list, tuple)) and len(marriage) >= 2:
                     db.execute('''
-                        INSERT INTO marriages (tree_id, person1_id, person2_id)
+                        INSERT OR REPLACE INTO marriages (tree_id, person1_id, person2_id)
                         VALUES (?, ?, ?)
                     ''', (tree_id, marriage[0], marriage[1]))
         
