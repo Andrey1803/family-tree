@@ -2683,12 +2683,12 @@ async function editPerson(pid) {
     document.body.appendChild(ov);
 }
 
-function deletePerson(pid) {
+async function deletePerson(pid) {
     if (!confirm("Удалить эту персону из дерева?")) return;
-    
+
     // Сохраняем состояние перед удалением
     if (window.undoManager) window.undoManager.beforeDeletePerson(treeData, pid);
-    
+
     const persons = treeData.persons;
     const p = persons[pid];
     if (!p) return;
@@ -2711,7 +2711,9 @@ function deletePerson(pid) {
         centerId = Object.keys(persons)[0] || null;
         treeData.current_center = centerId;
     }
-    saveTree();
+    
+    // Ждём сохранения перед перерисовкой
+    await saveTree();
     render();
 }
 
