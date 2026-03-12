@@ -49,6 +49,25 @@ if os.path.exists(DB_FILE):
 else:
     print('⚠️  БД НЕ существует! Будет создана.')
 
+# Миграция: добавляем photo_full если нет
+print('\n🔧 Проверка миграции photo_full...')
+try:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(persons)")
+    columns = [row[1] for row in cursor.fetchall()]
+    
+    if 'photo_full' not in columns:
+        print('🔧 Добавление колонки photo_full...')
+        cursor.execute('ALTER TABLE persons ADD COLUMN photo_full BLOB')
+        conn.commit()
+        print('✅ photo_full добавлена!')
+    else:
+        print('✅ photo_full уже существует')
+    conn.close()
+except Exception as e:
+    print(f'⚠️  Миграция photo_full: {e}')
+
 print(f'📦 Files in {DATA_DIR}: {os.listdir(DATA_DIR) if os.path.exists(DATA_DIR) else "DIR NOT FOUND"}')
 PYTHON_SCRIPT
 
