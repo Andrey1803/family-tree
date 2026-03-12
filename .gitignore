@@ -1,62 +1,42 @@
-# Python
+# Временные файлы проверок
+*.pyc
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-.eggs/
-*.egg
+*.bat
+*.ps1
+*.vbs
+check_*.py
+check_*.ps1
+verify_*.py
+test_*.py
+get_*.ps1
+git_*.bat
+git_*.ps1
+git_output.txt
+commit_msg.txt
+run_check.*
+final_check.*
 
-# Virtualenv
-venv/
-.venv/
-env/
+# Временные файлы
+*.log
+*.tmp
+*.bak
+error_log.txt
+debug_log*.txt
+admin_panel_log.txt
 
-# PyInstaller (сборка .exe)
+# Сборки
 dist/
 build/
-*.manifest
-*.spec.bak
-*.spec~
-
-# Релизные архивы (создаются scripts/create_release_zip)
-Семейное_древо_*_source.zip
-
-# Данные пользователя (создаются при работе, см. docs/DATA.md)
-data/
-!data/users.json
-users.json
-family_tree*.json
-user_settings*.json
-login_remember.json
-palette.json
-window_settings.json
-
-# Старые версии
-_old_versions/
+build/
+*.spec
+__pycache__/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
 
-# OS
-.DS_Store
+# ОС
 Thumbs.db
-
-# Debug / temp
-*.log
-*.tmp
-__pycache__/
-exe_builds/  
-dist/  
-build/  
-"FamilyTree_v1.*/"  
-"FamilyTree_*/"  
-"*.pyc"  
-"FamilyTree_*/"  
-"*.db"  
-"*.txt"  
+.DS_Store
