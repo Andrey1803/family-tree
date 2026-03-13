@@ -2927,6 +2927,24 @@ function addRelative(pid, relation) {
                 // ВАЖНО: Добавляем как строку!
                 par.parents = [...(par.parents || []).map(String), String(newId)];
                 console.log('[ADD_RELATIVE] Added', relation, newId, 'to parents of', pidStr, ':', par.parents);
+                
+                // === АВТОМАТИЧЕСКИ ДОБАВЛЯЕМ СУПРУГА ЕСЛИ ЕСТЬ ВТОРОЙ РОДИТЕЛЬ ===
+                const otherParentId = par.parents.find(id => String(id) !== String(newId));
+                if (otherParentId) {
+                    const otherParent = treeData.persons[otherParentId];
+                    if (otherParent && !otherParent.spouse_ids.includes(newId)) {
+                        // Делаем их супругами
+                        otherParent.spouse_ids = [...(otherParent.spouse_ids || []), newId];
+                        np.spouse_ids = [otherParentId];
+                        const pair = [String(newId), String(otherParentId)].sort();
+                        // Проверяем, нет ли уже такого брака
+                        const exists = treeData.marriages.some(([a, b]) => (a === newId && b === otherParentId) || (a === otherParentId && b === newId));
+                        if (!exists) {
+                            treeData.marriages = [...(treeData.marriages || []), pair];
+                        }
+                        console.log('[ADD_RELATIVE] Auto-added marriage between', newId, 'and', otherParentId);
+                    }
+                }
             }
         } else if (relation === "son" || relation === "daughter") {
             np.parents = [pidStr];

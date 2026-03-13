@@ -1,4 +1,7 @@
-fix: prevent modal close on text selection
+fix: auto-add marriage when adding second parent
 
-Added check for text selection in modal onclick handlers.
-Now modals won't close when user selects text inside.
+When adding a father/mother to a person who already has the other parent,
+automatically create a marriage between them.
+
+This fixes the issue where parents were displayed overlapping because
+they weren't recognized as spouses.
