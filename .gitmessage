@@ -1,7 +1,7 @@
-fix: auto-add marriage when adding second parent
+fix: add spouses from marriages before collect()
 
-When adding a father/mother to a person who already has the other parent,
-automatically create a marriage between them.
+Spouses from marriages array are now added to relatedRaw BEFORE
+calling collect(), ensuring they get coordinates and are rendered.
 
-This fixes the issue where parents were displayed overlapping because
-they weren't recognized as spouses.
+This fixes the issue where spouses weren't displayed because
+they were added after collect() had already processed the tree.
