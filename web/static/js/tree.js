@@ -823,7 +823,19 @@ function render() {
         return { left, right, top: y, bottom };
     }
 
-    const bounds = layout(rootId, 0, 0, CARD_W * 3) || { left: 0, right: 400, top: 0, bottom: 300 };
+    // === ВЫЗЫВАЕМ layout() ДЛЯ ВСЕХ ПЕРСОН БЕЗ КООРДИНАТ ===
+    let rootId = centerId || ids[0];
+    let bounds = layout(rootId, 0, 0, CARD_W * 3);
+    
+    // Если остались персоны без координат — вызываем layout() для них
+    for (const pid of related) {
+        if (!coords[pid] && persons[pid]) {
+            console.log('[RENDER] Layout for remaining person:', pid);
+            bounds = layout(pid, 0, coords[pid] ? coords[pid].y : 0, CARD_W * 3) || bounds;
+        }
+    }
+    
+    bounds = bounds || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
     // Вычисляем размеры на основе реальных размеров дерева

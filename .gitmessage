@@ -1,8 +1,8 @@
-fix: restore proper tree collection logic
+fix: layout all persons in related set
 
-Removed pre-adding spouses from marriages to relatedRaw.
-Now collect() properly traverses the full tree including:
-- centerId and its connections
-- spouses from marriages (via collect() for their connections)
+After initial layout() call from rootId, we now iterate through
+all persons in related set and call layout() for those without
+coordinates.
 
-This fixes the issue where only 2 persons got coordinates.
+This fixes the issue where only 2 persons got coordinates while
+43 were in the related set.
