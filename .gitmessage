@@ -1,8 +1,12 @@
-fix: skip spouse ancestors when collecting related persons
+fix: show only paternal-line siblings and their descendants
 
-Added skipSpouseAncestors parameter to collect() function.
-When collecting spouses, we now pass skipSpouseAncestors=true
-to prevent adding their ancestors, reducing line crossings.
+Modified collect() to accept includeSiblings and paternalOnly parameters.
+From center person we now show:
+- All ancestors (both parents)
+- All descendants (all children)
+- All siblings
+- Paternal-line siblings (father's siblings) and their descendants
+- NOT maternal-line siblings (mother's siblings) - reduces line crossings
 
-This matches desktop version behavior where spouse ancestors
-are collapsed by default.
+This matches traditional genealogy tree view following male line for
+collateral relatives.
