@@ -1,10 +1,4 @@
-fix: visible_persons.js type conversion and remove old collect() calls
+fix: add debug logging to visible_persons.js
 
-Fixed collectVisiblePersons():
-- Normalize centerId to string before lookup
-- Check both string and original centerId for compatibility
-- Added debug logging for BFS, marriages, final count
-
-Removed old collect() calls from tree.js:
-- Removed leftover code that called collect() for marriages
-- Now using only getVisiblePersons() from visible_persons.js
+Added extensive logging to collectVisiblePersons() to debug
+why BFS is not finding persons.

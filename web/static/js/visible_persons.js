@@ -22,8 +22,11 @@ function collectVisiblePersons(centerId, persons, marriages) {
     const centerIdStr = String(centerId);
     
     // Проверяем, существует ли центральная персона
-    if (!persons[centerIdStr] && !persons[centerId]) {
-        console.log('[VISIBLE] Center person not found:', centerId);
+    console.log('[VISIBLE] Looking for centerId:', centerIdStr, 'in persons:', !!persons[centerIdStr]);
+    console.log('[VISIBLE] persons keys:', Object.keys(persons).slice(0, 5));
+    
+    if (!persons[centerIdStr]) {
+        console.log('[VISIBLE] Center person NOT FOUND:', centerIdStr);
         // Если центр не найден — показываем всех
         Object.keys(persons).forEach(id => visibleSet.add(id));
         return visibleSet;
@@ -33,10 +36,22 @@ function collectVisiblePersons(centerId, persons, marriages) {
     const queue = [centerIdStr];
     visited.add(centerIdStr);
     
+    console.log('[VISIBLE] Starting BFS with:', centerIdStr);
+    
+    let iteration = 0;
     while (queue.length > 0) {
+        iteration++;
         const currentPid = queue.shift();
         
-        if (!persons[currentPid] || visited.has(currentPid)) {
+        console.log('[VISIBLE] BFS iteration', iteration, ', processing:', currentPid, ', queue length:', queue.length);
+        
+        if (!persons[currentPid]) {
+            console.log('[VISIBLE] Person NOT FOUND:', currentPid);
+            continue;
+        }
+        
+        if (visited.has(currentPid)) {
+            console.log('[VISIBLE] Already visited:', currentPid);
             continue;
         }
         
@@ -44,12 +59,15 @@ function collectVisiblePersons(centerId, persons, marriages) {
         visibleSet.add(currentPid);
         const person = persons[currentPid];
         
+        console.log('[VISIBLE] Added person:', currentPid, ', parents:', person.parents, ', children:', person.children, ', spouses:', person.spouse_ids);
+        
         // Добавляем всех связанных в очередь
         if (person.parents) {
             person.parents.forEach(parentId => {
                 const pStr = String(parentId);
                 if (!visited.has(pStr)) {
                     queue.push(pStr);
+                    console.log('[VISIBLE] Added parent to queue:', pStr);
                 }
             });
         }
@@ -59,6 +77,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 const cStr = String(childId);
                 if (!visited.has(cStr)) {
                     queue.push(cStr);
+                    console.log('[VISIBLE] Added child to queue:', cStr);
                 }
             });
         }
@@ -68,6 +87,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 const sStr = String(spouseId);
                 if (!visited.has(sStr)) {
                     queue.push(sStr);
+                    console.log('[VISIBLE] Added spouse to queue:', sStr);
                 }
             });
         }
@@ -81,6 +101,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                         const sk = String(siblingId);
                         if (sk !== currentPid && !visited.has(sk)) {
                             queue.push(sk);
+                            console.log('[VISIBLE] Added sibling to queue:', sk);
                         }
                     });
                 }
