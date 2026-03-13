@@ -1,7 +1,8 @@
-fix: restore proper recursive layout algorithm
+fix: layout disconnected persons from marriages
 
-Moved the coords[pid] check to the beginning of layout() and removed
-the early return condition for parents. Now layout() properly traverses
-the entire tree recursively from rootId, placing all persons correctly.
+After initial layout() from rootId, we now iterate through all persons
+in related set and call layout() for those without coordinates.
+This handles persons not connected via parents/children/spouse_ids
+to the main tree root.
 
-This matches the desktop version's place_subtree() logic.
+Disconnected persons are positioned with proper spacing (CARD_W * 2 apart).

@@ -826,9 +826,32 @@ function render() {
         return { left, right, top: y, bottom };
     }
 
-    // === ВЫЗЫВАЕМ layout() ТОЛЬКО ДЛЯ rootId ===
-    // Остальные персоны будут размещены рекурсивно
+    // === ВЫЗЫВАЕМ layout() ДЛЯ rootId ===
     let bounds = layout(rootId, 0, 0, CARD_W * 3);
+    
+    // === ЕСЛИ ОСТАЛИСЬ ПЕРСОНЫ БЕЗ КООРДИНАТ — вызываем layout() для них ===
+    // Это нужно для персон, не связанных с rootId через parents/children/spouse_ids
+    let layoutOffsetX = 0;
+    let layoutOffsetY = 0;
+    
+    for (const pid of related) {
+        if (!coords[pid] && persons[pid]) {
+            console.log('[RENDER] Layout for disconnected person:', pid);
+            const personBounds = layout(pid, layoutOffsetX, layoutOffsetY, CARD_W * 3);
+            if (personBounds) {
+                // Обновляем общие bounds
+                bounds = {
+                    left: Math.min(bounds.left, personBounds.left),
+                    right: Math.max(bounds.right, personBounds.right),
+                    top: Math.min(bounds.top, personBounds.top),
+                    bottom: Math.max(bounds.bottom, personBounds.bottom)
+                };
+                // Смещаем следующую персону вправо
+                layoutOffsetX += CARD_W * 2;
+            }
+        }
+    }
+    
     bounds = bounds || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
