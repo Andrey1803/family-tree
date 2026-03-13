@@ -313,6 +313,12 @@ def index():
     return render_template("tree.html", username=session.get("username", "Гость"))
 
 
+@app.route("/test-browser.html")
+def test_browser():
+    """Тестовая страница для проверки сохранения из браузера."""
+    return send_file("test-browser.html")
+
+
 @app.route("/download/exe")
 def download_exe():
     """Прокси: скачивает Tree.zip с GitHub, отдаёт пользователю. Без перехода на GitHub."""
