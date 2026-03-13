@@ -689,11 +689,12 @@ function render() {
             });
         }
         
-        // Супруги — добавляем, но НЕ добавляем их предков (skipSpouseAncestors=true)
+        // Супруги — добавляем, но НЕ добавляем их предков
         (p.spouse_ids || []).forEach(s => {
             const spouse = persons[s];
             if (spouse) {
-                collect(s, !skipSpouseAncestors, false, false, true); // true = скрывать предков супруги
+                // Всегда скрываем предков супруги (skipSpouseAncestors=true)
+                collect(s, false, false, false, true);
             }
         });
     }
