@@ -22,6 +22,7 @@
         <button type="button" class="tab-btn active" data-tab="stats">📊 Статистика</button>
         <button type="button" class="tab-btn" data-tab="users">👥 Пользователи</button>
         <button type="button" class="tab-btn" data-tab="trees">🌳 Деревья</button>
+        <button type="button" class="tab-btn" data-tab="fix">🔧 Исправить БД</button>
     </nav>
 
     <main class="admin-content">
@@ -137,6 +138,23 @@
         </div>
     </div>
 
+    <!-- Вкладка исправления БД -->
+    <section id="tab-fix" class="tab-pane">
+        <div class="admin-section">
+            <h3>🔧 Исправление дубликатов браков</h3>
+            <p class="admin-hint">
+                Эта функция удаляет дубликаты браков из базы данных.
+                Используйте если в дереве отображаются одинаковые браки много раз.
+            </p>
+            
+            <button type="button" id="btn-fix-duplicates" class="btn btn-primary" style="margin: 20px 0; padding: 12px 24px; font-size: 16px;">
+                🔧 Исправить дубликаты браков
+            </button>
+            
+            <div id="fix-output" class="fix-output" style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px; font-family: monospace; white-space: pre-wrap;"></div>
+        </div>
+    </section>
+
     <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
     
     <!-- HEARTBEAT: Отправка подтверждения активности каждую минуту -->
@@ -173,6 +191,47 @@
             heartbeatInterval = null;
         }
     }
+
+    // === ВКЛАДКА ИСПРАВЛЕНИЯ БД ===
+    document.querySelector('[data-tab="fix"]')?.addEventListener('click', async function() {
+        // Переключение вкладок
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('tab-fix').classList.add('active');
+        
+        // Загрузка данных
+        const output = document.getElementById('fix-output');
+        const btnFix = document.getElementById('btn-fix-duplicates');
+        
+        btnFix.onclick = async function() {
+            btnFix.disabled = true;
+            btnFix.textContent = '⏳ Исправление...';
+            output.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/admin/fix-duplicates', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    output.innerHTML = '<div class="fix-success">' + 
+                        result.results.map(r => `<div>✅ ${r}</div>`).join('') +
+                        '</div>';
+                } else {
+                    output.innerHTML = '<div class="fix-error">❌ Ошибка: ' + 
+                        (result.error || 'Неизвестная ошибка') + '</div>';
+                }
+            } catch (e) {
+                output.innerHTML = '<div class="fix-error">❌ Ошибка: ' + e.message + '</div>';
+            }
+            
+            btnFix.disabled = false;
+            btnFix.textContent = '🔧 Исправить дубликаты браков';
+        };
+    });
 
     window.addEventListener('load', startHeartbeat);
     window.addEventListener('beforeunload', stopHeartbeat);

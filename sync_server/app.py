@@ -1011,6 +1011,71 @@ def admin_migrate():
     
     return jsonify({'migrations': results})
 
+
+@app.route('/api/admin/fix-duplicates', methods=['POST'])
+@require_admin
+def admin_fix_duplicates():
+    """Очистить дубликаты браков в БД."""
+    import sqlite3
+    
+    results = []
+    
+    try:
+        DB_PATH = os.environ.get('DATA_DIR', '/data') + '/family_tree.db'
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Проверяем количество браков
+        cursor.execute("SELECT COUNT(*) FROM marriages")
+        total = cursor.fetchone()[0]
+        results.append(f"Всего браков: {total}")
+        
+        # Находим дубликаты
+        cursor.execute("""
+            SELECT tree_id, person1_id, person2_id, COUNT(*) as cnt
+            FROM marriages
+            GROUP BY tree_id, person1_id, person2_id
+            HAVING cnt > 1
+        """)
+        duplicates = cursor.fetchall()
+        
+        if duplicates:
+            results.append(f"Найдено {len(duplicates)} групп дубликатов")
+            
+            # Удаляем дубликаты (оставляем по 1 записи)
+            for dup in duplicates:
+                tree_id, p1, p2 = dup[0], dup[1], dup[2]
+                cursor.execute("""
+                    DELETE FROM marriages
+                    WHERE tree_id = ? AND person1_id = ? AND person2_id = ?
+                    AND rowid NOT IN (
+                        SELECT MIN(rowid)
+                        FROM marriages
+                        WHERE tree_id = ? AND person1_id = ? AND person2_id = ?
+                    )
+                """, (tree_id, p1, p2, tree_id, p1, p2))
+                deleted = cursor.rowcount
+                results.append(f"Удалено {deleted} дубликатов для tree={tree_id}")
+            
+            conn.commit()
+            
+            # Проверяем результат
+            cursor.execute("SELECT COUNT(*) FROM marriages")
+            new_total = cursor.fetchone()[0]
+            results.append(f"Осталось браков: {new_total}")
+            results.append(f"Всего удалено: {total - new_total} дубликатов")
+        else:
+            results.append("Дубликаты не найдены")
+        
+        conn.close()
+        
+    except Exception as e:
+        results.append(f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return jsonify({'results': results})
+
 # === ИНИЦИАЛИЗАЦИЯ ===
 def initialize_database():
     """Инициализация БД при старте"""

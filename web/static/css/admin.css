@@ -1,5 +1,30 @@
 /* Админ-панель — стили */
 
+/* Вкладка исправления БД */
+.fix-output {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 15px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    font-size: 13px;
+}
+
+.fix-success {
+    color: #059669;
+}
+
+.fix-success div {
+    margin: 5px 0;
+}
+
+.fix-error {
+    color: #dc2626;
+    font-weight: bold;
+}
+
+/* Админ-панель — стили */
+
 /* Заголовок */
 .admin-header {
     background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
