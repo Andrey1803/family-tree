@@ -825,15 +825,28 @@ function render() {
 
     // === ВЫЗЫВАЕМ layout() ДЛЯ ВСЕХ ПЕРСОН БЕЗ КООРДИНАТ ===
     let bounds = layout(rootId, 0, 0, CARD_W * 3);
-
+    
     // Если остались персоны без координат — вызываем layout() для них
+    // Позиционируем их ниже основного дерева
+    let layoutOffsetY = bounds.bottom + LEVEL_HEIGHT;
+    let layoutOffsetX = 0;
+    
     for (const pid of related) {
         if (!coords[pid] && persons[pid]) {
-            console.log('[RENDER] Layout for remaining person:', pid);
-            bounds = layout(pid, 0, coords[pid] ? coords[pid].y : 0, CARD_W * 3) || bounds;
+            console.log('[RENDER] Layout for remaining person:', pid, 'at', layoutOffsetX, layoutOffsetY);
+            const personBounds = layout(pid, layoutOffsetX, layoutOffsetY, CARD_W * 3);
+            if (personBounds) {
+                bounds = {
+                    left: Math.min(bounds.left, personBounds.left),
+                    right: Math.max(bounds.right, personBounds.right),
+                    top: Math.min(bounds.top, personBounds.top),
+                    bottom: Math.max(bounds.bottom, personBounds.bottom)
+                };
+                layoutOffsetX += CARD_W * 2; // Смещаем следующую персону
+            }
         }
     }
-
+    
     bounds = bounds || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
