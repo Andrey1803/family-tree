@@ -1,8 +1,4 @@
-fix: layout all persons in related set
+fix: remove duplicate rootId declaration
 
-After initial layout() call from rootId, we now iterate through
-all persons in related set and call layout() for those without
-coordinates.
-
-This fixes the issue where only 2 persons got coordinates while
-43 were in the related set.
+rootId was already declared earlier in render().
+Removed duplicate let rootId = centerId || ids[0];
