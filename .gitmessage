@@ -1,7 +1,8 @@
-fix: add spouses from marriages before collect()
+fix: process spouse connections from marriages
 
-Spouses from marriages array are now added to relatedRaw BEFORE
-calling collect(), ensuring they get coordinates and are rendered.
+After adding spouses from marriages to relatedRaw, we now also call
+collect() for their children, spouse_ids, and parents to ensure
+the full family tree is collected.
 
-This fixes the issue where spouses weren't displayed because
-they were added after collect() had already processed the tree.
+This fixes the issue where only 2 persons got coordinates because
+collect() was skipping spouses already in relatedRaw.
