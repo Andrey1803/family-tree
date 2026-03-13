@@ -1,17 +1,10 @@
-feat: copy visible persons logic from desktop version
+fix: visible_persons.js type conversion and remove old collect() calls
 
-Created visible_persons.js with full copy of desktop version logic:
-- collectVisiblePersons() - BFS collection of all related persons
-- isAncestor() - check if person is ancestor
-- applyCollapse() - apply collapsed_branches flag
-- applyFocusMode() - apply focus mode (hide ancestors)
-- applyFilters() - apply gender, status, photos_only filters
-- getVisiblePersons() - main function combining all steps
+Fixed collectVisiblePersons():
+- Normalize centerId to string before lookup
+- Check both string and original centerId for compatibility
+- Added debug logging for BFS, marriages, final count
 
-Updated tree.js to use getVisiblePersons() instead of custom collect().
-
-This provides identical behavior to desktop version:
-- Shows all ancestors, descendants, siblings, spouses
-- Respects collapsed_branches flag
-- Supports focus mode
-- Supports all filters
+Removed old collect() calls from tree.js:
+- Removed leftover code that called collect() for marriages
+- Now using only getVisiblePersons() from visible_persons.js

@@ -18,43 +18,56 @@ function collectVisiblePersons(centerId, persons, marriages) {
         return visibleSet;
     }
     
+    // Нормализуем centerId к строке
+    const centerIdStr = String(centerId);
+    
+    // Проверяем, существует ли центральная персона
+    if (!persons[centerIdStr] && !persons[centerId]) {
+        console.log('[VISIBLE] Center person not found:', centerId);
+        // Если центр не найден — показываем всех
+        Object.keys(persons).forEach(id => visibleSet.add(id));
+        return visibleSet;
+    }
+    
     // BFS для сбора всех связанных персон
-    const queue = [centerId];
-    visited.add(String(centerId));
+    const queue = [centerIdStr];
+    visited.add(centerIdStr);
     
     while (queue.length > 0) {
         const currentPid = queue.shift();
-        const key = String(currentPid);
         
-        if (!persons[key] || visited.has(key)) {
+        if (!persons[currentPid] || visited.has(currentPid)) {
             continue;
         }
         
-        visited.add(key);
-        visibleSet.add(key);
-        const person = persons[key];
+        visited.add(currentPid);
+        visibleSet.add(currentPid);
+        const person = persons[currentPid];
         
         // Добавляем всех связанных в очередь
         if (person.parents) {
             person.parents.forEach(parentId => {
-                if (!visited.has(String(parentId))) {
-                    queue.push(parentId);
+                const pStr = String(parentId);
+                if (!visited.has(pStr)) {
+                    queue.push(pStr);
                 }
             });
         }
         
         if (person.children) {
             person.children.forEach(childId => {
-                if (!visited.has(String(childId))) {
-                    queue.push(childId);
+                const cStr = String(childId);
+                if (!visited.has(cStr)) {
+                    queue.push(cStr);
                 }
             });
         }
         
         if (person.spouse_ids) {
             person.spouse_ids.forEach(spouseId => {
-                if (!visited.has(String(spouseId))) {
-                    queue.push(spouseId);
+                const sStr = String(spouseId);
+                if (!visited.has(sStr)) {
+                    queue.push(sStr);
                 }
             });
         }
@@ -66,14 +79,16 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 if (parent && parent.children) {
                     parent.children.forEach(siblingId => {
                         const sk = String(siblingId);
-                        if (sk !== key && !visited.has(sk)) {
-                            queue.push(siblingId);
+                        if (sk !== currentPid && !visited.has(sk)) {
+                            queue.push(sk);
                         }
                     });
                 }
             });
         }
     }
+    
+    console.log('[VISIBLE] After BFS:', visibleSet.size, 'persons');
     
     // === ДОБАВЛЯЕМ ВСЕХ СУПРУГОВ ИЗ marriages ===
     (marriages || []).forEach(m => {
@@ -91,13 +106,15 @@ function collectVisiblePersons(centerId, persons, marriages) {
         
         if (visibleSet.has(aStr) && !visibleSet.has(bStr)) {
             visibleSet.add(bStr);
-            console.log('[MARRIAGE_FIX] Добавлен супруг', bStr, 'в visibleSet');
+            console.log('[MARRIAGE_FIX] Добавлен супруг', bStr);
         }
         if (visibleSet.has(bStr) && !visibleSet.has(aStr)) {
             visibleSet.add(aStr);
-            console.log('[MARRIAGE_FIX] Добавлен супруг', aStr, 'в visibleSet');
+            console.log('[MARRIAGE_FIX] Добавлен супруг', aStr);
         }
     });
+    
+    console.log('[VISIBLE] After marriages:', visibleSet.size, 'persons');
     
     // === ДОБАВЛЯЕМ СУПРУГОВ ДЛЯ ВСЕХ ВИДИМЫХ ПЕРСОН ===
     const additionalSpouses = new Set();
@@ -117,6 +134,8 @@ function collectVisiblePersons(centerId, persons, marriages) {
         visibleSet.add(spouseId);
         console.log('[SPOUSE_FIX] Добавлен супруг', spouseId);
     });
+    
+    console.log('[VISIBLE] Final count:', visibleSet.size, 'persons');
     
     return visibleSet;
 }

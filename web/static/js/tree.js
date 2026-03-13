@@ -656,26 +656,8 @@ function render() {
     // === ИСПОЛЬЗУЕМ ФУНКЦИЮ ИЗ visible_persons.js (полная копия desktop-версии) ===
     const relatedRaw = getVisiblePersons(centerId, persons, treeData.marriages, focusModeActive, activeFilters);
     console.log('[RENDER] Visible persons:', relatedRaw.size);
-    (treeData.marriages || []).forEach(m => {
-        let a, b;
-        if (Array.isArray(m)) {
-            [a, b] = m;
-        } else if (m.persons && Array.isArray(m.persons)) {
-            [a, b] = m.persons;
-        } else {
-            return;
-        }
-        // Вызываем collect для связей (children, spouse_ids, parents)
-        [String(a), String(b)].forEach(id => {
-            const p = persons[id];
-            if (p) {
-                (p.children || []).forEach(c => collect(c, true));
-                (p.spouse_ids || []).forEach(s => collect(s, true));
-                (p.parents || []).forEach(pr => collect(pr, true));
-            }
-        });
-    });
 
+    // Применяем фильтры к visible persons
     const related = new Set();
     for (const pid of relatedRaw) {
         const p = persons[pid];
