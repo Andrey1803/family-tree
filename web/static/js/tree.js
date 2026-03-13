@@ -586,10 +586,16 @@ async function loadTree() {
 
     render();
 
-    // Центрируем дерево после рендеринга
+    // Центрируем дерево после рендеринга (БЕЗ сохранения!)
     setTimeout(() => {
         if (centerId) {
-            setCenterAndSave(centerId);
+            // Просто центрируем, без сохранения
+            const p = treeData.persons[centerId];
+            if (p && p.x !== undefined && p.y !== undefined) {
+                treePanX = -p.x * treeZoom + window.innerWidth / 2;
+                treePanY = -p.y * treeZoom + window.innerHeight / 2;
+                render();
+            }
         }
     }, 100);
 }
