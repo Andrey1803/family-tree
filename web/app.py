@@ -81,7 +81,7 @@ app.secret_key = _secret_key
 app.config["JSON_AS_ASCII"] = False
 app.config["SESSION_COOKIE_SECURE"] = False  # Разрешить HTTP
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SAMESITE"] = None  # Отправлять куки на все запросы
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
 # Если DATA_DIR не установлен — используем папку рядом с web/
