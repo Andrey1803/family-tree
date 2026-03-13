@@ -1086,7 +1086,8 @@ function render() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", totalW);
     svg.setAttribute("height", totalH);
-    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none;";
+    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none; z-index:10;";
+    svg.setAttribute("class", "tree-lines");
     wrap.appendChild(svg);
 
     // Отладка: проверяем marriages
@@ -1094,6 +1095,8 @@ function render() {
     console.log('[DEBUG] Marriages:', treeData.marriages);
     console.log('[DEBUG] Coords keys:', Object.keys(coords));
     console.log('[DEBUG] Related size:', related.size);
+    console.log('[DEBUG] OffsetX:', offsetX, 'OffsetY:', offsetY);
+    console.log('[DEBUG] TotalW:', totalW, 'TotalH:', totalH);
 
     // Линии родитель–ребёнок
     const parentSetToChildren = {};
@@ -1164,16 +1167,10 @@ function render() {
         }
 
         const idA = String(a), idB = String(b);
-        console.log('[MARRIAGE] Processing:', idA, idB);
-        console.log('[MARRIAGE] Has coords:', !!coords[idA], !!coords[idB]);
-        console.log('[MARRIAGE] In related:', related.has(idA), related.has(idB));
         
+        // Проверяем, что обе персоны имеют координаты (значит они отрисованы)
         if (!coords[idA] || !coords[idB]) {
-            console.log('[MARRIAGE] Skipping - no coords');
-            return;
-        }
-        if (!related.has(idA) || !related.has(idB)) {
-            console.log('[MARRIAGE] Skipping - not in related');
+            console.log('[MARRIAGE] Skipping - no coords for', idA, idB);
             return;
         }
 
@@ -1197,9 +1194,8 @@ function render() {
         line.setAttribute("stroke-linecap", "round");
         svg.appendChild(line);
         marriageLinesDrawn++;
-        console.log('[MARRIAGE] Line drawn:', idA, '->', idB);
     });
-    console.log('[MARRIAGE] Total lines drawn:', marriageLinesDrawn);
+    console.log('[MARRIAGE] Total marriage lines drawn:', marriageLinesDrawn);
 
     updateStatusBar();
 }

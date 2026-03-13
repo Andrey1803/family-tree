@@ -351,6 +351,29 @@ body {
   min-height: 600px;
 }
 
+/* SVG линии дерева */
+.tree-lines {
+  /* Убеждаемся, что линии поверх карточек */
+  z-index: 10;
+}
+
+.tree-lines line,
+.tree-lines polyline,
+.tree-lines path {
+  /* Плавная анимация при изменении масштаба */
+  transition: stroke-opacity 0.2s ease;
+}
+
+/* Линии супругов */
+.tree-lines line[stroke="#b45309"] {
+  stroke-opacity: 0.8;
+}
+
+/* Линии родителей */
+.tree-lines polyline[stroke="#475569"] {
+  stroke-opacity: 0.6;
+}
+
 .tree-card {
   position: absolute;
   width: 120px;
@@ -364,6 +387,9 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  z-index: 5;
+  /* Фон карточки должен быть непрозрачным чтобы перекрывать линии */
+  background-clip: padding-box;
 }
 
 .tree-card:hover {
