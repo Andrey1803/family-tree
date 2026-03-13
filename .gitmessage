@@ -1,9 +1,4 @@
-fix: remove keepalive: true from fetch requests
+fix: prevent modal close on text selection
 
-Problem: keepalive: true has 64KB limit, our tree data is ~65KB
-This caused "Failed to fetch" error on POST requests
-
-Changes:
-- Removed keepalive: true from saveTree() in tree.js
-- Removed keepalive: true from auto-save handlers
-- Bumped version to 20260313-3
+Added check for text selection in modal onclick handlers.
+Now modals won't close when user selects text inside.

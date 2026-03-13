@@ -2658,7 +2658,12 @@ async function editPerson(pid) {
         };
     });
 
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".tree-edit-modal").onclick = (e) => e.stopPropagation();
     ov.querySelector(".cancel").onclick = () => ov.remove();
     
@@ -2795,7 +2800,12 @@ function addFirstPerson() {
                 <button type="button" class="primary save">Добавить</button>
             </div>
         </div>`;
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".cancel").onclick = () => ov.remove();
     
     ov.querySelector(".save").onclick = async () => {
@@ -2885,7 +2895,12 @@ function addRelative(pid, relation) {
                 <button type="button" class="primary save">Добавить</button>
             </div>
         </div>`;
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".cancel").onclick = () => ov.remove();
     ov.querySelector(".save").onclick = () => {
         const name = ov.querySelector("#ar-name").value.trim();
@@ -3149,7 +3164,12 @@ function openColorPaletteDialog() {
     }
     renderRows();
 
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".tree-modal").onclick = (e) => e.stopPropagation();
     ov.querySelector(".cancel").onclick = () => {
         Object.assign(current, PALETTE_DEFAULTS);
@@ -3227,7 +3247,12 @@ function showBackupManager() {
                     });
                 };
             });
-            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
             document.body.appendChild(ov);
         });
 }
@@ -3516,7 +3541,12 @@ function openTimeline() {
     
     // Закрытие
     ov.querySelector(".btn-close").onclick = () => ov.remove();
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     
     document.body.appendChild(ov);
     
@@ -3568,7 +3598,12 @@ function showStats() {
                 </div>`;
             
             ov.querySelector(".cancel").onclick = () => ov.remove();
-            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
             document.body.appendChild(ov);
         });
 }
@@ -3591,7 +3626,12 @@ function checkUpdates() {
         </div>`;
     
     ov.querySelector(".cancel").onclick = () => ov.remove();
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     document.body.appendChild(ov);
     
     fetch("/api/version/check")
@@ -3648,7 +3688,12 @@ function showAbout() {
         </div>`;
     
     ov.querySelector(".cancel").onclick = () => ov.remove();
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     document.body.appendChild(ov);
 }
 
@@ -3676,7 +3721,12 @@ function showAboutDeveloper() {
         </div>`;
 
     ov.querySelector(".cancel").onclick = () => ov.remove();
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     document.body.appendChild(ov);
 }
 
@@ -3930,7 +3980,12 @@ function openFiltersDialog() {
                 <button type="button" class="primary" id="filter-apply">Применить</button>
             </div>
         </div>`;
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".cancel").onclick = () => ov.remove();
     ov.querySelector("#filter-apply").onclick = () => {
         activeFilters.gender = ov.querySelector("#filter-gender").value;
@@ -3997,7 +4052,12 @@ function openSearchDialog() {
     qInp.oninput = doSearch;
     qInp.onkeydown = (e) => { if (e.key === "Enter") doSearch(); };
 
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     ov.querySelector(".cancel").onclick = () => ov.remove();
     ov.querySelector(".tree-modal").onclick = (e) => e.stopPropagation();
     document.body.appendChild(ov);
@@ -4307,7 +4367,12 @@ function showWelcomeDialog() {
         });
     };
     
-    ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+    ov.onclick = (e) => { 
+        // Не закрываем если было выделение текста
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove(); 
+    };
     document.body.appendChild(ov);
     ov.querySelector("#welcome-name").focus();
 }
