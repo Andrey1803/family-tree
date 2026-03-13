@@ -1110,6 +1110,7 @@ function render() {
         parentSetToChildren[key].push(pid);
     });
     const childTopOffset = CARD_H / 2;
+    
     Object.values(parentSetToChildren).forEach(childPids => {
         const first = persons[childPids[0]];
         if (!first || !first.parents) return;
@@ -1134,26 +1135,48 @@ function render() {
         if (!childrenCoords.length) return;
         const minTopY = Math.min(...childrenCoords.map(t => t.topY));
         const lineY = (midY + minTopY) / 2;
-        const pts = [
-            [midX + offsetX, midY + offsetY],
-            [midX + offsetX, lineY + offsetY],
-        ];
-        childrenCoords.forEach(({ cx, topY }) => {
-            pts.push([cx + offsetX, lineY + offsetY]);
-            pts.push([cx + offsetX, topY + offsetY]);
-            pts.push([cx + offsetX, lineY + offsetY]);
-        });
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-        path.setAttribute("points", pts.map(p => p.join(",")).join(" "));
-        path.setAttribute("fill", "none");
-        // === ИСПОЛЬЗУЕМ ЦВЕТ ИЗ ПАЛИТРЫ (как в desktop) ===
+        
+        // === ИСПРАВЛЕНИЕ: Рисуем отдельные линии для каждого ребёнка ===
+        // Это даёт более чёткую отрисовку без лишних сегментов
         const parentLineColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--line-parent').trim() || '#475569';
-        path.setAttribute("stroke", parentLineColor);
-        path.setAttribute("stroke-width", 2);
-        path.setAttribute("stroke-linecap", "round");
-        path.setAttribute("stroke-linejoin", "round");
-        svg.appendChild(path);
+        
+        // Вертикальная линия от родителя до горизонтальной
+        const vertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        vertLine.setAttribute("x1", midX + offsetX);
+        vertLine.setAttribute("y1", midY + offsetY);
+        vertLine.setAttribute("x2", midX + offsetX);
+        vertLine.setAttribute("y2", lineY + offsetY);
+        vertLine.setAttribute("stroke", parentLineColor);
+        vertLine.setAttribute("stroke-width", 2);
+        vertLine.setAttribute("stroke-linecap", "round");
+        svg.appendChild(vertLine);
+        
+        // Горизонтальная линия
+        const minX = childrenCoords[0].cx;
+        const maxX = childrenCoords[childrenCoords.length - 1].cx;
+        const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        horizLine.setAttribute("x1", minX + offsetX);
+        horizLine.setAttribute("y1", lineY + offsetY);
+        horizLine.setAttribute("x2", maxX + offsetX);
+        horizLine.setAttribute("y2", lineY + offsetY);
+        horizLine.setAttribute("stroke", parentLineColor);
+        horizLine.setAttribute("stroke-width", 2);
+        horizLine.setAttribute("stroke-linecap", "round");
+        svg.appendChild(horizLine);
+        
+        // Вертикальные линии к каждому ребёнку
+        childrenCoords.forEach(({ cx, topY }) => {
+            const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            childLine.setAttribute("x1", cx + offsetX);
+            childLine.setAttribute("y1", lineY + offsetY);
+            childLine.setAttribute("x2", cx + offsetX);
+            childLine.setAttribute("y2", topY + offsetY);
+            childLine.setAttribute("stroke", parentLineColor);
+            childLine.setAttribute("stroke-width", 2);
+            childLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(childLine);
+        });
     });
     
     // Линии между супругами
