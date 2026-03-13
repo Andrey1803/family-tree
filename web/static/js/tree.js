@@ -1146,7 +1146,10 @@ function render() {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         path.setAttribute("points", pts.map(p => p.join(",")).join(" "));
         path.setAttribute("fill", "none");
-        path.setAttribute("stroke", "#475569");
+        // === ИСПОЛЬЗУЕМ ЦВЕТ ИЗ ПАЛИТРЫ (как в desktop) ===
+        const parentLineColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--line-parent').trim() || '#475569';
+        path.setAttribute("stroke", parentLineColor);
         path.setAttribute("stroke-width", 2);
         path.setAttribute("stroke-linecap", "round");
         path.setAttribute("stroke-linejoin", "round");
@@ -1184,11 +1187,15 @@ function render() {
         const xLeftEdge = xLeft + cardHalfWidth;
         const xRightEdge = xRight - cardHalfWidth;
 
+        // === ИСПОЛЬЗУЕМ ЦВЕТ ИЗ ПАЛИТРЫ (как в desktop) ===
+        const marriageLineColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--line-marriage').trim() || '#b45309';
+
         line.setAttribute("x1", xLeftEdge);
         line.setAttribute("y1", yCenter);
         line.setAttribute("x2", xRightEdge);
         line.setAttribute("y2", yCenter);
-        line.setAttribute("stroke", "#b45309");
+        line.setAttribute("stroke", marriageLineColor);
         line.setAttribute("stroke-width", 2);
         line.setAttribute("stroke-dasharray", "4 4");
         line.setAttribute("stroke-linecap", "round");
