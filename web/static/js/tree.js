@@ -1968,8 +1968,7 @@ async function saveTree(showNotification = false) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(treeData),
-                credentials: "include",
-                keepalive: true
+                credentials: "include"
             });
             
             console.log('[SAVE] Response status:', response.status);
@@ -4364,8 +4363,7 @@ document.addEventListener('visibilitychange', async () => {
                 await fetch('/api/tree', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(treeData),
-                    keepalive: true  // Важно: запрос выполнится даже если страница закроется
+                    body: JSON.stringify(treeData)
                 });
                 console.log('[AUTO-SAVE] Sent to server:', personsCount, 'persons');
             } catch (e) {
@@ -4393,8 +4391,7 @@ setInterval(() => {
         fetch('/api/tree', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(treeData),
-            keepalive: true
+            body: JSON.stringify(treeData)
         }).then(() => {
             console.log('[AUTO-SAVE] Periodic save to server at', new Date().toLocaleTimeString(), ':', personsCount, 'persons');
         }).catch(e => {
