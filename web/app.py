@@ -1704,6 +1704,59 @@ def api_backup_list():
     return jsonify({"backups": backups[:20]})  # Максимум 20 последних
 
 
+@app.route("/api/backup/import", methods=["POST"])
+def api_backup_import():
+    """Импорт дерева из ZIP файла."""
+    if "username" not in session:
+        return jsonify({"error": "Не авторизован"}), 401
+
+    username = session["username"]
+    
+    if "backup" not in request.files:
+        return jsonify({"error": "Файл не найден"}), 400
+    
+    file = request.files["backup"]
+    if file.filename == "":
+        return jsonify({"error": "Файл не выбран"}), 400
+    
+    if not file.filename.endswith(".zip"):
+        return jsonify({"error": "Неверный формат файла (ожидался .zip)"}), 400
+    
+    try:
+        # Читаем ZIP файл
+        with zipfile.ZipFile(file, 'r') as zf:
+            # Извлекаем JSON дерева
+            tree_filename = f"family_tree_{username}.json"
+            if tree_filename not in zf.namelist():
+                # Пробуем найти любой JSON
+                json_files = [f for f in zf.namelist() if f.endswith('.json')]
+                if json_files:
+                    tree_filename = json_files[0]
+                else:
+                    return jsonify({"error": "Файл дерева не найден в архиве"}), 404
+            
+            tree_data = json.loads(zf.read(tree_filename))
+            
+            # Сохраняем импортированные данные
+            if save_tree(username, tree_data):
+                persons_count = len(tree_data.get("persons", {}))
+                marriages_count = len(tree_data.get("marriages", []))
+                return jsonify({
+                    "ok": True, 
+                    "message": "Дерево импортировано",
+                    "persons": persons_count,
+                    "marriages": marriages_count
+                })
+            else:
+                return jsonify({"error": "Ошибка сохранения импортированных данных"}), 500
+    except zipfile.BadZipFile:
+        return jsonify({"error": "Неверный формат ZIP файла"}), 400
+    except json.JSONDecodeError:
+        return jsonify({"error": "Ошибка чтения данных дерева"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Ошибка импорта: {str(e)}"}), 500
+
+
 @app.route("/api/backup/restore", methods=["POST"])
 def api_backup_restore():
     """Восстановление из резервной копии."""
