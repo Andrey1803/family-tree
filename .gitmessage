@@ -1,4 +1,8 @@
-fix: add debug logging to visible_persons.js
+fix: BFS not adding center person to visibleSet
 
-Added extensive logging to collectVisiblePersons() to debug
-why BFS is not finding persons.
+Removed premature visited.add(centerIdStr) before BFS loop.
+The center person was being skipped because visited.has() returned
+true before the person was added to visibleSet.
+
+Now persons are added to visited and visibleSet together inside
+the loop, ensuring the center person is included.

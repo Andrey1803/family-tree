@@ -34,7 +34,6 @@ function collectVisiblePersons(centerId, persons, marriages) {
     
     // BFS для сбора всех связанных персон
     const queue = [centerIdStr];
-    visited.add(centerIdStr);
     
     console.log('[VISIBLE] Starting BFS with:', centerIdStr);
     
@@ -55,6 +54,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
             continue;
         }
         
+        // Сначала добавляем в visited и visibleSet
         visited.add(currentPid);
         visibleSet.add(currentPid);
         const person = persons[currentPid];
