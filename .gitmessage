@@ -1,7 +1,7 @@
-fix: position remaining persons in organized layout
+fix: restore proper recursive layout algorithm
 
-Persons without coordinates are now positioned below the main tree
-with proper spacing (CARD_W * 2 apart) instead of all at (0,0).
+Moved the coords[pid] check to the beginning of layout() and removed
+the early return condition for parents. Now layout() properly traverses
+the entire tree recursively from rootId, placing all persons correctly.
 
-This fixes the chaotic positioning issue where all remaining persons
-were rendered on top of each other.
+This matches the desktop version's place_subtree() logic.

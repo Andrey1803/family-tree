@@ -763,18 +763,22 @@ function render() {
     function layout(pid, x, y, w) {
         if (!pid || !persons[pid]) return null;
         const p = persons[pid];
+        
+        // Если координаты уже есть — пропускаем (уже размещён)
+        if (coords[pid]) return { left: x, right: x + w, top: y, bottom: y + CARD_H };
+        
         const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
         const kids = p.collapsed_branches ? [] : sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
-        
+
         // === ПОЗИЦИОНИРОВАНИЕ РОДИТЕЛЕЙ (выше текущей персоны) ===
-        const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr] && !coords[pr]);
-        if (visibleParents.length > 0 && !coords[pid]) {
+        const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr]);
+        if (visibleParents.length > 0) {
             // Родители ещё не спозиционированы — позиционируем их выше
             const parentY = y - LEVEL_HEIGHT;
             const parentWidths = visibleParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
             let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
             for (let i = 0; i < visibleParents.length - 1; i++) totalParentW += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
-            
+
             let parentX = x - totalParentW / 2;
             visibleParents.forEach((pr, i) => {
                 const pw = parentWidths[i];
@@ -782,9 +786,6 @@ function render() {
                 parentX += pw + (i < visibleParents.length - 1 ? gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]) : 0);
             });
         }
-        
-        // Если координаты уже есть — не перерисовываем
-        if (coords[pid]) return { left: x, right: x + w, top: y, bottom: y + CARD_H };
 
         const blockWidth = blockWidthOnly(p);
         const allocatedWidth = Math.max(w, blockWidth);
@@ -796,7 +797,9 @@ function render() {
             return ga - gb;
         });
         block.forEach(id => {
-            coords[id] = { x: dx + CARD_W / 2, y: y + CARD_H / 2 };
+            if (!coords[id]) {
+                coords[id] = { x: dx + CARD_W / 2, y: y + CARD_H / 2 };
+            }
             dx += spouseStep;
         });
         const parentCenterX = (coords[block[0]].x + coords[block[block.length - 1]].x) / 2;
@@ -823,30 +826,9 @@ function render() {
         return { left, right, top: y, bottom };
     }
 
-    // === ВЫЗЫВАЕМ layout() ДЛЯ ВСЕХ ПЕРСОН БЕЗ КООРДИНАТ ===
+    // === ВЫЗЫВАЕМ layout() ТОЛЬКО ДЛЯ rootId ===
+    // Остальные персоны будут размещены рекурсивно
     let bounds = layout(rootId, 0, 0, CARD_W * 3);
-    
-    // Если остались персоны без координат — вызываем layout() для них
-    // Позиционируем их ниже основного дерева
-    let layoutOffsetY = bounds.bottom + LEVEL_HEIGHT;
-    let layoutOffsetX = 0;
-    
-    for (const pid of related) {
-        if (!coords[pid] && persons[pid]) {
-            console.log('[RENDER] Layout for remaining person:', pid, 'at', layoutOffsetX, layoutOffsetY);
-            const personBounds = layout(pid, layoutOffsetX, layoutOffsetY, CARD_W * 3);
-            if (personBounds) {
-                bounds = {
-                    left: Math.min(bounds.left, personBounds.left),
-                    right: Math.max(bounds.right, personBounds.right),
-                    top: Math.min(bounds.top, personBounds.top),
-                    bottom: Math.max(bounds.bottom, personBounds.bottom)
-                };
-                layoutOffsetX += CARD_W * 2; // Смещаем следующую персону
-            }
-        }
-    }
-    
     bounds = bounds || { left: 0, right: 400, top: 0, bottom: 300 };
     const offsetX = Math.max(0, -bounds.left) + PAD;
     const offsetY = Math.max(0, -bounds.top) + PAD;
