@@ -655,21 +655,6 @@ function render() {
 
     const relatedRaw = new Set();
     
-    // === СНАЧАЛА добавляем супругов из marriages ===
-    (treeData.marriages || []).forEach(m => {
-        let a, b;
-        if (Array.isArray(m)) {
-            [a, b] = m;
-        } else if (m.persons && Array.isArray(m.persons)) {
-            [a, b] = m.persons;
-        } else {
-            return;
-        }
-        // Добавляем обоих супругов
-        if (persons[String(a)]) relatedRaw.add(String(a));
-        if (persons[String(b)]) relatedRaw.add(String(b));
-    });
-    
     function collect(pid, includeParents) {
         if (!pid || relatedRaw.has(pid)) return;
         relatedRaw.add(pid);
@@ -686,7 +671,7 @@ function render() {
     if (centerId) collect(centerId, !focusModeActive);
     else ids.forEach(id => collect(id, true));
 
-    // === ДОБАВЛЯЕМ СВЯЗИ для супругов из marriages (даже если уже в relatedRaw) ===
+    // === ДОБАВЛЯЕМ СВЯЗИ для супругов из marriages ===
     (treeData.marriages || []).forEach(m => {
         let a, b;
         if (Array.isArray(m)) {

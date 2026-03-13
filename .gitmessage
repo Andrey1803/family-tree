@@ -1,8 +1,8 @@
-fix: process spouse connections from marriages
+fix: restore proper tree collection logic
 
-After adding spouses from marriages to relatedRaw, we now also call
-collect() for their children, spouse_ids, and parents to ensure
-the full family tree is collected.
+Removed pre-adding spouses from marriages to relatedRaw.
+Now collect() properly traverses the full tree including:
+- centerId and its connections
+- spouses from marriages (via collect() for their connections)
 
-This fixes the issue where only 2 persons got coordinates because
-collect() was skipping spouses already in relatedRaw.
+This fixes the issue where only 2 persons got coordinates.
