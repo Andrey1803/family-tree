@@ -82,8 +82,9 @@ if not _secret_key:
     print("[WARNING] SECRET_KEY не установлен! Сгенерирован случайный ключ. Для production установите SECRET_KEY в переменных окружения.")
 app.secret_key = _secret_key
 
+# Настройки кук сессии для работы с JavaScript fetch() запросами
 app.config["JSON_AS_ASCII"] = False
-app.config["SESSION_COOKIE_SECURE"] = False  # Разрешить HTTP
+app.config["SESSION_COOKIE_SECURE"] = True  # HTTPS на Railway
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = None  # Разрешить куки на POST запросах из JavaScript
 
