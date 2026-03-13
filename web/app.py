@@ -70,7 +70,13 @@ SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring
 app = Flask(__name__)
 
 # Включаем CORS для поддержки кросс-доменных запросов с кук/ами
-CORS(app, supports_credentials=True, origins=["*"])
+# origins="*" с supports_credentials=True требует явного указания доменов
+CORS(app, 
+     supports_credentials=True, 
+     origins=["*"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     max_age=3600)
 
 # Генерация секретного ключа
 _secret_key = os.environ.get("SECRET_KEY")
@@ -1126,8 +1132,17 @@ def api_admin_all_trees():
         return jsonify({"trees": []})
 
 
-@app.route("/api/tree", methods=["GET", "POST"])
+@app.route("/api/tree", methods=["GET", "POST", "OPTIONS"])
 def api_tree():
+    # Обработка CORS preflight (OPTIONS) запроса
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        return response, 200
+    
     if "username" not in session:
         return jsonify({"error": "Не авторизован"}), 401
 

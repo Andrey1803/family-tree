@@ -1968,7 +1968,7 @@ async function saveTree(showNotification = false) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(treeData),
-                credentials: "same-origin",
+                credentials: "include",
                 keepalive: true
             });
             
