@@ -57,6 +57,7 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
 
 from flask import Flask, request, jsonify, redirect, url_for, session, render_template, send_file, Response
+from flask_cors import CORS
 
 _web_dir = os.path.dirname(os.path.abspath(__file__))
 _project_root = os.path.dirname(_web_dir)
@@ -67,6 +68,9 @@ if _project_root not in sys.path:
 SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring-production-3656.up.railway.app"
 
 app = Flask(__name__)
+
+# Включаем CORS для поддержки кросс-доменных запросов с кук/ами
+CORS(app, supports_credentials=True, origins=["*"])
 
 # Генерация секретного ключа
 _secret_key = os.environ.get("SECRET_KEY")
