@@ -655,7 +655,7 @@ function render() {
 
     const relatedRaw = new Set();
 
-    function collect(pid, includeParents, includeChildren, includeSiblings, paternalOnly) {
+    function collect(pid, includeParents, includeChildren, includeSiblings, skipSpouseAncestors) {
         if (!pid || relatedRaw.has(pid)) return;
         relatedRaw.add(pid);
         const p = persons[pid];
@@ -663,7 +663,7 @@ function render() {
             console.log('[RENDER] Person not found:', pid);
             return;
         }
-        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'includeChildren=', includeChildren, 'includeSiblings=', includeSiblings, 'paternalOnly=', paternalOnly);
+        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'skipSpouseAncestors=', skipSpouseAncestors);
         
         if (includeParents) {
             // Добавляем всех родителей
@@ -675,26 +675,31 @@ function render() {
             (p.children || []).forEach(c => collect(c, false, true, true, false));
         }
         
-        // Братья/сёстры — добавляем только по отцовской линии (если paternalOnly=true)
+        // Братья/сёстры — добавляем
         if (includeSiblings && p.parents) {
             p.parents.forEach(parentId => {
                 const parent = persons[parentId];
                 if (parent && parent.children) {
                     parent.children.forEach(siblingId => {
                         if (siblingId !== pid) {
-                            collect(siblingId, false, true, true, paternalOnly);
+                            collect(siblingId, false, true, true, false);
                         }
                     });
                 }
             });
         }
         
-        // Супруги — добавляем
-        (p.spouse_ids || []).forEach(s => collect(s, false, false, false, false));
+        // Супруги — добавляем, но НЕ добавляем их предков (skipSpouseAncestors=true)
+        (p.spouse_ids || []).forEach(s => {
+            const spouse = persons[s];
+            if (spouse) {
+                collect(s, !skipSpouseAncestors, false, false, true); // true = скрывать предков супруги
+            }
+        });
     }
     
     // От центральной персоны: добавляем предков, детей, братьев/сестёр
-    // paternalOnly=true для братьев/сестёр (только по отцовской линии)
+    // skipSpouseAncestors=true = скрывать предков супругов
     if (centerId) {
         collect(centerId, true, true, true, true);
     } else {
