@@ -653,61 +653,9 @@ function render() {
     console.log('[RENDER] Rendering tree with', ids.length, 'persons');
     emptyMsg.style.display = "none";
 
-    const relatedRaw = new Set();
-
-    function collect(pid, includeParents, includeChildren, includeSiblings, skipSpouseAncestors) {
-        if (!pid || relatedRaw.has(pid)) return;
-        relatedRaw.add(pid);
-        const p = persons[pid];
-        if (!p) {
-            console.log('[RENDER] Person not found:', pid);
-            return;
-        }
-        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'skipSpouseAncestors=', skipSpouseAncestors);
-        
-        if (includeParents) {
-            // Добавляем всех родителей
-            (p.parents || []).forEach(pr => collect(pr, true, false, false, false));
-        }
-        
-        // Дети — добавляем всех
-        if (includeChildren) {
-            (p.children || []).forEach(c => collect(c, false, true, true, false));
-        }
-        
-        // Братья/сёстры — добавляем
-        if (includeSiblings && p.parents) {
-            p.parents.forEach(parentId => {
-                const parent = persons[parentId];
-                if (parent && parent.children) {
-                    parent.children.forEach(siblingId => {
-                        if (siblingId !== pid) {
-                            collect(siblingId, false, true, true, false);
-                        }
-                    });
-                }
-            });
-        }
-        
-        // Супруги — добавляем, но НЕ добавляем их предков
-        (p.spouse_ids || []).forEach(s => {
-            const spouse = persons[s];
-            if (spouse) {
-                // Всегда скрываем предков супруги (skipSpouseAncestors=true)
-                collect(s, false, false, false, true);
-            }
-        });
-    }
-    
-    // От центральной персоны: добавляем предков, детей, братьев/сестёр
-    // skipSpouseAncestors=true = скрывать предков супругов
-    if (centerId) {
-        collect(centerId, true, true, true, true);
-    } else {
-        ids.forEach(id => collect(id, true, true, true, false));
-    }
-
-    // === ДОБАВЛЯЕМ СВЯЗИ для супругов из marriages ===
+    // === ИСПОЛЬЗУЕМ ФУНКЦИЮ ИЗ visible_persons.js (полная копия desktop-версии) ===
+    const relatedRaw = getVisiblePersons(centerId, persons, treeData.marriages, focusModeActive, activeFilters);
+    console.log('[RENDER] Visible persons:', relatedRaw.size);
     (treeData.marriages || []).forEach(m => {
         let a, b;
         if (Array.isArray(m)) {

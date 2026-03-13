@@ -1,7 +1,17 @@
-fix: always hide spouse ancestors (fix parameter bug)
+feat: copy visible persons logic from desktop version
 
-Fixed bug where spouse ancestors were being added because
-!skipSpouseAncestors was passed instead of always using true.
+Created visible_persons.js with full copy of desktop version logic:
+- collectVisiblePersons() - BFS collection of all related persons
+- isAncestor() - check if person is ancestor
+- applyCollapse() - apply collapsed_branches flag
+- applyFocusMode() - apply focus mode (hide ancestors)
+- applyFilters() - apply gender, status, photos_only filters
+- getVisiblePersons() - main function combining all steps
 
-Now spouses are always collected with skipSpouseAncestors=true,
-preventing their ancestors from being displayed.
+Updated tree.js to use getVisiblePersons() instead of custom collect().
+
+This provides identical behavior to desktop version:
+- Shows all ancestors, descendants, siblings, spouses
+- Respects collapsed_branches flag
+- Supports focus mode
+- Supports all filters
