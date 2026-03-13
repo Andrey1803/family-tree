@@ -1957,14 +1957,22 @@ async function saveTree(showNotification = false) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log('[SAVE] Attempt', attempt, 'at', new Date().toLocaleTimeString());
+            
+            // DEBUG: Показываем полную информацию
+            const fullUrl = window.location.origin + '/api/tree';
+            console.log('[SAVE] URL:', fullUrl);
+            console.log('[SAVE] Session check:', document.cookie ? 'Cookies present' : 'No cookies');
+            console.log('[SAVE] Tree data size:', JSON.stringify(treeData).length, 'bytes');
 
-            const response = await fetch("/api/tree", {
+            const response = await fetch(fullUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(treeData),
-                credentials: "same-origin",  // Важно для кук сессии
+                credentials: "same-origin",
                 keepalive: true
             });
+            
+            console.log('[SAVE] Response status:', response.status);
 
             if (response.ok) {
                 const result = await response.json();
