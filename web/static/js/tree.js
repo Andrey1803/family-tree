@@ -654,8 +654,8 @@ function render() {
     emptyMsg.style.display = "none";
 
     const relatedRaw = new Set();
-    
-    function collect(pid, includeParents) {
+
+    function collect(pid, includeParents, skipSpouseAncestors = false) {
         if (!pid || relatedRaw.has(pid)) return;
         relatedRaw.add(pid);
         const p = persons[pid];
@@ -663,13 +663,32 @@ function render() {
             console.log('[RENDER] Person not found:', pid);
             return;
         }
-        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'parents=', p.parents);
-        if (includeParents) (p.parents || []).forEach(pr => collect(pr, true));
-        (p.children || []).forEach(c => collect(c, true));
-        (p.spouse_ids || []).forEach(s => collect(s, true));
+        console.log('[RENDER] Collecting', pid, 'includeParents=', includeParents, 'skipSpouseAncestors=', skipSpouseAncestors, 'parents=', p.parents);
+        
+        if (includeParents) {
+            // Добавляем родителей
+            (p.parents || []).forEach(pr => {
+                const parent = persons[pr];
+                if (parent) {
+                    // Если это предок супруги (skipSpouseAncestors=true), не добавляем ЕГО предков
+                    collect(pr, true, skipSpouseAncestors);
+                }
+            });
+        }
+        
+        // Дети — добавляем всех
+        (p.children || []).forEach(c => collect(c, true, false));
+        
+        // Супруги — добавляем, но НЕ добавляем предков супруги
+        (p.spouse_ids || []).forEach(s => {
+            const spouse = persons[s];
+            if (spouse) {
+                collect(s, !focusModeActive, true); // true = не добавлять предков супруги
+            }
+        });
     }
-    if (centerId) collect(centerId, !focusModeActive);
-    else ids.forEach(id => collect(id, true));
+    if (centerId) collect(centerId, !focusModeActive, false);
+    else ids.forEach(id => collect(id, true, false));
 
     // === ДОБАВЛЯЕМ СВЯЗИ для супругов из marriages ===
     (treeData.marriages || []).forEach(m => {

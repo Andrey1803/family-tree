@@ -1,8 +1,8 @@
-fix: layout disconnected persons from marriages
+fix: skip spouse ancestors when collecting related persons
 
-After initial layout() from rootId, we now iterate through all persons
-in related set and call layout() for those without coordinates.
-This handles persons not connected via parents/children/spouse_ids
-to the main tree root.
+Added skipSpouseAncestors parameter to collect() function.
+When collecting spouses, we now pass skipSpouseAncestors=true
+to prevent adding their ancestors, reducing line crossings.
 
-Disconnected persons are positioned with proper spacing (CARD_W * 2 apart).
+This matches desktop version behavior where spouse ancestors
+are collapsed by default.
