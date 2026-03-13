@@ -1962,7 +1962,8 @@ async function saveTree(showNotification = false) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(treeData),
-                keepalive: true  // Важно для мобильных
+                credentials: "same-origin",  // Важно для кук сессии
+                keepalive: true
             });
 
             if (response.ok) {
@@ -1989,6 +1990,11 @@ async function saveTree(showNotification = false) {
                     setTimeout(() => msg.remove(), 4000);
                 }
                 return true;  // Успех
+            } else if (response.status === 401) {
+                console.error('[SAVE] ❌ Unauthorized - session expired');
+                alert('Сессия истекла. Пожалуйста, войдите снова.');
+                window.location.href = '/login';
+                return false;
             } else {
                 console.error('[SAVE] ❌ Server error:', response.status, 'attempt', attempt);
             }
