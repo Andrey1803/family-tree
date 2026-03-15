@@ -81,6 +81,13 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 // Ищем ребёнка по всем ключам (строка/число)
                 const childKey = Object.keys(persons).find(k => String(k) === String(childId));
                 const cStr = childKey || String(childId);
+                
+                // Проверяем, существует ли ребёнок в persons
+                if (!persons[cStr]) {
+                    console.log('[VISIBLE] Child NOT in persons:', childId, 'searched for:', cStr);
+                    return;
+                }
+                
                 if (!visited.has(cStr)) {
                     queue.push(cStr);
                     console.log('[VISIBLE] Added child to queue:', cStr);
