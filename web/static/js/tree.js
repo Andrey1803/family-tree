@@ -739,13 +739,20 @@ function render() {
         // === ПОЗИЦИОНИРОВАНИЕ РОДИТЕЛЕЙ (выше текущей персоны) ===
         const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr]);
         if (visibleParents.length > 0) {
+            // Сначала вычислим где будет центр текущего блока
+            const currentBlockWidth = blockWidthOnly(p);
+            const currentAllocatedWidth = Math.max(w, currentBlockWidth);
+            const currentBlockX = x + Math.max(0, (currentAllocatedWidth - currentBlockWidth) / 2);
+            const currentCenterX = currentBlockX + currentBlockWidth / 2;
+            
             // Родители ещё не спозиционированы — позиционируем их выше
             const parentY = y - LEVEL_HEIGHT;
             const parentWidths = visibleParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
             let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
             for (let i = 0; i < visibleParents.length - 1; i++) totalParentW += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
 
-            let parentX = x - totalParentW / 2;
+            // Центрируем родителей относительно текущего блока
+            let parentX = currentCenterX - totalParentW / 2;
             visibleParents.forEach((pr, i) => {
                 const pw = parentWidths[i];
                 layout(pr, parentX, parentY, pw);
