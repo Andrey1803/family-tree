@@ -82,24 +82,34 @@ function collectVisiblePersons(centerId, persons, marriages) {
             });
         }
 
-        // Добавляем siblings (через родителей)
-        if (person.parents) {
+        // Добавляем siblings (через ОБОИХ родителей)
+        if (person.parents && person.parents.length > 0) {
+            // Собираем всех детей от всех родителей
+            const allSiblings = new Set();
             person.parents.forEach(parentId => {
                 const parent = persons[String(parentId)];
                 if (parent && parent.children) {
                     parent.children.forEach(siblingId => {
                         const sk = String(siblingId);
-                        if (sk !== currentPid && !visited.has(sk)) {
-                            queue.push(sk);
-                            console.log('[VISIBLE] Added sibling to queue:', sk);
+                        if (sk !== currentPid) {
+                            allSiblings.add(sk);
                         }
                     });
+                }
+            });
+            
+            // Добавляем всех найденных братьев/сестёр в очередь
+            allSiblings.forEach(sk => {
+                if (!visited.has(sk)) {
+                    queue.push(sk);
+                    console.log('[VISIBLE] Added sibling to queue:', sk);
                 }
             });
         }
     }
 
     console.log('[VISIBLE] After blood relatives BFS:', visibleSet.size, 'persons');
+    console.log('[VISIBLE] Blood relatives:', Array.from(visibleSet));
 
     // === ДОБАВЛЯЕМ СУПРУГОВ ДЛЯ ВСЕХ КРОВНЫХ РОДСТВЕННИКОВ ===
     const spousesToAdd = new Set();
@@ -118,6 +128,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
     spousesToAdd.forEach(spouseStr => visibleSet.add(spouseStr));
 
     console.log('[VISIBLE] After adding spouses:', visibleSet.size, 'persons');
+    console.log('[VISIBLE] All visible:', Array.from(visibleSet));
 
     return visibleSet;
 }
