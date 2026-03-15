@@ -1117,7 +1117,7 @@ function render() {
         parentSetToChildren[key].push(pid);
     });
     const childTopOffset = CARD_H / 2;
-    
+
     Object.values(parentSetToChildren).forEach(childPids => {
         const first = persons[childPids[0]];
         if (!first || !first.parents) return;
@@ -1142,23 +1142,27 @@ function render() {
         if (!childrenCoords.length) return;
         const minTopY = Math.min(...childrenCoords.map(t => t.topY));
         const lineY = (midY + minTopY) / 2;
-        
-        // === ИСПРАВЛЕНИЕ: Рисуем отдельные линии для каждого ребёнка ===
-        // Это даёт более чёткую отрисовку без лишних сегментов
+
+        // === ОТРИСОВКА ЛИНИЙ РОДИТЕЛЕЙ ===
         const parentLineColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--line-parent').trim() || '#475569';
-        
-        // Вертикальная линия от родителя до горизонтальной
-        const vertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        vertLine.setAttribute("x1", midX + offsetX);
-        vertLine.setAttribute("y1", midY + offsetY);
-        vertLine.setAttribute("x2", midX + offsetX);
-        vertLine.setAttribute("y2", lineY + offsetY);
-        vertLine.setAttribute("stroke", parentLineColor);
-        vertLine.setAttribute("stroke-width", 2);
-        vertLine.setAttribute("stroke-linecap", "round");
-        svg.appendChild(vertLine);
-        
+
+        // Вертикальные линии от каждого родителя до горизонтальной линии
+        parentPids.forEach(prId => {
+            const pr = coords[prId];
+            const prBottomY = pr.y + CARD_H / 2;  // Низ карточки родителя
+            
+            const vertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            vertLine.setAttribute("x1", pr.x + offsetX);
+            vertLine.setAttribute("y1", prBottomY + offsetY);
+            vertLine.setAttribute("x2", pr.x + offsetX);
+            vertLine.setAttribute("y2", lineY + offsetY);
+            vertLine.setAttribute("stroke", parentLineColor);
+            vertLine.setAttribute("stroke-width", 2);
+            vertLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(vertLine);
+        });
+
         // Горизонтальная линия
         const minX = childrenCoords[0].cx;
         const maxX = childrenCoords[childrenCoords.length - 1].cx;
@@ -1171,7 +1175,7 @@ function render() {
         horizLine.setAttribute("stroke-width", 2);
         horizLine.setAttribute("stroke-linecap", "round");
         svg.appendChild(horizLine);
-        
+
         // Вертикальные линии к каждому ребёнку
         childrenCoords.forEach(({ cx, topY }) => {
             const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
