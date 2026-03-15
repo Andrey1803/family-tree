@@ -68,6 +68,8 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 if (!visited.has(pStr)) {
                     queue.push(pStr);
                     console.log('[VISIBLE] Added parent to queue:', pStr);
+                } else {
+                    console.log('[VISIBLE] Parent already visited:', pStr);
                 }
             });
         }
@@ -78,6 +80,8 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 if (!visited.has(cStr)) {
                     queue.push(cStr);
                     console.log('[VISIBLE] Added child to queue:', cStr);
+                } else {
+                    console.log('[VISIBLE] Child already visited:', cStr);
                 }
             });
         }
