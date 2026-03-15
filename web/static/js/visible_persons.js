@@ -64,7 +64,9 @@ function collectVisiblePersons(centerId, persons, marriages) {
         // Добавляем ТОЛЬКО кровных: родители, дети, братья/сёстры (СУПРУГИ НЕ ДОБАВЛЯЕМ!)
         if (person.parents) {
             person.parents.forEach(parentId => {
-                const pStr = String(parentId);
+                // Ищем родителя по всем ключам (строка/число)
+                const parentKey = Object.keys(persons).find(k => String(k) === String(parentId));
+                const pStr = parentKey || String(parentId);
                 if (!visited.has(pStr)) {
                     queue.push(pStr);
                     console.log('[VISIBLE] Added parent to queue:', pStr);
@@ -76,7 +78,9 @@ function collectVisiblePersons(centerId, persons, marriages) {
 
         if (person.children) {
             person.children.forEach(childId => {
-                const cStr = String(childId);
+                // Ищем ребёнка по всем ключам (строка/число)
+                const childKey = Object.keys(persons).find(k => String(k) === String(childId));
+                const cStr = childKey || String(childId);
                 if (!visited.has(cStr)) {
                     queue.push(cStr);
                     console.log('[VISIBLE] Added child to queue:', cStr);
@@ -91,7 +95,9 @@ function collectVisiblePersons(centerId, persons, marriages) {
             // Собираем всех детей от всех родителей
             const allSiblings = new Set();
             person.parents.forEach(parentId => {
-                const parent = persons[String(parentId)];
+                // Ищем родителя по всем ключам (строка/число)
+                const parentKey = Object.keys(persons).find(k => String(k) === String(parentId));
+                const parent = parentKey ? persons[parentKey] : null;
                 if (parent && parent.children) {
                     parent.children.forEach(siblingId => {
                         const sk = String(siblingId);
@@ -101,7 +107,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                     });
                 }
             });
-            
+
             // Добавляем всех найденных братьев/сестёр в очередь
             allSiblings.forEach(sk => {
                 if (!visited.has(sk)) {
