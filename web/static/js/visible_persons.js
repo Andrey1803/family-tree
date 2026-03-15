@@ -32,36 +32,36 @@ function collectVisiblePersons(centerId, persons, marriages) {
         return visibleSet;
     }
     
-    // BFS для сбора всех связанных персон
+    // BFS для сбора КРОВНЫХ родственников (предки, потомки, братья/сёстры)
     const queue = [centerIdStr];
-    
+
     console.log('[VISIBLE] Starting BFS with:', centerIdStr);
-    
+
     let iteration = 0;
     while (queue.length > 0) {
         iteration++;
         const currentPid = queue.shift();
-        
+
         console.log('[VISIBLE] BFS iteration', iteration, ', processing:', currentPid, ', queue length:', queue.length);
-        
+
         if (!persons[currentPid]) {
             console.log('[VISIBLE] Person NOT FOUND:', currentPid);
             continue;
         }
-        
+
         if (visited.has(currentPid)) {
             console.log('[VISIBLE] Already visited:', currentPid);
             continue;
         }
-        
-        // Сначала добавляем в visited и visibleSet
+
+        // Добавляем в кровные родственники
         visited.add(currentPid);
         visibleSet.add(currentPid);
         const person = persons[currentPid];
-        
-        console.log('[VISIBLE] Added person:', currentPid, ', parents:', person.parents, ', children:', person.children, ', spouses:', person.spouse_ids);
-        
-        // Добавляем всех связанных в очередь
+
+        console.log('[VISIBLE] Added blood relative:', currentPid, ', parents:', person.parents, ', children:', person.children);
+
+        // Добавляем ТОЛЬКО кровных: родители, дети, братья/сёстры (СУПРУГИ НЕ ДОБАВЛЯЕМ!)
         if (person.parents) {
             person.parents.forEach(parentId => {
                 const pStr = String(parentId);
@@ -71,7 +71,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 }
             });
         }
-        
+
         if (person.children) {
             person.children.forEach(childId => {
                 const cStr = String(childId);
@@ -81,17 +81,7 @@ function collectVisiblePersons(centerId, persons, marriages) {
                 }
             });
         }
-        
-        if (person.spouse_ids) {
-            person.spouse_ids.forEach(spouseId => {
-                const sStr = String(spouseId);
-                if (!visited.has(sStr)) {
-                    queue.push(sStr);
-                    console.log('[VISIBLE] Added spouse to queue:', sStr);
-                }
-            });
-        }
-        
+
         // Добавляем siblings (через родителей)
         if (person.parents) {
             person.parents.forEach(parentId => {
@@ -108,56 +98,27 @@ function collectVisiblePersons(centerId, persons, marriages) {
             });
         }
     }
-    
-    console.log('[VISIBLE] After BFS:', visibleSet.size, 'persons');
-    
-    // === ДОБАВЛЯЕМ ВСЕХ СУПРУГОВ ИЗ marriages ===
-    (marriages || []).forEach(m => {
-        let a, b;
-        if (Array.isArray(m)) {
-            [a, b] = m;
-        } else if (m.persons && Array.isArray(m.persons)) {
-            [a, b] = m.persons;
-        } else {
-            return;
-        }
-        
-        const aStr = String(a);
-        const bStr = String(b);
-        
-        if (visibleSet.has(aStr) && !visibleSet.has(bStr)) {
-            visibleSet.add(bStr);
-            console.log('[MARRIAGE_FIX] Добавлен супруг', bStr);
-        }
-        if (visibleSet.has(bStr) && !visibleSet.has(aStr)) {
-            visibleSet.add(aStr);
-            console.log('[MARRIAGE_FIX] Добавлен супруг', aStr);
-        }
-    });
-    
-    console.log('[VISIBLE] After marriages:', visibleSet.size, 'persons');
-    
-    // === ДОБАВЛЯЕМ СУПРУГОВ ДЛЯ ВСЕХ ВИДИМЫХ ПЕРСОН ===
-    const additionalSpouses = new Set();
+
+    console.log('[VISIBLE] After blood relatives BFS:', visibleSet.size, 'persons');
+
+    // === ДОБАВЛЯЕМ СУПРУГОВ ДЛЯ ВСЕХ КРОВНЫХ РОДСТВЕННИКОВ ===
+    const spousesToAdd = new Set();
     visibleSet.forEach(pid => {
         const person = persons[pid];
         if (person && person.spouse_ids) {
             person.spouse_ids.forEach(spouseId => {
                 const spouseStr = String(spouseId);
                 if (!visibleSet.has(spouseStr)) {
-                    additionalSpouses.add(spouseStr);
+                    spousesToAdd.add(spouseStr);
+                    console.log('[VISIBLE] Will add spouse:', spouseStr, 'for:', pid);
                 }
             });
         }
     });
-    
-    additionalSpouses.forEach(spouseId => {
-        visibleSet.add(spouseId);
-        console.log('[SPOUSE_FIX] Добавлен супруг', spouseId);
-    });
-    
-    console.log('[VISIBLE] Final count:', visibleSet.size, 'persons');
-    
+    spousesToAdd.forEach(spouseStr => visibleSet.add(spouseStr));
+
+    console.log('[VISIBLE] After adding spouses:', visibleSet.size, 'persons');
+
     return visibleSet;
 }
 
