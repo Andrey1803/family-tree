@@ -2124,8 +2124,20 @@ function showContextMenu(pid, x, y, persons) {
         { label: "Редактировать", action: () => editPerson(pid) },
         { label: "Удалить", action: () => deletePerson(pid) },
         { sep: true },
+        // === СВЁРНУТЬ/РАЗВЕРНУТЬ ВЕТКУ ===
+        p.children && p.children.length > 0 && {
+            label: p.collapsed_branches ? "🔓 Развернуть ветку" : "🔒 Свернуть ветку",
+            action: () => {
+                if (window.undoManager) window.undoManager.saveState(treeData);
+                p.collapsed_branches = !p.collapsed_branches;
+                saveTree();
+                render();
+            }
+        },
+        { sep: true },
+        // === /СВЁРНУТЬ/РАЗВЕРНУТЬ ВЕТКУ ===
         { label: "Родственник", sub: subItems },
-    ];
+    ].filter(Boolean);
 
     items.forEach((it) => {
         if (it.sep) {
