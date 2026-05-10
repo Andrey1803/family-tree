@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учёт объектов</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+        }
+        
+        /* ШАПКА */
+        .header {
+            background: linear-gradient(135deg, #2E75B6, #1E5A8E);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 { font-size: 24px; }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.15);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .stat-card .label {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+        
+        /* КНОПКИ */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover { background: #388E3C; }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-edit {
+            background: #2196F3;
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        /* КОНТЕЙНЕР */
+        .container {
+            max-width: 1600px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        
+        /* ТАБЛИЦА */
+        .table-wrapper {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #2E75B6;
+            color: white;
+            padding: 12px 10px;
+            text-align: center;
+            font-size: 13px;
+            position: sticky;
+            top: 0;
+        }
+        
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            text-align: center;
+        }
+        
+        tr:hover { background: #f5f5f5; }
+        
+        .debt-row { background: #FFC7CE !important; }
+        .debt-row td { font-weight: 600; }
+        
+        .balance-cell, .profit-cell {
+            font-weight: bold;
+            text-align: right;
+        }
+        
+        .positive { color: #006100; }
+        .negative { color: #9C0006; }
+        
+        /* СТАТУСЫ */
+        .status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-Запланирован { background: #FFEB9C; color: #666; }
+        .status-В { background: #BDD7EE; color: #1E5A8E; }
+        .status-Приостановлен { background: #FFC7CE; color: #9C0006; }
+        .status-Завершён { background: #C6EFCE; color: #006100; }
+        .status-Оплачен { background: #E2EFDA; color: #333; }
+        
+        /* МОДАЛЬНОЕ ОКНО */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #2E75B6;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-cancel {
+            background: #999;
+            color: white;
+        }
+        
+        /* ФИЛЬТРЫ */
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filters input, .filters select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        
+        .filters input[type="text"] { flex: 1; min-width: 200px; }
+    </style>
+</head>
+<body>
+    <!-- ШАПКА -->
+    <div class="header">
+        <h1>Учёт объектов</h1>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="value" id="stat-total">0</div>
+                <div class="label">Всего</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-progress">0</div>
+                <div class="label">В работе</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-completed">0</div>
+                <div class="label">Завершено</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-profit">0 BYN</div>
+                <div class="label">Прибыль</div>
+            </div>
+        </div>
+        <div style="display:flex; gap: 10px;">
+            <a href="/estimate/" style="text-decoration:none">
+                <button class="btn" style="background:#FF6B35; color:white;">📊 Сметы</button>
+            </a>
+            <button class="btn btn-primary" onclick="openModal()">+ Добавить объект</button>
+        </div>
+    </div>
+    
+    <!-- КОНТЕНТ -->
+    <div class="container">
+        <!-- ФИЛЬТРЫ -->
+        <div class="filters">
+            <input type="text" id="filter-search" placeholder="Поиск по наименованию...">
+            <select id="filter-status">
+                <option value="">Все статусы</option>
+                <option>Запланирован</option>
+                <option>В работе</option>
+                <option>Приостановлен</option>
+                <option>Завершён</option>
+                <option>Оплачен</option>
+            </select>
+            <select id="filter-client">
+                <option value="">Все клиенты</option>
+            </select>
+        </div>
+        
+        <!-- ТАБЛИЦА -->
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Дата начала</th>
+                        <th>Дата завершения</th>
+                        <th>Наименование</th>
+                        <th>Клиент</th>
+                        <th>Сумма</th>
+                        <th>Затраты</th>
+                        <th>Статус</th>
+                        <th>Аванс</th>
+                        <th>Зарплата</th>
+                        <th>Остаток</th>
+                        <th>Прибыль</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- МОДАЛЬНОЕ ОКНО -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Добавить объект</h2>
+            <form id="object-form">
+                <input type="hidden" id="obj-id">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Дата начала</label>
+                        <input type="date" id="date-start">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата завершения</label>
+                        <input type="date" id="date-end">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Наименование *</label>
+                    <input type="text" id="name" required placeholder="Например: Колодищи - насос">
+                </div>
+                
+                <div class="form-group">
+                    <label>Клиент</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <select id="client" style="flex:1">
+                            <option value="">-- Выберите клиента --</option>
+                            <option value="__new__">+ Добавить нового клиента...</option>
+                        </select>
+                    </div>
+                    <div id="new-client-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="new-client-name" placeholder="ФИО или название нового клиента" style="flex:1">
+                            <button type="button" class="btn" style="background:#4CAF50; color:white; padding:8px 12px; font-size:12px;" onclick="addNewClient()">✓ Добавить</button>
+                            <button type="button" class="btn" style="background:#999; color:white; padding:8px 12px; font-size:12px;" onclick="cancelNewClient()">✕</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Сумма работ</label>
+                        <input type="number" id="sum-work" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Затраты</label>
+                        <input type="number" id="expenses" step="0.01" value="0">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Статус</label>
+                        <select id="status">
+                            <option>Запланирован</option>
+                            <option>В работе</option>
+                            <option>Приостановлен</option>
+                            <option>Завершён</option>
+                            <option>Оплачен</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Аванс</label>
+                        <input type="number" id="advance" step="0.01" value="0">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Зарплата рабочим</label>
+                    <input type="number" id="salary" step="0.01" value="0">
+                </div>
+                
+                <div class="form-group">
+                    <label>Примечания</label>
+                    <textarea id="notes" rows="2" placeholder="Дополнительная информация..."></textarea>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="button" class="btn btn-cancel" onclick="closeModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        let objects = [];
+        let clients = [];
+        let editingId = null;
+        
+        // Загрузка данных
+        async function loadData() {
+            const res = await fetch('/api/objects');
+            objects = await res.json();
+            
+            const clientsRes = await fetch('/api/clients');
+            clients = await clientsRes.json();
+            
+            const statsRes = await fetch('/api/stats');
+            const stats = await statsRes.json();
+            
+            renderStats(stats);
+            renderClients();
+            renderTable();
+        }
+        
+        // Статистика
+        function renderStats(stats) {
+            document.getElementById('stat-total').textContent = stats.total;
+            document.getElementById('stat-progress').textContent = stats.in_progress;
+            document.getElementById('stat-completed').textContent = stats.completed;
+            
+            const profitEl = document.getElementById('stat-profit');
+            profitEl.textContent = stats.profit.toLocaleString('ru-RU', {minimumFractionDigits: 2}) + ' BYN';
+            profitEl.style.color = stats.profit >= 0 ? '#C6EFCE' : '#FFC7CE';
+        }
+        
+        // Клиенты в форму и фильтр
+        function renderClients() {
+            const select = document.getElementById('client');
+            const filterSelect = document.getElementById('filter-client');
+            
+            select.innerHTML = '<option value="">-- Выберите клиента --</option>';
+            clients.forEach(c => {
+                select.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+            });
+            select.innerHTML += '<option value="__new__">+ Добавить нового клиента...</option>';
+            
+            filterSelect.innerHTML = '<option value="">Все клиенты</option>';
+            clients.forEach(c => {
+                filterSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+            });
+        }
+        
+        // Таблица
+        function renderTable() {
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            const statusFilter = document.getElementById('filter-status').value;
+            const clientFilter = document.getElementById('filter-client').value;
+            
+            let filtered = objects.filter(obj => {
+                if (search && !obj.name.toLowerCase().includes(search)) return false;
+                if (statusFilter && obj.status !== statusFilter) return false;
+                if (clientFilter && obj.client !== clientFilter) return false;
+                return true;
+            });
+            
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            
+            filtered.forEach((obj, idx) => {
+                const hasDebt = obj.balance > 0;
+                const tr = document.createElement('tr');
+                if (hasDebt) tr.className = 'debt-row';
+                
+                tr.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td>${formatDate(obj.date_start)}</td>
+                    <td>${formatDate(obj.date_end)}</td>
+                    <td style="text-align:left">${obj.name}</td>
+                    <td>${obj.client || '-'}</td>
+                    <td>${formatMoney(obj.sum_work)}</td>
+                    <td>${formatMoney(obj.expenses)}</td>
+                    <td><span class="status status-${obj.status}">${obj.status}</span></td>
+                    <td>${formatMoney(obj.advance)}</td>
+                    <td>${formatMoney(obj.salary)}</td>
+                    <td class="balance-cell ${hasDebt ? 'negative' : 'positive'}">${formatMoney(obj.balance)}</td>
+                    <td class="profit-cell ${obj.profit >= 0 ? 'positive' : 'negative'}">${formatMoney(obj.profit)}</td>
+                    <td>
+                        <button class="btn btn-edit" onclick="editObject(${obj.id})">✏️</button>
+                        <button class="btn btn-danger" type="button" onclick="deleteObject(${obj.id})" title="Название объекта: ${escapeHtmlAttr(obj.name || '')}">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Форматирование
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const parts = dateStr.split('-');
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+        
+        function formatMoney(val) {
+            return Number(val).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        
+        function escapeHtmlAttr(s) {
+            return String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;');
+        }
+        
+        function deleteObjectConfirmMessage(id) {
+            const obj = objects.find(o => o.id === id);
+            let msg = 'Удалить объект?\n\n';
+            if (obj) {
+                const name = String(obj.name || '').trim() || '(без названия)';
+                const client = String(obj.client || '').trim();
+                const notes = String(obj.notes || '').trim();
+                const notesShort = notes.length > 220 ? notes.slice(0, 220) + '…' : notes;
+                msg += 'Название объекта: ' + name + '\n';
+                if (client) msg += 'Клиент: ' + client + '\n';
+                if (notesShort) msg += 'Примечание: ' + notesShort + '\n';
+                if (obj.status) msg += 'Статус: ' + obj.status + '\n';
+            }
+            msg += '\nid записи: ' + id;
+            return msg;
+        }
+        
+        // Модальное окно
+        function openModal(id = null) {
+            editingId = id;
+            const modal = document.getElementById('modal');
+            modal.classList.add('active');
+            
+            document.getElementById('modal-title').textContent = id ? 'Редактировать объект' : 'Добавить объект';
+            
+            if (id) {
+                const obj = objects.find(o => o.id === id);
+                document.getElementById('obj-id').value = obj.id;
+                document.getElementById('date-start').value = obj.date_start || '';
+                document.getElementById('date-end').value = obj.date_end || '';
+                document.getElementById('name').value = obj.name;
+                document.getElementById('client').value = obj.client || '';
+                document.getElementById('sum-work').value = obj.sum_work;
+                document.getElementById('expenses').value = obj.expenses;
+                document.getElementById('status').value = obj.status;
+                document.getElementById('advance').value = obj.advance;
+                document.getElementById('salary').value = obj.salary;
+                document.getElementById('notes').value = obj.notes || '';
+            } else {
+                document.getElementById('object-form').reset();
+                document.getElementById('date-start').value = new Date().toISOString().split('T')[0];
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+            editingId = null;
+        }
+        
+        // Сохранение
+        document.getElementById('object-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                date_start: document.getElementById('date-start').value,
+                date_end: document.getElementById('date-end').value,
+                name: document.getElementById('name').value,
+                client: document.getElementById('client').value,
+                sum_work: parseFloat(document.getElementById('sum-work').value) || 0,
+                expenses: parseFloat(document.getElementById('expenses').value) || 0,
+                status: document.getElementById('status').value,
+                advance: parseFloat(document.getElementById('advance').value) || 0,
+                salary: parseFloat(document.getElementById('salary').value) || 0,
+                notes: document.getElementById('notes').value
+            };
+            
+            if (editingId) {
+                await fetch(`/api/objects/${editingId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+            } else {
+                await fetch('/api/objects', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+            }
+            
+            closeModal();
+            loadData();
+        });
+        
+        // Редактирование
+        function editObject(id) {
+            openModal(id);
+        }
+        
+        // Удаление
+        async function deleteObject(id) {
+            if (!confirm(deleteObjectConfirmMessage(id))) return;
+            await fetch(`/api/objects/${id}`, { method: 'DELETE' });
+            loadData();
+        }
+        
+        // Фильтры
+        document.getElementById('filter-search').addEventListener('input', renderTable);
+        document.getElementById('filter-status').addEventListener('change', renderTable);
+        document.getElementById('filter-client').addEventListener('change', renderTable);
+        
+        // Обработка выбора "Добавить нового клиента"
+        document.getElementById('client').addEventListener('change', function() {
+            if (this.value === '__new__') {
+                document.getElementById('new-client-row').style.display = 'block';
+                document.getElementById('new-client-name').focus();
+                this.value = '';
+            }
+        });
+        
+        // Добавление нового клиента
+        async function addNewClient() {
+            const name = document.getElementById('new-client-name').value.trim();
+            if (!name) { alert('Введите имя клиента!'); return; }
+            
+            const res = await fetch('/api/clients', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name })
+            });
+            
+            if (res.ok) {
+                const client = await res.json();
+                clients.push(client);
+                renderClients();
+                document.getElementById('client').value = name;
+                document.getElementById('new-client-row').style.display = 'none';
+                document.getElementById('new-client-name').value = '';
+            }
+        }
+        
+        // Отмена добавления клиента
+        function cancelNewClient() {
+            document.getElementById('new-client-row').style.display = 'none';
+            document.getElementById('new-client-name').value = '';
+        }
+        
+        // Enter в поле нового клиента
+        document.getElementById('new-client-name').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); addNewClient(); }
+            if (e.key === 'Escape') { cancelNewClient(); }
+        });
+        
+        // Закрытие модалки по клику вне
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') closeModal();
+        });
+        
+        // Запуск
+        loadData();
+    </script>
+</body>
+</html>
