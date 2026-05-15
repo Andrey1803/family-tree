@@ -829,6 +829,12 @@ function render() {
     // ФИНАЛЬНАЯ ВЕРСИЯ: простое размещение по поколениям
     let layoutResult;
 
+    if (typeof renderFinalLayout !== 'function') {
+        console.error('[RENDER] final_layout.js not loaded — hard refresh (Ctrl+F5)');
+        emptyMsg.style.display = 'block';
+        emptyMsg.innerHTML = 'Не загружен модуль отрисовки. Нажмите <b>Ctrl+F5</b> для обновления страницы.';
+        return;
+    }
     console.log('[RENDER] Using FINAL layout...');
     layoutResult = renderFinalLayout(centerId, persons, treeData.marriages, related);
     

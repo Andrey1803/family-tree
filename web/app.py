@@ -118,11 +118,11 @@ app.config["SESSION_COOKIE_SAMESITE"] = os.environ.get("SESSION_COOKIE_SAMESITE"
 def add_cache_headers(response):
     # Для статических файлов добавляем заголовки для кэширования
     if request.path.startswith('/static/'):
-        # Если есть версия в query параметре (?v=...) - кэшируем надолго
-        if 'v=' in request.query_string.decode():
+        qs = request.query_string.decode()
+        # Долгий кэш только для успешных ответов (иначе 404 кэшируется навсегда)
+        if response.status_code == 200 and 'v=' in qs:
             response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         else:
-            # Без версии - не кэшируем
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
