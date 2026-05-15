@@ -1298,9 +1298,9 @@ function render() {
             midVertLine.setAttribute("stroke-linecap", "round");
             svg.appendChild(midVertLine);
 
-            // Горизонтальная линия над всеми детьми
-            const minX = childrenCoords[0].cx;
-            const maxX = childrenCoords[childrenCoords.length - 1].cx;
+            // Горизонталь — от центра родителей до крайних детей (мост при смещении группы)
+            const minX = Math.min(parentCenterX, childrenCoords[0].cx);
+            const maxX = Math.max(parentCenterX, childrenCoords[childrenCoords.length - 1].cx);
             const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
             horizLine.setAttribute("x1", (minX + offsetX));
             horizLine.setAttribute("y1", (horizLineY + offsetY));

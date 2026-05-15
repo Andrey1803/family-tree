@@ -425,12 +425,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     groupStartX = parentCenterX - totalWidth / 2;
                 }
 
-                // === ВАЖНО: Если группа наезжает на предыдущую — сдвигаем вправо ===
-                if (currentX > 0 && groupStartX < currentX) {
-                    console.log(`[FINAL] Group [${parentKey}] overlaps! Moving from ${groupStartX.toFixed(0)} to ${currentX.toFixed(0)}`);
-                    groupStartX = currentX;
-                }
-
+                // Дети всегда под центром родителей (не сдвигаем вправо — иначе отрыв от линий)
                 console.log(`[FINAL] Group under parents [${parentKey}]: ${children.length} children, center=${parentCenterX.toFixed(1)}, startX=${groupStartX.toFixed(1)}`);
                 
                 // === Размещаем детей и супругов РЯДОМ ===
@@ -510,12 +505,6 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 } else {
                     // Несколько детей — обычное центрирование
                     groupStartX = p.x - groupTotalWidth / 2;
-                }
-
-                // === ВАЖНО: Если группа наезжает на предыдущую — сдвигаем вправо ===
-                if (currentX > 0 && groupStartX < currentX) {
-                    console.log(`[FINAL] Group [${parentKey}] overlaps! Moving from ${groupStartX.toFixed(0)} to ${currentX.toFixed(0)}`);
-                    groupStartX = currentX;
                 }
 
                 console.log(`[FINAL] Group under single parent [${parentKey}]: ${children.length} children, parentX=${p.x.toFixed(1)}, groupWidth=${groupTotalWidth.toFixed(1)}, startX=${groupStartX.toFixed(1)}`);
