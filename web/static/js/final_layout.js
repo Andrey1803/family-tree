@@ -1389,13 +1389,138 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 groups++;
             });
         });
+
+        /**
+         * После pack дети часто смещены относительно середины брака родителей:
+         * вертикаль тогда «приземляется» на край горизонтали. Сдвигаем целый кластер
+         * (ребёнок + супруги на том же ряду) к midX, насколько позволяют зазоры PACK_GAP.
+         */
+        function collectGroupNodeIds(childList, csMap) {
+            const ids = new Set();
+            childList.forEach(cid => {
+                if (coords[cid]) ids.add(cid);
+                (csMap.get(cid) || []).forEach(sid => {
+                    if (coords[sid]) ids.add(sid);
+                });
+            });
+            return ids;
+        }
+
+        function horizExtentsForCluster(childList, csMap, rowSnapY) {
+            let lo = Infinity;
+            let hi = -Infinity;
+            childList.forEach(cid => {
+                const order = spouseRowOrderLocal(cid, csMap.get(cid) || []);
+                order.forEach(pid => {
+                    const c = coords[pid];
+                    if (!c || snapLayoutRowY(c.y) !== rowSnapY) return;
+                    lo = Math.min(lo, c.x - CARD_W / 2);
+                    hi = Math.max(hi, c.x + CARD_W / 2);
+                });
+            });
+            if (!Number.isFinite(lo)) return null;
+            return { lo, hi, width: hi - lo };
+        }
+
+        for (let rpass = 0; rpass < 14; rpass++) {
+            let movedRelax = false;
+            layoutRowKeys().forEach(pyRelax => {
+                const cryRelax = pyRelax + LEVEL_HEIGHT;
+
+                const byKeyRelax = new Map();
+                Object.keys(coords).forEach(cid => {
+                    if (!related.has(cid) || !coords[cid] || !persons[cid]) return;
+                    if (snapLayoutRowY(coords[cid].y) !== cryRelax) return;
+                    const pk = dataParentKey(cid);
+                    if (!pk) return;
+                    const prs = pk.split('|').filter(Boolean);
+                    const onGenAbove = prs.some(
+                        pr => coords[pr] && snapLayoutRowY(coords[pr].y) === pyRelax
+                    );
+                    if (!onGenAbove) return;
+                    if (!byKeyRelax.has(pk)) byKeyRelax.set(pk, []);
+                    byKeyRelax.get(pk).push(cid);
+                });
+
+                const rg = [];
+                byKeyRelax.forEach((childList, pk) => {
+                    childList.sort((a, b) => {
+                        const da = persons[a]?.birth_date || '9999.99.99';
+                        const db = persons[b]?.birth_date || '9999.99.99';
+                        if (da !== db) return da.localeCompare(db);
+                        return String(a).localeCompare(String(b));
+                    });
+                    const prIds = pk.split('|').filter(Boolean);
+                    const placedOnRowAbove = prIds.filter(
+                        pr => coords[pr] && snapLayoutRowY(coords[pr].y) === pyRelax
+                    );
+                    if (placedOnRowAbove.length === 0) return;
+                    let midXR;
+                    if (placedOnRowAbove.length >= 2) {
+                        midXR =
+                            placedOnRowAbove.reduce((s, pr) => s + coords[pr].x, 0) /
+                            placedOnRowAbove.length;
+                    } else {
+                        midXR = coords[placedOnRowAbove[0]].x;
+                    }
+                    const csMapR = new Map();
+                    childList.forEach(cid => csMapR.set(cid, spousesNextToChildOnRow(cid)));
+                    rg.push({ pk, childList, midX: midXR, csMap: csMapR });
+                });
+
+                rg.forEach(entry => {
+                    const ex = horizExtentsForCluster(entry.childList, entry.csMap, cryRelax);
+                    entry._extent = ex;
+                    entry._centChild =
+                        entry.childList.reduce((s, cid) => s + coords[cid].x, 0) /
+                        Math.max(1, entry.childList.length);
+                });
+
+                rg.sort(
+                    (a, b) =>
+                        (a._extent?.lo ?? Infinity) - (b._extent?.lo ?? Infinity)
+                );
+
+                let prevHi = -Infinity;
+                rg.forEach((entry, idx) => {
+                    const ext = entry._extent;
+                    if (!ext) return;
+                    let lo = ext.lo;
+                    let hi = ext.hi;
+                    const centroid = entry._centChild;
+                    let deltaIdeal = entry.midX - centroid;
+
+                    const next = rg[idx + 1];
+                    const nextLo = next && next._extent ? next._extent.lo : Infinity;
+
+                    const deltaMin = prevHi + PACK_GAP - lo;
+                    const deltaMax = Number.isFinite(nextLo) ? nextLo - PACK_GAP - hi : Infinity;
+                    let delta = deltaIdeal;
+                    if (delta < deltaMin) delta = deltaMin;
+                    if (delta > deltaMax) delta = deltaMax;
+
+                    if (Math.abs(delta) > 0.25) {
+                        const toMove = collectGroupNodeIds(entry.childList, entry.csMap);
+                        toMove.forEach(pid => {
+                            if (coords[pid]) coords[pid].x += delta;
+                        });
+                        movedRelax = true;
+                        lo += delta;
+                        hi += delta;
+                    }
+                    prevHi = Math.max(prevHi, hi);
+                });
+            });
+            if (!movedRelax) break;
+        }
+
         if (groups) {
             console.log(
                 '[FINAL] Re-anchored children under parents (row pack, gap≥',
                 PACK_GAP,
                 '):',
                 groups,
-                'groups'
+                'groups (+ relax toward marriage mid)'
             );
         }
     })();
