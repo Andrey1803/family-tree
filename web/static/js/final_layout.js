@@ -712,9 +712,9 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         return [...new Set(Object.keys(coords).map(id => snapLayoutRowY(coords[id].y)))].sort((a, b) => a - b);
     }
 
-    // === POST: раздвигаем супругов по горизонтали под ширину ряда детей (середина брака не сдвигается) ===
-    (function widenParentCouplesForChildFootprint() {
-        const H_PAD = 20;
+    // === POST: фиксируем расстояние между супругами (между центрами = CARD_W + SPOUSE_GAP, как «одна карточка + зазор») ===
+    (function normalizeMarriedCoupleSpacing() {
+        const CENTER_DIST = CARD_W + SPOUSE_GAP; // два соседних блока парного ряда, без искусственного разъезда
 
         function gatherUnitsOnRow(py) {
             const onRow = Object.keys(coords).filter(
@@ -745,40 +745,6 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return units;
         }
 
-        function childFootprintBelow(unit) {
-            const py = unit.y;
-            const cry = py + LEVEL_HEIGHT;
-            const childIds = new Set();
-            unit.ids.forEach(pid => {
-                (persons[pid].children || []).forEach(c => {
-                    const cs = String(c);
-                    if (!related.has(cs) || !coords[cs]) return;
-                    if (snapLayoutRowY(coords[cs].y) !== cry) return;
-                    childIds.add(cs);
-                });
-            });
-            if (childIds.size === 0) return null;
-
-            let lo = Infinity;
-            let hi = -Infinity;
-            const bump = cid => {
-                if (!coords[cid]) return;
-                lo = Math.min(lo, coords[cid].x - CARD_W / 2);
-                hi = Math.max(hi, coords[cid].x + CARD_W / 2);
-            };
-            childIds.forEach(cid => {
-                bump(cid);
-                (marriageMap.get(cid) || []).forEach(sidRaw => {
-                    const sid = String(sidRaw);
-                    if (!related.has(sid) || !coords[sid]) return;
-                    if (snapLayoutRowY(coords[sid].y) !== snapLayoutRowY(coords[cid].y)) return;
-                    bump(sid);
-                });
-            });
-            if (!isFinite(lo)) return null;
-            return hi - lo;
-        }
-
         let n = 0;
         layoutRowKeys().forEach(py => {
             gatherUnitsOnRow(py).forEach(unit => {
@@ -787,20 +753,13 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     (a, b) => coords[a].x - coords[b].x
                 );
                 const mid = (coords[pLeft].x + coords[pRight].x) / 2;
-                const defaultOuter = 2 * CARD_W + SPOUSE_GAP;
-                const fpW = childFootprintBelow(unit);
-                const needOuter = fpW != null
-                    ? Math.max(defaultOuter, fpW + 2 * H_PAD)
-                    : defaultOuter;
-                const Dmin = CARD_W + SPOUSE_GAP;
-                const D = Math.max(Dmin, needOuter - CARD_W);
-                coords[pLeft].x = mid - D / 2;
-                coords[pRight].x = mid + D / 2;
+                coords[pLeft].x = mid - CENTER_DIST / 2;
+                coords[pRight].x = mid + CENTER_DIST / 2;
                 n++;
             });
         });
         if (n) {
-            console.log('[FINAL] Widened', n, 'parent couples to child-row footprint (marriage mid fixed)');
+            console.log('[FINAL] Normalized', n, 'married pairs → fixed center distance', CENTER_DIST, 'px');
         }
     })();
 
