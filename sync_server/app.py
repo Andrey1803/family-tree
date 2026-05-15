@@ -39,7 +39,9 @@ _cors_origins = [
     o.strip()
     for o in os.environ.get(
         "CORS_ORIGINS",
-        "http://127.0.0.1:5000,http://localhost:5000,https://ravishing-caring-production-3656.up.railway.app",
+        "http://127.0.0.1:5000,http://localhost:5000,"
+        "https://ravishing-caring-production-3656.up.railway.app,"
+        "https://family-tree-production-0e7d.up.railway.app",
     ).split(",")
     if o.strip()
 ]

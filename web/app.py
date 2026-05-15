@@ -545,6 +545,30 @@ def api_session():
     return jsonify({"error": "No token"}), 400
 
 
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    """Вход через веб-сервер (прокси к sync, без cross-origin в браузере)."""
+    data = request.get_json() or {}
+    login_val = (data.get("login") or "").strip()
+    password = data.get("password") or ""
+
+    if not login_val or not password:
+        return jsonify({"error": "Введите логин и пароль"}), 400
+
+    session.pop("server_token", None)
+    session.pop("server_user_id", None)
+
+    if auth_check(login_val, password):
+        return jsonify({
+            "ok": True,
+            "token": session.get("server_token"),
+            "user_id": session.get("server_user_id"),
+            "login": login_val,
+        }), 200
+
+    return jsonify({"error": "Неверный логин или пароль"}), 401
+
+
 @app.route("/api/auth/login-local", methods=["POST"])
 def api_login_local():
     """Локальный вход (для пользователей из users.json)"""

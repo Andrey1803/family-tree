@@ -38,8 +38,6 @@
     localStorage.removeItem('family_tree_backup');
     localStorage.removeItem('family_tree_username');
     
-    const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
-
     const registerForm = document.getElementById('registerForm');
     const errorDiv = document.getElementById('error');
 
@@ -64,10 +62,11 @@
         errorDiv.textContent = 'Регистрация...';
 
         try {
-            const response = await fetch(SYNC_SERVER_URL + '/api/auth/register', {
+            const response = await fetch('/api/auth/register', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({login: login, password: password, email: email})
+                body: JSON.stringify({login: login, password: password, email: email, password2: password2})
             });
 
             const data = await response.json();

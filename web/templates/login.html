@@ -14,9 +14,9 @@
         <div id="error" class="error" style="color: red; margin: 10px 0;"></div>
         <form id="loginForm">
             <label>Логин</label>
-            <input type="text" name="login" id="login" value="{{ login or '' }}" required autofocus>
+            <input type="text" name="login" id="login" value="{{ login or '' }}" required autofocus autocomplete="username">
             <label>Пароль</label>
-            <input type="password" name="password" id="password" required>
+            <input type="password" name="password" id="password" required autocomplete="current-password">
             <div class="auth-buttons">
                 <button type="submit">Войти</button>
                 <a href="{{ url_for('register') }}" class="btn-link">Регистрация</a>
@@ -25,14 +25,8 @@
     </div>
     
     <script>
-    // === БЕЗОПАСНОСТЬ: Очищаем localStorage при загрузке страницы входа ===
-    // Это предотвращает утечку данных между пользователями
-    console.log('[LOGIN] Clearing localStorage for security');
     localStorage.removeItem('family_tree_backup');
     localStorage.removeItem('family_tree_username');
-    
-    // URL сервера синхронизации
-    const SYNC_SERVER_URL = 'https://ravishing-caring-production-3656.up.railway.app';
 
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -42,82 +36,24 @@
         const errorDiv = document.getElementById('error');
 
         errorDiv.textContent = 'Вход...';
-        console.log('[LOGIN] Attempting login for:', login);
 
         try {
-            // Шаг 1: Вход на сервер синхронизации
-            const response = await fetch(SYNC_SERVER_URL + '/api/auth/login', {
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    login: login,
-                    password: password
-                })
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({login: login, password: password})
             });
 
             const data = await response.json();
-            console.log('[LOGIN] Response status:', response.status);
 
-            if (response.ok && data.token) {
-                console.log('[LOGIN] Got token, saving session...');
-
-                // Шаг 2: Сохраняем токен в сессии веб-приложения
-                const sessionResp = await fetch('/api/auth/session', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        token: data.token,
-                        user_id: data.user_id,
-                        login: login
-                    })
-                });
-
-                console.log('[LOGIN] Session response:', sessionResp.status);
-
-                if (sessionResp.ok) {
-                    console.log('[LOGIN] Success! Redirecting...');
-                    // === БЕЗОПАСНОСТЬ: Сохраняем username в localStorage ===
-                    localStorage.setItem('family_tree_username', login);
-                    console.log('[LOGIN] Saved username to localStorage:', login);
-                    // Полная перезагрузка для применения сессии
-                    window.location.href = '/?login=success';
-                } else {
-                    const sessionError = await sessionResp.json().catch(() => ({}));
-                    errorDiv.textContent = 'Ошибка сохранения сессии: ' + (sessionError.error || 'неизвестная ошибка');
-                }
-            } else if (response.status === 401) {
-                // Сервер отверг — пробуем локальный вход
-                console.log('[LOGIN] Server rejected, trying local login...');
-                errorDiv.textContent = 'Пользователь не найден на сервере. Пробуем локальный вход...';
-                
-                const localResp = await fetch('/api/auth/login-local', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({login: login, password: password})
-                });
-                
-                const localData = await localResp.json();
-
-                if (localResp.ok && localData.ok) {
-                    console.log('[LOGIN] Local login success!');
-                    // === БЕЗОПАСНОСТЬ: Сохраняем username в localStorage ===
-                    localStorage.setItem('family_tree_username', login);
-                    console.log('[LOGIN] Saved username to localStorage:', login);
-                    window.location.href = '/?login=success';
-                } else {
-                    errorDiv.textContent = localData.error || 'Неверный логин или пароль';
-                }
+            if (response.ok && data.ok) {
+                localStorage.setItem('family_tree_username', login);
+                window.location.href = '/?login=success';
             } else {
-                console.log('[LOGIN] Auth failed:', data.error || data.message);
-                errorDiv.textContent = data.error || data.message || 'Неверный логин или пароль';
+                errorDiv.textContent = data.error || 'Неверный логин или пароль';
             }
         } catch (err) {
-            console.error('[LOGIN] Error:', err);
             errorDiv.textContent = 'Ошибка подключения к серверу';
         }
     });
