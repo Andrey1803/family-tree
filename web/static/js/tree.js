@@ -4912,24 +4912,18 @@ async function checkAdminView() {
     }
 }
 
-function finalizeAdminView(treeDataFromStorage) {
+function finalizeAdminView(meta) {
     // Показываем информацию о владельце
     const header = document.querySelector('.tree-header h1');
-    if (header && treeDataFromStorage.treeOwner) {
-        header.textContent = `🌳 ${treeDataFromStorage.treeName} (владелец: ${treeDataFromStorage.treeOwner})`;
+    if (header && meta.treeOwner) {
+        header.textContent = `🌳 ${meta.treeName || 'Дерево'} (владелец: ${meta.treeOwner})`;
     }
     
     // Нормализуем браки (п��еобразуем из {persons: [a,b]} в [a,b])
-    if (treeData.marriages && treeData.marriages.length) {
-        treeData.marriages = treeData.marriages.map(m => {
-            if (Array.isArray(m)) return m;
-            if (m.persons && Array.isArray(m.persons)) return m.persons;
-            return [];
-        }).filter(m => m.length === 2);
-    }
-    
-    // Перерисовываем дерево
-    console.log('[ADMIN_VIEW] Calling render()...');
+    syncTreeRelations(treeData);
+    treeLoaded = true;
+    centerId = treeData.current_center || Object.keys(treeData.persons)[0] || null;
+    console.log('[ADMIN_VIEW] Marriages:', treeData.marriages.length, 'Calling render()...');
     render();
     
     // Показываем кнопку "Назад в админ-панель"
