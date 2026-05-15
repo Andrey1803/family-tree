@@ -1236,21 +1236,30 @@ function render() {
                 L++;
             }
         }
-        const laneCount = laneIntervals.filter(Boolean).length;
+        const laneIndices = [...new Set(jobs.map(j => j.laneIndex))].sort((a, b) => a - b);
+        const laneCount = laneIndices.length;
         if (laneCount === 0) return;
 
-        const ref = jobs[0];
-        const parentBottom = ref.parentY + CARD_H / 2;
-        const corridorTop = parentBottom + 3;
+        const MIN_LANE_SEP = 10;
+        const maxParentBottom = Math.max(...jobs.map(j => j.parentY + CARD_H / 2));
         const minChildTop = Math.min(...jobs.map(j => j.minTopY));
-        const corridorBot = minChildTop - 3;
+
+        let corridorTop = maxParentBottom + 3;
+        let corridorBot = minChildTop - 3;
         let span = corridorBot - corridorTop;
+        const requiredSpan = (laneCount - 1) * MIN_LANE_SEP + 10;
+        if (span < requiredSpan) {
+            const deficit = requiredSpan - span;
+            corridorTop -= deficit * 0.55;
+            corridorBot += deficit * 0.45;
+            span = corridorBot - corridorTop;
+        }
         if (span < 4) span = 4;
 
-        let step = Math.min(14, Math.max(4, span / laneCount));
+        let step = Math.min(16, Math.max(MIN_LANE_SEP, span / Math.max(laneCount, 1)));
         let stack = (laneCount - 1) * step;
         if (stack > span - 2) {
-            step = Math.max(3, (span - 2) / laneCount);
+            step = Math.max(MIN_LANE_SEP, (span - 2) / Math.max(laneCount, 1));
             stack = (laneCount - 1) * step;
         }
         const startY = corridorTop + Math.max(0, (span - stack) / 2);
@@ -1262,6 +1271,7 @@ function render() {
     }
 
     const connectorJobsByBand = {};
+    const snapRow = (y) => Math.round(y / LEVEL_HEIGHT) * LEVEL_HEIGHT;
 
     Object.entries(parentSetToChildren).forEach(([parentKey, childPids]) => {
         const first = persons[childPids[0]];
@@ -1316,9 +1326,8 @@ function render() {
             const cx1 = childrenCoords[childrenCoords.length - 1].cx;
             const minSpanX = Math.min(parentCenterX, cx0) - 2;
             const maxSpanX = Math.max(parentCenterX, cx1) + 2;
-            const childRowCy = Math.round(childrenCoords[0].cy);
 
-            const bandKey = `${parentY}_${childRowCy}`;
+            const bandKey = String(snapRow(childrenCoords[0].cy));
             if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
             connectorJobsByBand[bandKey].push({
                 parentCenterX,

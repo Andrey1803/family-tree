@@ -715,6 +715,23 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     q.push(cid);
                 }
             }
+
+            let spChanged = true;
+            while (spChanged) {
+                spChanged = false;
+                for (const id of [...out]) {
+                    if (!coords[id]) continue;
+                    const y = coords[id].y;
+                    for (const sidRaw of marriageMap.get(id) || []) {
+                        const sid = String(sidRaw);
+                        if (!related.has(sid) || !coords[sid] || out.has(sid)) continue;
+                        if (Math.abs(coords[sid].y - y) <= 12) {
+                            out.add(sid);
+                            spChanged = true;
+                        }
+                    }
+                }
+            }
             return out;
         }
 
