@@ -22,8 +22,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Импортируем общие утилиты аутентификации из корня проекта
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# auth_utils: в папке web/ (Railway root) или в корне monorepo (локально)
+_web_dir = os.path.dirname(os.path.abspath(__file__))
+if _web_dir not in sys.path:
+    sys.path.insert(0, _web_dir)
+_project_root = os.path.dirname(_web_dir)
+if os.path.isfile(os.path.join(_project_root, "auth_utils.py")) and _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 from auth_utils import (
     SUPER_ADMINS,
     _password_hash,
@@ -58,11 +63,6 @@ except ImportError:
 
 from flask import Flask, request, jsonify, redirect, url_for, session, render_template, send_file, Response
 from flask_cors import CORS
-
-_web_dir = os.path.dirname(os.path.abspath(__file__))
-_project_root = os.path.dirname(_web_dir)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
 
 # Настройки сервера синхронизации
 SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring-production-3656.up.railway.app"
