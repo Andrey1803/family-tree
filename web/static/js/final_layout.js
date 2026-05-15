@@ -274,6 +274,43 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         const yPos = level * LEVEL_HEIGHT;
         const placed = new Set();
 
+        function multiCardBlockWidth(nCards) {
+            if (nCards <= 0) return 0;
+            return nCards * CARD_W + (nCards - 1) * SPOUSE_GAP;
+        }
+
+        function widthForChildBlock(childId, spousesArr) {
+            const sp = spousesArr || [];
+            return multiCardBlockWidth(1 + sp.length);
+        }
+
+        /** Карточки подряд слева направо; при неоднозначном поле порядок фиксированный */
+        function placeChildWithSpousesAt(xLeft, childId, spousesArr) {
+            const sp = spousesArr || [];
+            let order;
+            if (sp.length === 1) {
+                const ch = persons[childId];
+                const s0 = persons[sp[0]];
+                const cM = ch?.gender === 'Мужской';
+                const sM = s0?.gender === 'Мужской';
+                if (cM && !sM) order = [childId, sp[0]];
+                else if (!cM && sM) order = [sp[0], childId];
+                else order = [childId, sp[0]];
+            } else if (sp.length > 1) {
+                order = [childId, ...sp];
+            } else {
+                order = [childId];
+            }
+            let px = xLeft;
+            for (let i = 0; i < order.length; i++) {
+                const pid = order[i];
+                coords[pid] = { x: px + CARD_W / 2, y: yPos };
+                placed.add(pid);
+                px += CARD_W + (i < order.length - 1 ? SPOUSE_GAP : 0);
+            }
+            return multiCardBlockWidth(order.length);
+        }
+
         console.log(`[FINAL] === Placing level ${level} (yPos=${yPos}) with ${pids.length} persons ===`);
         console.log('[FINAL] Persons on this level:', pids.map(pid => `${pid}(${persons[pid]?.name || '?'})`).join(', '));
 
@@ -428,27 +465,16 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
                 let totalWidth = 0;
                 children.forEach((childId, idx) => {
-                    const spouses = childSpouses.get(childId) || [];
-                    // Супруги всегда рядом: считаем как 1 блок
-                    totalWidth += CARD_W + spouses.length * (CARD_W + SPOUSE_GAP);
-                    if (idx < children.length - 1) {
-                        totalWidth += SIBLING_GAP;
-                    }
+                    totalWidth += widthForChildBlock(childId, childSpouses.get(childId) || []);
+                    if (idx < children.length - 1) totalWidth += SIBLING_GAP;
                 });
 
                 // === ИСПРАВЛЕНИЕ: Для одного ребёнка центрируем точно под родителями ===
                 if (children.length === 1) {
                     const childId = children[0];
                     const spouses = childSpouses.get(childId) || [];
-                    
-                    if (spouses.length === 0) {
-                        // Один ребёнок без супруга — центр карточки = центр родителей
-                        groupStartX = parentCenterX - CARD_W / 2;
-                    } else {
-                        // Один ребёнок с супругом — центр пары = центр родителей
-                        const pairWidth = 2 * CARD_W + SPOUSE_GAP;
-                        groupStartX = parentCenterX - pairWidth / 2;
-                    }
+                    const w = widthForChildBlock(childId, spouses);
+                    groupStartX = parentCenterX - w / 2;
                 } else {
                     // Несколько детей — обычное центрирование
                     groupStartX = parentCenterX - totalWidth / 2;
@@ -464,41 +490,8 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
                 children.forEach(childId => {
                     const spouses = childSpouses.get(childId) || [];
-                    const child = persons[childId];
-                    const childIsMale = child?.gender === 'Мужской';
-
-                    let mainPersonId = childId;
-                    let spouseId = null;
-
-                    if (spouses.length === 1) {
-                        const spouse = persons[spouses[0]];
-                        const spouseIsMale = spouse?.gender === 'Мужской';
-
-                        if (childIsMale && !spouseIsMale) {
-                            mainPersonId = childId;
-                            spouseId = spouses[0];
-                        } else if (!childIsMale && spouseIsMale) {
-                            mainPersonId = spouses[0];
-                            spouseId = childId;
-                        }
-                    }
-
-                    // Размещаем главную персону (слева)
-                    coords[mainPersonId] = { x: x + CARD_W / 2, y: yPos };
-                    placed.add(mainPersonId);
-
-                    // Размещаем супруга (справа) если есть
-                    if (spouseId) {
-                        coords[spouseId] = { x: x + CARD_W + SPOUSE_GAP + CARD_W / 2, y: yPos };
-                        placed.add(spouseId);
-                    }
-                    
-                    // ВАЖНО: Помечаем ВСЕХ детей и супругов как размещённых
-                    placed.add(childId);
-                    spouses.forEach(spId => placed.add(spId));
-
-                    const blockWidth = CARD_W + spouses.length * (CARD_W + SPOUSE_GAP);
-                    x += blockWidth + SIBLING_GAP;
+                    const bw = placeChildWithSpousesAt(x, childId, spouses);
+                    x += bw + SIBLING_GAP;
                 });
 
                 registerOccupied(resolvedStart, x - resolvedStart - SIBLING_GAP, levelOccupied);
@@ -514,26 +507,16 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
                 let groupTotalWidth = 0;
                 children.forEach((childId, idx) => {
-                    const spouses = childSpouses.get(childId) || [];
-                    groupTotalWidth += CARD_W + spouses.length * (CARD_W + SPOUSE_GAP);
-                    if (idx < children.length - 1) {
-                        groupTotalWidth += SIBLING_GAP;
-                    }
+                    groupTotalWidth += widthForChildBlock(childId, childSpouses.get(childId) || []);
+                    if (idx < children.length - 1) groupTotalWidth += SIBLING_GAP;
                 });
 
                 // === ИСПРАВЛЕНИЕ: Для одного ребёнка центрируем точно под родителем ===
                 if (children.length === 1) {
                     const childId = children[0];
                     const spouses = childSpouses.get(childId) || [];
-                    
-                    if (spouses.length === 0) {
-                        // Один ребёнок без супруга — центр карточки = центр родителя
-                        groupStartX = p.x - CARD_W / 2;
-                    } else {
-                        // Один ребёнок с супругом — центр пары = центр родителя
-                        const pairWidth = 2 * CARD_W + SPOUSE_GAP;
-                        groupStartX = p.x - pairWidth / 2;
-                    }
+                    const w = widthForChildBlock(childId, spouses);
+                    groupStartX = p.x - w / 2;
                 } else {
                     // Несколько детей — обычное центрирование
                     groupStartX = p.x - groupTotalWidth / 2;
@@ -549,41 +532,8 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
                 children.forEach(childId => {
                     const spouses = childSpouses.get(childId) || [];
-                    const child = persons[childId];
-                    const childIsMale = child?.gender === 'Мужской';
-
-                    let mainPersonId = childId;
-                    let spouseId = null;
-
-                    if (spouses.length === 1) {
-                        const spouse = persons[spouses[0]];
-                        const spouseIsMale = spouse?.gender === 'Мужской';
-
-                        if (childIsMale && !spouseIsMale) {
-                            mainPersonId = childId;
-                            spouseId = spouses[0];
-                        } else if (!childIsMale && spouseIsMale) {
-                            mainPersonId = spouses[0];
-                            spouseId = childId;
-                        }
-                    }
-
-                    // Размещаем главную персону (слева)
-                    coords[mainPersonId] = { x: x + CARD_W / 2, y: yPos };
-                    placed.add(mainPersonId);
-
-                    // Размещаем супруга (справа) если есть
-                    if (spouseId) {
-                        coords[spouseId] = { x: x + CARD_W + SPOUSE_GAP + CARD_W / 2, y: yPos };
-                        placed.add(spouseId);
-                    }
-                    
-                    // ВАЖНО: Помечаем ВСЕХ детей и супругов как размещённых
-                    placed.add(childId);
-                    spouses.forEach(spId => placed.add(spId));
-
-                    const blockWidth = CARD_W + spouses.length * (CARD_W + SPOUSE_GAP);
-                    x += blockWidth + SIBLING_GAP;
+                    const bw = placeChildWithSpousesAt(x, childId, spouses);
+                    x += bw + SIBLING_GAP;
                 });
 
                 registerOccupied(resolvedStart, x - resolvedStart - SIBLING_GAP, levelOccupied);
