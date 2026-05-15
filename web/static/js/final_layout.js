@@ -300,14 +300,6 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return [childId];
         }
 
-        /** Смещение центра карточки именно этого ребёнка от левого края его блока. */
-        function childCenterOffsetFromBlockLeft(childId, spousesArr) {
-            const order = spouseRowOrder(childId, spousesArr);
-            const idx = order.indexOf(childId);
-            if (idx < 0) return CARD_W / 2;
-            return idx * (CARD_W + SPOUSE_GAP) + CARD_W / 2;
-        }
-
         /** Середина брака: центр между карточками двух родителей (линия супругов). */
         function centersOneChildPackAtMid(midMarriageX, childId, spousesArr) {
             const order = spouseRowOrder(childId, spousesArr);
@@ -352,17 +344,26 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return { width: geom.width, geom };
         }
 
-        /** Среднее горизонтальное положение центров карточек детей (не супругов), если считать ряд слева от 0. */
-        function childrenRowAvgChildCenter(children, childSpouses) {
+        /** Центр bbox всего ряда детей+супругов при старте слева от 0 (согласовано с reAnchor). */
+        function childrenRowBBoxMidFromLeft(children, childSpouses) {
             let leftEdge = 0;
-            let sumCx = 0;
+            let minL = Infinity;
+            let maxR = -Infinity;
             children.forEach((cid, idx) => {
                 const sp = childSpouses.get(cid) || [];
-                sumCx += leftEdge + childCenterOffsetFromBlockLeft(cid, sp);
+                const order = spouseRowOrder(cid, sp);
+                order.forEach((pid, i) => {
+                    const cleft = leftEdge + i * (CARD_W + SPOUSE_GAP);
+                    minL = Math.min(minL, cleft);
+                    maxR = Math.max(maxR, cleft + CARD_W);
+                });
                 leftEdge += widthForChildBlock(cid, sp);
                 if (idx < children.length - 1) leftEdge += SIBLING_GAP;
             });
-            return { avgChildCenterFromRowLeft: sumCx / children.length, totalRowWidth: leftEdge };
+            return {
+                bboxMidFromRowLeft: Number.isFinite(minL) ? (minL + maxR) / 2 : 0,
+                totalRowWidth: leftEdge,
+            };
         }
 
         /** Карточки подряд от левого края блока.rebёнок центрируют под браком только через placeOneChildAnchoredMidMarriage. */
@@ -547,18 +548,18 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     return;
                 }
 
-                const { avgChildCenterFromRowLeft, totalRowWidth } = childrenRowAvgChildCenter(
+                const { bboxMidFromRowLeft, totalRowWidth } = childrenRowBBoxMidFromLeft(
                     children,
                     childSpouses
                 );
-                let groupStartX = parentCenterX - avgChildCenterFromRowLeft;
+                let groupStartX = parentCenterX - bboxMidFromRowLeft;
 
                 const resolvedStart = resolveGroupStartX(groupStartX, totalRowWidth, levelOccupied);
                 if (Math.abs(resolvedStart - groupStartX) > 1) {
                     console.log(`[FINAL] Group [${parentKey}] shifted right by ${(resolvedStart - groupStartX).toFixed(0)}px (overlap)`);
                 }
                 console.log(
-                    `[FINAL] Group under parents [${parentKey}]: ${children.length} children, marriageMid=${parentCenterX.toFixed(1)}, avgChildCx=${avgChildCenterFromRowLeft.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`
+                    `[FINAL] Group under parents [${parentKey}]: ${children.length} children, marriageMid=${parentCenterX.toFixed(1)}, bboxMidRow=${bboxMidFromRowLeft.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`
                 );
 
                 let x = resolvedStart;
@@ -599,18 +600,18 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     return;
                 }
 
-                const { avgChildCenterFromRowLeft, totalRowWidth } = childrenRowAvgChildCenter(
+                const { bboxMidFromRowLeft, totalRowWidth } = childrenRowBBoxMidFromLeft(
                     children,
                     childSpouses
                 );
-                let groupStartX = parentMidX - avgChildCenterFromRowLeft;
+                let groupStartX = parentMidX - bboxMidFromRowLeft;
 
                 const resolvedStart = resolveGroupStartX(groupStartX, totalRowWidth, levelOccupied);
                 if (Math.abs(resolvedStart - groupStartX) > 1) {
                     console.log(`[FINAL] Group [${parentKey}] shifted right by ${(resolvedStart - groupStartX).toFixed(0)}px (overlap)`);
                 }
                 console.log(
-                    `[FINAL] Group under single parent [${parentKey}]: ${children.length} children, parentMidX=${parentMidX.toFixed(1)}, avgChildCx=${avgChildCenterFromRowLeft.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`
+                    `[FINAL] Group under single parent [${parentKey}]: ${children.length} children, parentMidX=${parentMidX.toFixed(1)}, bboxMidRow=${bboxMidFromRowLeft.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`
                 );
 
                 let x = resolvedStart;
@@ -1199,23 +1200,24 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return nCards * CARD_W + (nCards - 1) * SPOUSE_GAP;
         }
 
-        function childCenterOffsetFromBlockLeftLocal(childId, sp) {
-            const order = spouseRowOrderLocal(childId, sp || []);
-            const idx = order.indexOf(childId);
-            if (idx < 0) return CARD_W / 2;
-            return idx * (CARD_W + SPOUSE_GAP) + CARD_W / 2;
-        }
-
-        function childrenRowAvgChildCenterLocal(children, childSpouses) {
+        /** Центр bbox всего ряда «ребёнок+супруги» при старте слева от 0 — лучше для линий, чем среднее по центрам детей. */
+        function childrenRowBBoxMidFromLeftLocal(children, childSpouses) {
             let leftEdge = 0;
-            let sumCx = 0;
+            let minL = Infinity;
+            let maxR = -Infinity;
             children.forEach((cid, idx) => {
                 const spp = childSpouses.get(cid) || [];
-                sumCx += leftEdge + childCenterOffsetFromBlockLeftLocal(cid, spp);
+                const order = spouseRowOrderLocal(cid, spp);
+                order.forEach((pid, i) => {
+                    const cleft = leftEdge + i * (CARD_W + SPOUSE_GAP);
+                    minL = Math.min(minL, cleft);
+                    maxR = Math.max(maxR, cleft + CARD_W);
+                });
                 leftEdge += multiNw(1 + spp.length);
                 if (idx < children.length - 1) leftEdge += SIBLING_GAP;
             });
-            return { avgChildCenterFromRowLeft: sumCx / children.length, totalRowWidth: leftEdge };
+            const bboxMidFromRowLeft = Number.isFinite(minL) ? (minL + maxR) / 2 : 0;
+            return { bboxMidFromRowLeft, totalRowWidth: leftEdge };
         }
 
         function writeChildBlockFromLeft(xLeft, yRow, childId, spArr) {
@@ -1304,6 +1306,35 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return start;
         }
 
+        function packStartValid(s, groupWidth, occupied, gap) {
+            if (groupWidth <= 0) return true;
+            for (const r of occupied) {
+                if (!(s >= r.right + gap || s + groupWidth <= r.left)) return false;
+            }
+            return true;
+        }
+
+        /** Старт блока: из допустимых позиций выбираем ближайшую к idealLeft (не только сдвиг вправо). */
+        function resolvePackNearest(idealLeft, groupWidth, occupied, gap) {
+            if (groupWidth <= 0) return idealLeft;
+            const cands = new Set([idealLeft]);
+            for (const r of occupied) {
+                cands.add(r.right + gap);
+                cands.add(r.left - gap - groupWidth);
+            }
+            let best = resolvePackLeft(idealLeft, groupWidth, occupied, gap);
+            let bestAbs = Math.abs(best - idealLeft);
+            for (const s of cands) {
+                if (!packStartValid(s, groupWidth, occupied, gap)) continue;
+                const d = Math.abs(s - idealLeft);
+                if (d < bestAbs - 1e-6 || (Math.abs(d - bestAbs) < 1e-6 && s < best)) {
+                    bestAbs = d;
+                    best = s;
+                }
+            }
+            return best;
+        }
+
         let groups = 0;
         const PACK_GAP = Math.max(FAMILY_GROUP_GAP + 48, SIBLING_GAP + 32);
 
@@ -1363,7 +1394,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     const cid = g.childList[0];
                     const sp = g.csMap.get(cid) || [];
                     const geom0 = geomOneFamilyAnchoredMid(g.midX, cid, sp);
-                    const resolvedLeft = resolvePackLeft(
+                    const resolvedLeft = resolvePackNearest(
                         geom0.left,
                         geom0.width,
                         rowOccupied,
@@ -1373,10 +1404,12 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     writeOneChildAnchoredMid(g.midX + dMid, cry, cid, sp);
                     registerOccupied(resolvedLeft, geom0.width, rowOccupied);
                 } else {
-                    const { avgChildCenterFromRowLeft, totalRowWidth } =
-                        childrenRowAvgChildCenterLocal(g.childList, g.csMap);
-                    const idealLeft = g.midX - avgChildCenterFromRowLeft;
-                    const resolvedLeft = resolvePackLeft(
+                    const { bboxMidFromRowLeft, totalRowWidth } = childrenRowBBoxMidFromLeftLocal(
+                        g.childList,
+                        g.csMap
+                    );
+                    const idealLeft = g.midX - bboxMidFromRowLeft;
+                    const resolvedLeft = resolvePackNearest(
                         idealLeft,
                         totalRowWidth,
                         rowOccupied,
