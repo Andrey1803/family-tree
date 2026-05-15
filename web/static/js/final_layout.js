@@ -712,6 +712,98 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         return [...new Set(Object.keys(coords).map(id => snapLayoutRowY(coords[id].y)))].sort((a, b) => a - b);
     }
 
+    // === POST: раздвигаем супругов по горизонтали под ширину ряда детей (середина брака не сдвигается) ===
+    (function widenParentCouplesForChildFootprint() {
+        const H_PAD = 20;
+
+        function gatherUnitsOnRow(py) {
+            const onRow = Object.keys(coords).filter(
+                id => snapLayoutRowY(coords[id].y) === py
+            );
+            const assigned = new Set();
+            const units = [];
+            for (const pid of onRow) {
+                if (assigned.has(pid)) continue;
+                const cset = new Set([pid]);
+                let grow = true;
+                while (grow) {
+                    grow = false;
+                    for (const q of [...cset]) {
+                        for (const sidRaw of marriageMap.get(q) || []) {
+                            const sid = String(sidRaw);
+                            if (!onRow.includes(sid) || cset.has(sid)) continue;
+                            if (snapLayoutRowY(coords[sid].y) === py) {
+                                cset.add(sid);
+                                grow = true;
+                            }
+                        }
+                    }
+                }
+                cset.forEach(id => assigned.add(id));
+                units.push({ ids: [...cset].sort(), y: py });
+            }
+            return units;
+        }
+
+        function childFootprintBelow(unit) {
+            const py = unit.y;
+            const cry = py + LEVEL_HEIGHT;
+            const childIds = new Set();
+            unit.ids.forEach(pid => {
+                (persons[pid].children || []).forEach(c => {
+                    const cs = String(c);
+                    if (!related.has(cs) || !coords[cs]) return;
+                    if (snapLayoutRowY(coords[cs].y) !== cry) return;
+                    childIds.add(cs);
+                });
+            });
+            if (childIds.size === 0) return null;
+
+            let lo = Infinity;
+            let hi = -Infinity;
+            const bump = cid => {
+                if (!coords[cid]) return;
+                lo = Math.min(lo, coords[cid].x - CARD_W / 2);
+                hi = Math.max(hi, coords[cid].x + CARD_W / 2);
+            };
+            childIds.forEach(cid => {
+                bump(cid);
+                (marriageMap.get(cid) || []).forEach(sidRaw => {
+                    const sid = String(sidRaw);
+                    if (!related.has(sid) || !coords[sid]) return;
+                    if (snapLayoutRowY(coords[sid].y) !== snapLayoutRowY(coords[cid].y)) return;
+                    bump(sid);
+                });
+            });
+            if (!isFinite(lo)) return null;
+            return hi - lo;
+        }
+
+        let n = 0;
+        layoutRowKeys().forEach(py => {
+            gatherUnitsOnRow(py).forEach(unit => {
+                if (unit.ids.length !== 2) return;
+                const [pLeft, pRight] = [...unit.ids].sort(
+                    (a, b) => coords[a].x - coords[b].x
+                );
+                const mid = (coords[pLeft].x + coords[pRight].x) / 2;
+                const defaultOuter = 2 * CARD_W + SPOUSE_GAP;
+                const fpW = childFootprintBelow(unit);
+                const needOuter = fpW != null
+                    ? Math.max(defaultOuter, fpW + 2 * H_PAD)
+                    : defaultOuter;
+                const Dmin = CARD_W + SPOUSE_GAP;
+                const D = Math.max(Dmin, needOuter - CARD_W);
+                coords[pLeft].x = mid - D / 2;
+                coords[pRight].x = mid + D / 2;
+                n++;
+            });
+        });
+        if (n) {
+            console.log('[FINAL] Widened', n, 'parent couples to child-row footprint (marriage mid fixed)');
+        }
+    })();
+
     // === POST: разъезжаем блоки родителей, если горизонтальные «коридоры» связи к детям пересекаются ===
     (function spreadParentBlocksForconnectorSpans() {
         const CONNECTOR_PAD = 10;
