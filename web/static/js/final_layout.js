@@ -14,8 +14,37 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     const CARD_H = 90;
     const SPOUSE_GAP = 36;
     const SIBLING_GAP = 120;
+    const FAMILY_GROUP_GAP = 48;  // зазор между семьями на одном уровне
     const LEVEL_HEIGHT = 252;
     const PAD = 60;
+
+    function rangesOverlap(l1, r1, l2, r2) {
+        return l1 < r2 && l2 < r1;
+    }
+
+    /** Старт группы: по центру родителей, при пересечении — минимальный сдвиг вправо */
+    function resolveGroupStartX(idealLeft, groupWidth, occupied) {
+        let start = idealLeft;
+        let guard = 0;
+        while (guard++ < 200) {
+            let hit = false;
+            for (const r of occupied) {
+                if (rangesOverlap(start, start + groupWidth, r.left, r.right)) {
+                    start = r.right + FAMILY_GROUP_GAP;
+                    hit = true;
+                    break;
+                }
+            }
+            if (!hit) break;
+        }
+        return start;
+    }
+
+    function registerOccupied(left, width, occupied) {
+        if (width <= 0) return;
+        occupied.push({ left, right: left + width });
+        occupied.sort((a, b) => a.left - b.left);
+    }
 
     // === ПРОВЕРКА: centerId и related валидны ===
     if (!centerId || !persons[centerId]) {
@@ -361,16 +390,16 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         const sortedGroups = Array.from(familyGroups.entries()).sort(([keyA, grpA], [keyB, grpB]) => {
             const parentsA = grpA.parentIds.map(id => coords[id]?.x || 0);
             const parentsB = grpB.parentIds.map(id => coords[id]?.x || 0);
-            // === ИСПРАВЛЕНИЕ: Защита от пустых массивов ===
-            const minX_A = parentsA.length > 0 ? Math.min(...parentsA) : 0;
-            const minX_B = parentsB.length > 0 ? Math.min(...parentsB) : 0;
-            return minX_A - minX_B;
+            const centerA = parentsA.length ? parentsA.reduce((s, v) => s + v, 0) / parentsA.length : 0;
+            const centerB = parentsB.length ? parentsB.reduce((s, v) => s + v, 0) / parentsB.length : 0;
+            return centerA - centerB;
         });
 
         console.log(`[FINAL] sortedGroups: ${sortedGroups.length} groups: ${sortedGroups.map(([k, g]) => `[${k}]:${g.children.length}`).join(', ')}`);
 
-        // === ШАГ 4: Размещаем группы СЛЕВА (семьи с родителями) ===
-        let currentX = 0;  // Начинаем с 0 для каждого уровня
+        // === ШАГ 4: Размещаем группы (без наложения на одном уровне) ===
+        const levelOccupied = [];
+        let currentX = 0;
 
         sortedGroups.forEach(([parentKey, group]) => {
             const { parentIds, children, childSpouses } = group;
@@ -425,11 +454,13 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     groupStartX = parentCenterX - totalWidth / 2;
                 }
 
-                // Дети всегда под центром родителей (не сдвигаем вправо — иначе отрыв от линий)
-                console.log(`[FINAL] Group under parents [${parentKey}]: ${children.length} children, center=${parentCenterX.toFixed(1)}, startX=${groupStartX.toFixed(1)}`);
-                
-                // === Размещаем детей и супругов РЯДОМ ===
-                let x = groupStartX;
+                const resolvedStart = resolveGroupStartX(groupStartX, totalWidth, levelOccupied);
+                if (Math.abs(resolvedStart - groupStartX) > 1) {
+                    console.log(`[FINAL] Group [${parentKey}] shifted right by ${(resolvedStart - groupStartX).toFixed(0)}px (overlap)`);
+                }
+                console.log(`[FINAL] Group under parents [${parentKey}]: ${children.length} children, center=${parentCenterX.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`);
+
+                let x = resolvedStart;
 
                 children.forEach(childId => {
                     const spouses = childSpouses.get(childId) || [];
@@ -470,6 +501,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     x += blockWidth + SIBLING_GAP;
                 });
 
+                registerOccupied(resolvedStart, x - resolvedStart - SIBLING_GAP, levelOccupied);
                 currentX = Math.max(currentX, x);
             } else if (parentIds.length === 1 && hasPlacedParents) {
                 const p = coords[parentIds[0]];
@@ -507,10 +539,13 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     groupStartX = p.x - groupTotalWidth / 2;
                 }
 
-                console.log(`[FINAL] Group under single parent [${parentKey}]: ${children.length} children, parentX=${p.x.toFixed(1)}, groupWidth=${groupTotalWidth.toFixed(1)}, startX=${groupStartX.toFixed(1)}`);
-                
-                // === Размещаем детей и супругов РЯДОМ ===
-                let x = groupStartX;
+                const resolvedStart = resolveGroupStartX(groupStartX, groupTotalWidth, levelOccupied);
+                if (Math.abs(resolvedStart - groupStartX) > 1) {
+                    console.log(`[FINAL] Group [${parentKey}] shifted right by ${(resolvedStart - groupStartX).toFixed(0)}px (overlap)`);
+                }
+                console.log(`[FINAL] Group under single parent [${parentKey}]: ${children.length} children, parentX=${p.x.toFixed(1)}, groupWidth=${groupTotalWidth.toFixed(1)}, startX=${resolvedStart.toFixed(1)}`);
+
+                let x = resolvedStart;
 
                 children.forEach(childId => {
                     const spouses = childSpouses.get(childId) || [];
@@ -551,6 +586,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     x += blockWidth + SIBLING_GAP;
                 });
 
+                registerOccupied(resolvedStart, x - resolvedStart - SIBLING_GAP, levelOccupied);
                 currentX = Math.max(currentX, x);
             } else {
                 // Родители не размещены — добавляем детей в сироты для ШАГА 5
@@ -601,29 +637,31 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             }
         });
         
-        // Размещаем пары сирот
+        // Размещаем пары сирот (без наложения на семьи)
         orphansWithSpouses.forEach(([pid1, pid2]) => {
             const p1 = persons[pid1];
             const p1IsMale = p1?.gender === 'Мужской';
-            
             const mainId = p1IsMale ? pid1 : pid2;
             const spouseId = p1IsMale ? pid2 : pid1;
-            
-            coords[mainId] = { x: currentX + CARD_W / 2, y: yPos };
-            coords[spouseId] = { x: currentX + CARD_W + SPOUSE_GAP + CARD_W / 2, y: yPos };
+            const pairW = 2 * CARD_W + SPOUSE_GAP;
+            const start = resolveGroupStartX(currentX, pairW, levelOccupied);
+
+            coords[mainId] = { x: start + CARD_W / 2, y: yPos };
+            coords[spouseId] = { x: start + CARD_W + SPOUSE_GAP + CARD_W / 2, y: yPos };
             placed.add(mainId);
             placed.add(spouseId);
-            
-            console.log(`[FINAL] Orphan spouse pair: ${mainId}(${persons[mainId]?.name}) + ${spouseId}(${persons[spouseId]?.name}) at [${currentX + CARD_W/2},${yPos}]`);
-            currentX += 2 * CARD_W + SPOUSE_GAP + SIBLING_GAP;
+            registerOccupied(start, pairW, levelOccupied);
+            currentX = start + pairW + SIBLING_GAP;
+            console.log(`[FINAL] Orphan spouse pair: ${mainId} + ${spouseId} at x=${start}`);
         });
-        
-        // Размещаем одиноких сирот
+
         singleOrphans.forEach(pid => {
+            const start = resolveGroupStartX(currentX, CARD_W, levelOccupied);
             placed.add(pid);
-            coords[pid] = { x: currentX + CARD_W / 2, y: yPos };
-            currentX += CARD_W + SIBLING_GAP;
-            console.log(`[FINAL] Orphan ${pid}(${persons[pid]?.name}) at [${currentX - CARD_W/2},${yPos}]`);
+            coords[pid] = { x: start + CARD_W / 2, y: yPos };
+            registerOccupied(start, CARD_W, levelOccupied);
+            currentX = start + CARD_W + SIBLING_GAP;
+            console.log(`[FINAL] Orphan ${pid}(${persons[pid]?.name}) at x=${start}`);
         });
 
         console.log(`[FINAL] Level ${level} placed: ${placed.size} persons`);
