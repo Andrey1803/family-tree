@@ -1192,17 +1192,27 @@ function render() {
     console.log('[MARRIAGE] Total marriage lines drawn:', marriageLinesDrawn);
 
     // === 2. ЛИНИИ РОДИТЕЛЕЙ (рисуются поверх линий супругов) ===
+    /** Ключ — полный список parent id из записи ребёнка (сортированный).
+     *  НЕ только «видимые с coords»: иначе полусибсы/ветки с общим показанным отцом
+     *  сливаются в одну группу и одна горизонталь тянется через всё дерево уровня. */
     const parentSetToChildren = {};
     Object.keys(coords).forEach(pid => {
         const p = persons[pid];
         if (!p || !p.parents) return;
-        // Фильтруем только ВИДИМЫХ родителей (у которых есть coords)
-        const visibleParents = (p.parents || []).filter(pid2 => coords[pid2] && related.has(pid2));
+        const dataParents = (p.parents || [])
+            .map(String)
+            .filter(prId => persons[prId])
+            .sort();
+        if (!dataParents.length) return;
+
+        const visibleParents = dataParents.filter(
+            pid2 => coords[pid2] && related.has(pid2)
+        );
         if (!visibleParents.length) {
             console.log(`[DEBUG] ${pid} (${p.name}) has no visible parents, skipping line`);
             return;
         }
-        const key = visibleParents.map(String).sort().join("|");
+        const key = dataParents.join('|');
         parentSetToChildren[key] = parentSetToChildren[key] || [];
         parentSetToChildren[key].push(pid);
     });
@@ -1295,75 +1305,54 @@ function render() {
         const first = persons[childPids[0]];
         if (!first || !first.parents) return;
 
-        let parentPids = (first.parents || []).filter(pid => coords[pid]);
+        const parentPids = (first.parents || []).filter(pid => coords[pid]);
         if (!parentPids.length) return;
 
-        const childrenByParents = {};
-        childPids.forEach(cid => {
-            const child = persons[cid];
-            const childParents = (child.parents || [])
-                .filter(pid => coords[pid] && related.has(pid))
-                .map(String)
-                .sort()
-                .join('|');
+        let parentCenterX, parentY, spouseLineY;
+        if (parentPids.length >= 2) {
+            const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
+            parentCenterX = (p1.x + p2.x) / 2;
+            parentY = p1.y;
+            spouseLineY = p1.y;
+        } else {
+            parentCenterX = coords[parentPids[0]].x;
+            parentY = coords[parentPids[0]].y;
+            spouseLineY = parentY;
+        }
 
-            if (!childrenByParents[childParents]) {
-                childrenByParents[childParents] = [];
-            }
-            childrenByParents[childParents].push(cid);
-        });
+        const childrenCoords = childPids
+            .filter(cid => coords[cid])
+            .map(cid => {
+                const c = coords[cid];
+                const bl = cardBlockLeftRightAtRow(cid);
+                return {
+                    cx: c.x,
+                    cy: c.y,
+                    topY: c.y - childTopOffset,
+                    blockLeft: bl.left,
+                    blockRight: bl.right,
+                };
+            })
+            .sort((a, b) => a.cx - b.cx);
+        if (!childrenCoords.length) return;
 
-        Object.values(childrenByParents).forEach(subGroupChildPids => {
-            const subFirst = persons[subGroupChildPids[0]];
-            parentPids = (subFirst.parents || []).filter(pid => coords[pid]);
-            if (!parentPids.length) return;
+        const minTopY = Math.min(...childrenCoords.map(t => t.topY));
+        const minSpanX =
+            Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft)) - 2;
+        const maxSpanX =
+            Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight)) + 2;
 
-            let parentCenterX, parentY, spouseLineY;
-            if (parentPids.length >= 2) {
-                const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
-                parentCenterX = (p1.x + p2.x) / 2;
-                parentY = p1.y;
-                spouseLineY = p1.y;
-            } else {
-                parentCenterX = coords[parentPids[0]].x;
-                parentY = coords[parentPids[0]].y;
-                spouseLineY = parentY;
-            }
-
-            const childrenCoords = subGroupChildPids
-                .filter(cid => coords[cid])
-                .map(cid => {
-                    const c = coords[cid];
-                    const bl = cardBlockLeftRightAtRow(cid);
-                    return {
-                        cx: c.x,
-                        cy: c.y,
-                        topY: c.y - childTopOffset,
-                        blockLeft: bl.left,
-                        blockRight: bl.right,
-                    };
-                })
-                .sort((a, b) => a.cx - b.cx);
-            if (!childrenCoords.length) return;
-
-            const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-            const minSpanX =
-                Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft)) - 2;
-            const maxSpanX =
-                Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight)) + 2;
-
-            const bandKey = String(snapRow(childrenCoords[0].cy));
-            if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
-            connectorJobsByBand[bandKey].push({
-                parentCenterX,
-                parentY,
-                spouseLineY,
-                parentPids: [...parentPids],
-                childrenCoords,
-                minTopY,
-                minSpanX,
-                maxSpanX,
-            });
+        const bandKey = String(snapRow(childrenCoords[0].cy));
+        if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
+        connectorJobsByBand[bandKey].push({
+            parentCenterX,
+            parentY,
+            spouseLineY,
+            parentPids: [...parentPids],
+            childrenCoords,
+            minTopY,
+            minSpanX,
+            maxSpanX,
         });
     });
 
