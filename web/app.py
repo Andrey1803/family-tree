@@ -1269,37 +1269,25 @@ def api_tree():
                     print(f"[API_TREE] Error loading tree for {tree_owner}: {e}")
         
         # Обычная загрузка дерева текущего пользователя
-        # Пробуем загрузить с сервера синхронизации ТОЛЬКО если есть токен
-        use_local = True  # По умолчанию используем локальные данные
-        
         if server_token:
             try:
                 print(f"[API_TREE] Downloading from sync server...")
 
-                # ВАЖНО: Сначала проверяем, что токен соответствует текущему пользователю
-                try:
-                    me_req = urllib.request.Request(
-                        f"{SYNC_SERVER_URL}/api/auth/me",
-                        headers={'Authorization': f'Bearer {server_token}'},
-                        method='GET'
-                    )
-                    with urllib.request.urlopen(me_req, timeout=5) as me_resp:
-                        me_data = json.loads(me_resp.read().decode())
-                        server_login = me_data.get('login', '')
-                        print(f"[API_TREE] Server login: {server_login}, session username: {username}")
+                # Проверяем, что токен соответствует текущему пользователю
+                me_req = urllib.request.Request(
+                    f"{SYNC_SERVER_URL}/api/auth/me",
+                    headers={'Authorization': f'Bearer {server_token}'},
+                    method='GET'
+                )
+                with urllib.request.urlopen(me_req, timeout=5) as me_resp:
+                    me_data = json.loads(me_resp.read().decode())
+                    server_login = me_data.get('login', '')
+                    print(f"[API_TREE] Server login: {server_login}, session username: {username}")
 
-                        # Если логин на сервере не совпадает с сессией — это ошибка!
-                        if server_login != username:
-                            print(f"[API_TREE] SECURITY: Server login '{server_login}' != session username '{username}'")
-                            session.clear()
-                            return jsonify({"error": "Сессия недействительна. Войдите снова."}), 401
-                except Exception as e:
-                    print(f"[API_TREE] Could not verify server login: {e}")
-                    # Не удалось проверить токен - используем локальные данные
-                    use_local = True
-
-                if use_local:
-                    raise Exception("Using local data due to auth error")
+                    if server_login != username:
+                        print(f"[API_TREE] SECURITY: Server login '{server_login}' != session username '{username}'")
+                        session.clear()
+                        return jsonify({"error": "Сессия недействительна. Войдите снова."}), 401
 
                 req = urllib.request.Request(
                     f"{SYNC_SERVER_URL}/api/sync/download",
