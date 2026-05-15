@@ -196,6 +196,8 @@ class FamilyTreeApp:
         self.canvas = tk.Canvas(root, bg=constants.CANVAS_BG, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.photo_images = {}  # Хранит ссылки на PhotoImage
+        self._kinship_cache_center = None
+        self._kinship_cache_data = {}
         self.coords = {}  # Хранит координаты {pid: (x, y)}
         self.visible_persons_in_coords = {}  # Персоны, видимые с учётом скрытия
         self.units = {}  # Супружеские пары {unit_id: [pid1, pid2]}
@@ -441,13 +443,13 @@ class FamilyTreeApp:
         """Выделение персоны при наведении курсора."""
         if pid != self.hovered_person_id:
             self.hovered_person_id = pid
-            self.refresh_view()
+            self.refresh_view(skip_layout=True)
 
     def on_person_leave(self, pid):
         """Снятие выделения при уходе курсора."""
         if self.hovered_person_id == pid:
             self.hovered_person_id = None
-            self.refresh_view()
+            self.refresh_view(skip_layout=True)
 
     def on_person_click(self, pid):
         """Устанавливает персону как центр дерева. Показывает только её ветку. Места на холсте не меняются."""
@@ -1780,7 +1782,7 @@ class FamilyTreeApp:
             self.statusbar.config(text=constants.MSG_STATUS_ZOOM_OUT)
         self.offset_x = canvas_x - (canvas_x - self.offset_x) * (self.current_scale / old_scale)
         self.offset_y = canvas_y - (canvas_y - self.offset_y) * (self.current_scale / old_scale)
-        self.refresh_view()
+        self.refresh_view(skip_layout=True)
 
     def start_pan(self, event):
         """Начало перетаскивания холста"""
@@ -1798,21 +1800,13 @@ class FamilyTreeApp:
             self.is_dragging = True
             self.statusbar.config(text=constants.MSG_STATUS_PAN_ACTIVE)
             self.root.focus_set()  # Снимаем фокус с элементов
-            print(f"[PAN] Начало перетаскивания, units={len(self.units)}, coords={len(self.coords)}")
 
         if self.is_dragging:
-            # ИСПРАВЛЕНО: карточки двигаются СИНХРОННО с курсором (без минуса!)
-
+            self.canvas.move("all", dx, dy)
             self.offset_x += dx
             self.offset_y += dy
-
-            # Обновляем стартовую точку для плавного продолжения
             self.drag_start_x = event.x
             self.drag_start_y = event.y
-
-            print(f"[PAN] Перетаскивание: offset=({self.offset_x}, {self.offset_y}), units={len(self.units)}, coords={len(self.coords)}")
-            # Мгновенное обновление без задержек (skip_layout=True чтобы не пересчитывать раскладку)
-            self.refresh_view(skip_layout=True)
 
     def stop_pan(self, event):
         """Завершение перетаскивания"""
@@ -2112,9 +2106,28 @@ class FamilyTreeApp:
         self.photo_images.clear()
         self.refresh_view()
 
+    def _get_kinship_relationships(self):
+        """Кэш вычисления родства (дорогая операция — не повторять при каждой перерисовке)."""
+        center = self.model.current_center
+        center_key = str(center) if center is not None else None
+        if center_key == self._kinship_cache_center:
+            return self._kinship_cache_data
+        self._kinship_cache_center = center_key
+        self._kinship_cache_data = {}
+        if center and KINSHIP_AVAILABLE:
+            try:
+                self._kinship_cache_data = calculate_kinship(self.model, str(center))
+            except Exception as e:
+                print(f"[KINSHIP] Ошибка вычисления родства: {e}")
+        return self._kinship_cache_data
+
     def refresh_view(self, skip_layout=False):
         if constants.DEBUG_LAYOUT:
             print(f"[REFRESH] skip_layout={skip_layout}, units до delete={len(self.units)}, coords={len(self.coords)}")
+        persons_count = len(self.model.persons)
+        if persons_count != getattr(self, "_kinship_persons_count", -1):
+            self._kinship_cache_center = None
+            self._kinship_persons_count = persons_count
         self.update_adaptive_settings()
         self.canvas.delete("all")
         if constants.DEBUG_LAYOUT:
@@ -2286,20 +2299,15 @@ class FamilyTreeApp:
             for mid in unit_members:
                 if mid in self.coords and mid not in filtered_visible:
                     filtered_visible[mid] = self.coords[mid]
-                    print(f"[MARRIAGE_FIX] Добавлен супруг {mid} в filtered_visible")
         # === /КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ===
 
         self.visible_persons_in_coords = filtered_visible
 
-        # === ВЫЧИСЛЕНИЕ СТЕПЕНИ РОДСТВА (если есть центральная персона) ===
-        self.relationships = {}
-        if self.model.current_center and KINSHIP_AVAILABLE:
-            try:
-                self.relationships = calculate_kinship(self.model, str(self.model.current_center))
-            except Exception as e:
-                print(f"[KINSHIP] Ошибка вычисления родства: {e}")
-                self.relationships = {}
-        # === /ВЫЧИСЛЕНИЕ СТЕПЕНИ РОДСТВА ===
+        if skip_layout:
+            self.relationships = self._get_kinship_relationships()
+        else:
+            self._kinship_cache_center = None
+            self.relationships = self._get_kinship_relationships()
 
         # === ОТРИСОВКА СВЯЗЕЙ РОДИТЕЛИ → ДЕТИ (середина линии родителей → общая линия детей → верх карточки ребёнка, скругления) ===
         def _key_in_vis(pid):
@@ -2394,25 +2402,12 @@ class FamilyTreeApp:
         CARD_HALF_W = self.CARD_WIDTH / 2
         CARD_HALF_H = self.CARD_HEIGHT / 2
 
-        print(f"[MARRIAGE] Отрисовка линий: units={len(self.units)}, visible={len(self.visible_persons_in_coords)}, coords={len(self.coords)}")
-        print(f"[MARRIAGE] skip_layout={skip_layout}, current_center={self.model.current_center}")
-        
-        # Проверка: выводим все units и их видимость
-        for unit_key, members in self.units.items():
-            members_in_coords = [mid for mid in members if mid in self.coords]
-            members_in_visible = [mid for mid in members if mid in self.visible_persons_in_coords]
-            print(f"[MARRIAGE] Unit {unit_key}: members={members}, in_coords={members_in_coords}, in_visible={members_in_visible}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[MARRIAGE] units={len(self.units)}, visible={len(self.visible_persons_in_coords)}")
 
         for unit_key, members in self.units.items():
             if len(members) < 2:
-                print(f"[MARRIAGE] Пропущен {unit_key}: меньше 2 членов ({len(members)})")
                 continue
-
-            # Проверка видимости супругов
-            missing_spouses = [mid for mid in members if mid not in self.visible_persons_in_coords]
-            if missing_spouses:
-                print(f"[MARRIAGE] WARNING: супруги {missing_spouses} из unit {unit_key} НЕ в visible_persons_in_coords!")
-                print(f"[MARRIAGE] visible_persons_in_coords ключи: {list(self.visible_persons_in_coords.keys())[:10]}")
 
             xs, ys = [], []
             all_visible = True
@@ -2424,10 +2419,8 @@ class FamilyTreeApp:
                     ys.append(y)
                 else:
                     all_visible = False
-                    print(f"[MARRIAGE] Супруг {mid} не найден в visible_persons_in_coords через _key_in_vis")
                     break
             if not all_visible:
-                print(f"[MARRIAGE] Пропущен брак {unit_key}: не все супруги видимы (all_visible=False)")
                 continue
             if len(xs) == 2:
                 # Координаты центров карточек
@@ -2459,14 +2452,9 @@ class FamilyTreeApp:
                 scaled_x2 = x2 * self.current_scale + self.offset_x
                 scaled_y2 = y2 * self.current_scale + self.offset_y
                 
-                # === ОТЛАДКА: рисуем линию с более ярким цветом и большей шириной ===
-                # Используем ярко-красный для видимости
-                debug_color = "#ff0000"
-                line_width = max(5, self.MARRIAGE_LINE_WIDTH * self.current_scale)
-                if constants.DEBUG_LAYOUT:
-                    print(f"[MARRIAGE_LINE] Цвет: {debug_color}, Ширина: {line_width}")
+                line_width = max(2, self.MARRIAGE_LINE_WIDTH * self.current_scale)
                 line_id = self.canvas.create_line(scaled_x1, scaled_y1, scaled_x2, scaled_y2,
-                                        fill=debug_color,
+                                        fill=constants.MARRIAGE_LINE_COLOR,
                                         width=line_width,
                                         dash=constants.DEFAULT_MARRIAGE_LINE_DASH,
                                         tags="marriage_line")
@@ -2478,6 +2466,8 @@ class FamilyTreeApp:
         
         # Поднимаем все супружеские линии на передний план
         self.canvas.tag_raise("marriage_line")
+
+        self.trim_photo_cache(max_size=120)
 
         # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
         total_persons = len(self.model.persons)
