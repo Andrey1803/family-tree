@@ -1337,10 +1337,13 @@ function render() {
         if (!childrenCoords.length) return;
 
         const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-        const minSpanX =
-            Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft)) - 2;
-        const maxSpanX =
-            Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight)) + 2;
+        /* Ширина вилки — по центрам детей и родителя; НЕ по blockLeft/Right (там супруг,
+         * из‑за этого при одном ребёнке «плечи» горизонтали уходили далеко в стороны). */
+        const childCentersX = childrenCoords.map(t => t.cx);
+        const limbMinX = Math.min(parentCenterX, ...childCentersX);
+        const limbMaxX = Math.max(parentCenterX, ...childCentersX);
+        const minSpanX = limbMinX - 2;
+        const maxSpanX = limbMaxX + 2;
 
         const bandKey = String(snapRow(childrenCoords[0].cy));
         if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
@@ -1384,25 +1387,32 @@ function render() {
             midVertLine.setAttribute("stroke-linecap", "round");
             svg.appendChild(midVertLine);
 
-            const minX = Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft));
-            const maxX = Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight));
+            const minX = Math.min(parentCenterX, ...childrenCoords.map(t => t.cx));
+            const maxX = Math.max(parentCenterX, ...childrenCoords.map(t => t.cx));
 
-            const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            horizLine.setAttribute("x1", (minX + offsetX));
-            horizLine.setAttribute("y1", (horizLineY + offsetY));
-            horizLine.setAttribute("x2", (maxX + offsetX));
-            horizLine.setAttribute("y2", (horizLineY + offsetY));
-            horizLine.setAttribute("stroke", parentLineColor);
-            horizLine.setAttribute("stroke-width", 2);
-            horizLine.setAttribute("stroke-linecap", "round");
-            svg.appendChild(horizLine);
+            const hy = horizLineY + offsetY;
+            /* Почти нулевая горизонталь не нужна; слишком большой порог давал разрыв при микросдвиге cx */
+            const drawHoriz = maxX - minX > 1e-3;
+
+            if (drawHoriz) {
+                const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                horizLine.setAttribute("x1", (minX + offsetX));
+                horizLine.setAttribute("y1", hy);
+                horizLine.setAttribute("x2", (maxX + offsetX));
+                horizLine.setAttribute("y2", hy);
+                horizLine.setAttribute("stroke", parentLineColor);
+                horizLine.setAttribute("stroke-width", 2);
+                horizLine.setAttribute("stroke-linecap", "round");
+                svg.appendChild(horizLine);
+            }
 
             childrenCoords.forEach(({ cx, topY }) => {
                 const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                const yTop = topY + offsetY;
                 childLine.setAttribute("x1", (cx + offsetX));
-                childLine.setAttribute("y1", (horizLineY + offsetY));
+                childLine.setAttribute("y1", hy);
                 childLine.setAttribute("x2", (cx + offsetX));
-                childLine.setAttribute("y2", (topY + offsetY));
+                childLine.setAttribute("y2", yTop);
                 childLine.setAttribute("stroke", parentLineColor);
                 childLine.setAttribute("stroke-width", 2);
                 childLine.setAttribute("stroke-linecap", "round");
