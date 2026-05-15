@@ -1016,7 +1016,173 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         }
         console.log('[FINAL] Married-cluster row separation applied');
     })();
-    
+
+    // === POST: заново ставим ряд детей под актуальной серединой брака (spread/separate могли сместить родителей) ===
+    (function reAnchorChildrenUnderPlacedParents() {
+        function dataParentKey(pid) {
+            return (persons[pid].parents || [])
+                .map(String)
+                .filter(pr => persons[pr])
+                .sort()
+                .join('|');
+        }
+
+        function spouseRowOrderLocal(childId, sp) {
+            const arr = sp || [];
+            if (arr.length === 1) {
+                const ch = persons[childId];
+                const s0 = persons[arr[0]];
+                const cM = ch?.gender === 'Мужской';
+                const sM = s0?.gender === 'Мужской';
+                if (cM && !sM) return [childId, arr[0]];
+                if (!cM && sM) return [arr[0], childId];
+                return [childId, arr[0]];
+            }
+            if (arr.length > 1) return [childId, ...arr];
+            return [childId];
+        }
+
+        function multiNw(nCards) {
+            if (nCards <= 0) return 0;
+            return nCards * CARD_W + (nCards - 1) * SPOUSE_GAP;
+        }
+
+        function childCenterOffsetFromBlockLeftLocal(childId, sp) {
+            const order = spouseRowOrderLocal(childId, sp || []);
+            const idx = order.indexOf(childId);
+            if (idx < 0) return CARD_W / 2;
+            return idx * (CARD_W + SPOUSE_GAP) + CARD_W / 2;
+        }
+
+        function childrenRowAvgChildCenterLocal(children, childSpouses) {
+            let leftEdge = 0;
+            let sumCx = 0;
+            children.forEach((cid, idx) => {
+                const spp = childSpouses.get(cid) || [];
+                sumCx += leftEdge + childCenterOffsetFromBlockLeftLocal(cid, spp);
+                leftEdge += multiNw(1 + spp.length);
+                if (idx < children.length - 1) leftEdge += SIBLING_GAP;
+            });
+            return { avgChildCenterFromRowLeft: sumCx / children.length, totalRowWidth: leftEdge };
+        }
+
+        function writeChildBlockFromLeft(xLeft, yRow, childId, spArr) {
+            const order = spouseRowOrderLocal(childId, spArr || []);
+            let px = xLeft;
+            for (let i = 0; i < order.length; i++) {
+                const pid = order[i];
+                if (!coords[pid]) continue;
+                coords[pid].x = px + CARD_W / 2;
+                coords[pid].y = yRow;
+                px += CARD_W + (i < order.length - 1 ? SPOUSE_GAP : 0);
+            }
+            return multiNw(order.length);
+        }
+
+        function writeOneChildAnchoredMid(midX, yRow, childId, spArr) {
+            const order = spouseRowOrderLocal(childId, spArr || []);
+            const k = order.indexOf(childId);
+            if (k < 0) {
+                if (coords[childId]) {
+                    coords[childId].x = midX;
+                    coords[childId].y = yRow;
+                }
+                return;
+            }
+            const centers = new Array(order.length);
+            centers[k] = midX;
+            for (let j = k - 1; j >= 0; j--) {
+                centers[j] = centers[j + 1] - CARD_W - SPOUSE_GAP;
+            }
+            for (let j = k + 1; j < order.length; j++) {
+                centers[j] = centers[j - 1] + CARD_W + SPOUSE_GAP;
+            }
+            order.forEach((pid, i) => {
+                if (coords[pid]) {
+                    coords[pid].x = centers[i];
+                    coords[pid].y = yRow;
+                }
+            });
+        }
+
+        function spousesNextToChildOnRow(childId) {
+            const cy = coords[childId] ? coords[childId].y : null;
+            if (cy == null) return [];
+            const rowSnap = snapLayoutRowY(cy);
+            return (marriageMap.get(childId) || []).map(String).filter(sid => {
+                if (!related.has(sid) || !coords[sid]) return false;
+                return snapLayoutRowY(coords[sid].y) === rowSnap;
+            });
+        }
+
+        let groups = 0;
+        layoutRowKeys().forEach(py => {
+            const cry = py + LEVEL_HEIGHT;
+
+            /** Все ключи родителей -> дети на ряду cry */
+            const byKey = new Map();
+            Object.keys(coords).forEach(cid => {
+                if (!related.has(cid) || !coords[cid] || !persons[cid]) return;
+                if (snapLayoutRowY(coords[cid].y) !== cry) return;
+                const pk = dataParentKey(cid);
+                if (!pk) return;
+                const prs = pk.split('|').filter(Boolean);
+                const onGenAbove = prs.some(
+                    pr => coords[pr] && snapLayoutRowY(coords[pr].y) === py
+                );
+                if (!onGenAbove) return;
+                if (!byKey.has(pk)) byKey.set(pk, []);
+                byKey.get(pk).push(cid);
+            });
+
+            byKey.forEach((childList, pk) => {
+                childList.sort((a, b) => {
+                    const da = persons[a]?.birth_date || '9999.99.99';
+                    const db = persons[b]?.birth_date || '9999.99.99';
+                    if (da !== db) return da.localeCompare(db);
+                    return String(a).localeCompare(String(b));
+                });
+
+                const prIds = pk.split('|').filter(Boolean);
+                const placedOnRowAbove = prIds.filter(
+                    pr => coords[pr] && snapLayoutRowY(coords[pr].y) === py
+                );
+                if (placedOnRowAbove.length === 0) return;
+
+                let midX;
+                if (placedOnRowAbove.length >= 2) {
+                    midX =
+                        placedOnRowAbove.reduce((s, pr) => s + coords[pr].x, 0) /
+                        placedOnRowAbove.length;
+                } else {
+                    midX = coords[placedOnRowAbove[0]].x;
+                }
+
+                const csMap = new Map();
+                childList.forEach(cid => csMap.set(cid, spousesNextToChildOnRow(cid)));
+
+                if (childList.length === 1) {
+                    writeOneChildAnchoredMid(midX, cry, childList[0], csMap.get(childList[0]) || []);
+                } else {
+                    const { avgChildCenterFromRowLeft } = childrenRowAvgChildCenterLocal(
+                        childList,
+                        csMap
+                    );
+                    let x = midX - avgChildCenterFromRowLeft;
+                    childList.forEach((cid, idx) => {
+                        const sp = csMap.get(cid) || [];
+                        const bw = writeChildBlockFromLeft(x, cry, cid, sp);
+                        x += bw + SIBLING_GAP;
+                    });
+                }
+                groups++;
+            });
+        });
+        if (groups) {
+            console.log('[FINAL] Re-anchored children under parents:', groups, 'parent-keys');
+        }
+    })();
+
     // === ПРОВЕРКА ПОСЛЕ РАЗМЕЩЕНИЯ: где кто оказался ===
     console.log('[FINAL] === FINAL COORDINATES CHECK ===');
     Object.entries(coords).forEach(([pid, pos]) => {
