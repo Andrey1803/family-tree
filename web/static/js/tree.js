@@ -27,6 +27,38 @@ let focusModeActive = false;
 let activeFilters = { gender: "Все", status: "Все", photos_only: false, childless: false };
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
+let treeLoaded = false;  // Флаг: дерево загружено
+
+// === РЕЖИМ ОТРИСОВКИ ===
+// По умолчанию classic (синхронизирован с desktop-версией)
+let renderMode = localStorage.getItem('family_tree_render_mode') || 'classic'; // 'generations' | 'classic'
+const RENDER_MODE_KEY = 'family_tree_render_mode';
+
+/**
+ * Сохраняет режим отрисовки в localStorage
+ */
+function setRenderMode(mode) {
+    renderMode = mode;
+    localStorage.setItem(RENDER_MODE_KEY, mode);
+    console.log('[RENDER_MODE] Set to:', mode);
+    render();
+}
+
+/**
+ * Переключает режим отрисовки
+ */
+function toggleRenderMode() {
+    const newMode = renderMode === 'generations' ? 'classic' : 'generations';
+    setRenderMode(newMode);
+    return newMode;
+}
+
+/**
+ * Возвращает текущий режим отрисовки
+ */
+function getRenderMode() {
+    return renderMode;
+}
 
 // === АВТОСОХРАНЕНИЕ ===
 let autoSaveTimer = null;
@@ -501,9 +533,9 @@ async function loadTree() {
     if (!r.ok) {
         console.error('[LOAD_TREE] Response not ok:', r.status);
         // Если сервер не ответил, используем локальные данные
-        if (localData) {
+        if (normalizedLocalData) {
             console.log('[LOAD_TREE] Using local data (server error)');
-            treeData = localData;
+            treeData = normalizedLocalData;
             centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
             treeZoom = 0.5;
             treePanX = 0;
@@ -514,8 +546,58 @@ async function loadTree() {
     }
 
     const serverData = await r.json();
-    const serverPersonsCount = Object.keys(serverData.persons || {}).length;
-    const localPersonsCount = localData ? Object.keys(localData.persons || {}).length : 0;
+    
+    // === ОТЛАДКА: покажем, что пришёл с сервера ===
+    console.log('[LOAD_TREE] Raw serverData marriages:', serverData.marriages);
+    console.log('[LOAD_TREE] Raw serverData marriages type:', Array.isArray(serverData.marriages) ? 'Array' : typeof serverData.marriages);
+    
+    // === НОРМАЛИЗАЦИЯ ДАННЫХ ===
+    // Преобразуем все ID в строки для консистентности
+    const normalizePerson = (p) => {
+        if (!p) return p;
+        return {
+            ...p,
+            id: String(p.id),
+            parents: (p.parents || []).map(String),
+            children: (p.children || []).map(String),
+            spouse_ids: (p.spouse_ids || []).map(String),
+        };
+    };
+    
+    const normalizeMarriage = (m) => {
+        if (Array.isArray(m)) {
+            return m.map(String);
+        } else if (m && m.persons && Array.isArray(m.persons)) {
+            return { persons: m.persons.map(String) };
+        }
+        return m;
+    };
+    
+    // Нормализуем данные с сервера
+    const normalizedServerData = {
+        persons: {},
+        marriages: (serverData.marriages || []).map(normalizeMarriage),
+        current_center: serverData.current_center,
+    };
+    Object.entries(serverData.persons || {}).forEach(([id, p]) => {
+        normalizedServerData.persons[String(id)] = normalizePerson(p);
+    });
+    
+    // Нормализуем локальные данные
+    let normalizedLocalData = null;
+    if (localData) {
+        normalizedLocalData = {
+            persons: {},
+            marriages: (localData.marriages || []).map(normalizeMarriage),
+            current_center: localData.current_center,
+        };
+        Object.entries(localData.persons || {}).forEach(([id, p]) => {
+            normalizedLocalData.persons[String(id)] = normalizePerson(p);
+        });
+    }
+    
+    const serverPersonsCount = Object.keys(normalizedServerData.persons || {}).length;
+    const localPersonsCount = normalizedLocalData ? Object.keys(normalizedLocalData.persons || {}).length : 0;
 
     console.log('[LOAD_TREE] Server:', serverPersonsCount, 'persons, Local:', localPersonsCount, 'persons');
 
@@ -535,7 +617,7 @@ async function loadTree() {
     // 1. Если сервер пустой, а локально есть данные - НЕ перезаписываем локальные!
     if (serverPersonsCount === 0 && localPersonsCount > 0) {
         console.log('[SYNC] Server empty, KEEPING local data (DO NOT OVERWRITE)');
-        treeData = localData;
+        treeData = normalizedLocalData;
         // Сохраняем обратно в localStorage чтобы не потерять
         treeData._username = username;
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
@@ -543,7 +625,7 @@ async function loadTree() {
     // 2. Если локально пусто, а сервер вернул данные - используем сервер
     else if (serverPersonsCount > 0 && localPersonsCount === 0) {
         console.log('[SYNC] Local empty, using server data');
-        treeData = serverData;
+        treeData = normalizedServerData;
         // Сохраняем в localStorage
         treeData._username = username;
         localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
@@ -555,10 +637,10 @@ async function loadTree() {
         // Выбираем где больше персон
         if (localPersonsCount > serverPersonsCount) {
             console.log('[SYNC] Local has more persons, using local data');
-            treeData = localData;
+            treeData = normalizedLocalData;
         } else {
             console.log('[SYNC] Server has more/equal persons, using server data');
-            treeData = serverData;
+            treeData = normalizedServerData;
         }
 
         // Сохраняем выбранное в localStorage
@@ -572,12 +654,73 @@ async function loadTree() {
         treeData._username = username;
     }
 
+    // === СИНХРОНИЗАЦИЯ spouse_ids И marriages (как в desktop models.py) ===
+    // Восстанавливаем spouse_ids из marriages
+    console.log('[SYNC] Synchronizing spouse_ids with marriages...');
+    const marriages = treeData.marriages || [];
+    
+    // Очищаем spouse_ids у всех персон
+    Object.values(treeData.persons).forEach(p => {
+        if (p) p.spouse_ids = [];
+    });
+    
+    // Восстанавливаем spouse_ids из marriages
+    let restoredCount = 0;
+    marriages.forEach(m => {
+        let a, b;
+        if (Array.isArray(m)) {
+            [a, b] = m;
+        } else if (m.persons && Array.isArray(m.persons)) {
+            [a, b] = m.persons;
+        } else {
+            return;
+        }
+        
+        const idA = String(a), idB = String(b);
+        const pA = treeData.persons[idA];
+        const pB = treeData.persons[idB];
+        
+        if (pA && pB) {
+            if (!pA.spouse_ids.includes(idB)) pA.spouse_ids.push(idB);
+            if (!pB.spouse_ids.includes(idA)) pB.spouse_ids.push(idA);
+            restoredCount++;
+        }
+    });
+    
+    console.log('[SYNC] Restored', restoredCount, 'spouse relationships from marriages');
+    
+    // === ИСПРАВЛЕНИЕ: восстанавливаем marriages из spouse_ids, если marriages пуст ===
+    if (marriages.length === 0 && Object.keys(treeData.persons).length > 0) {
+        console.log('[SYNC] Marriages empty, restoring from spouse_ids...');
+        const marriageSet = new Set();
+        
+        Object.entries(treeData.persons).forEach(([id, p]) => {
+            if (p && p.spouse_ids) {
+                p.spouse_ids.forEach(spouseId => {
+                    const pair = [id, spouseId].sort();
+                    marriageSet.add(pair.join('|'));
+                });
+            }
+        });
+        
+        treeData.marriages = Array.from(marriageSet).map(pairStr => {
+            const [a, b] = pairStr.split('|');
+            return [a, b];
+        });
+        
+        console.log('[SYNC] Restored', treeData.marriages.length, 'marriages from spouse_ids');
+    }
+    // === КОНЕЦ СИНХРОНИЗАЦИИ ===
+
     // Сохраняем объединённые данные в backup
     treeData._username = username;
     localStorage.setItem('family_tree_backup', JSON.stringify(treeData));
 
     centerId = treeData.current_center || (Object.keys(treeData.persons)[0] || null);
     console.log('[LOAD_TREE] centerId:', centerId, 'total persons:', Object.keys(treeData.persons).length);
+
+    // ✅ Устанавливаем флаг загрузки
+    treeLoaded = true;
 
     // Сбрасываем зум и панорамирование при загрузке
     treeZoom = 0.5;
@@ -586,14 +729,17 @@ async function loadTree() {
 
     render();
 
+    // ✅ ПРОВЕРКА ПЕРВОГО ЗАПУСКА (после загрузки!)
+    checkFirstRun();
+
     // Центрируем дерево после рендеринга (БЕЗ сохранения!)
     setTimeout(() => {
-        if (centerId) {
-            // Просто центрируем, без сохранения
-            const p = treeData.persons[centerId];
-            if (p && p.x !== undefined && p.y !== undefined) {
-                treePanX = -p.x * treeZoom + window.innerWidth / 2;
-                treePanY = -p.y * treeZoom + window.innerHeight / 2;
+        if (centerId && treeData._coords && treeData._coords[centerId]) {
+            // Используем координаты из render()
+            const pos = treeData._coords[centerId];
+            if (pos && pos.x !== undefined && pos.y !== undefined) {
+                treePanX = -pos.x * treeZoom + window.innerWidth / 2;
+                treePanY = -pos.y * treeZoom + window.innerHeight / 2;
                 render();
             }
         }
@@ -633,29 +779,36 @@ function render() {
     const persons = treeData.persons || {};
     const ids = Object.keys(persons);
 
-    console.log('[RENDER] persons count:', ids.length);
-    console.log('[RENDER] centerId:', centerId);
-    console.log('[RENDER] treeData:', treeData);
-    console.log('[RENDER] persons:', treeData.persons);
+    console.log('[RENDER] persons count:', ids.length, 'treeLoaded:', treeLoaded);
 
+    // === ПРОВЕРКА: Дерево загружено? ===
+    // Если treeLoaded=false, ждём загрузки (не показываем empty-msg)
+    if (!treeLoaded && ids.length === 0) {
+        console.log('[RENDER] Tree not loaded yet, waiting...');
+        return;  // Просто выходим, не показывая empty-msg
+    }
+    
+    // Если persons пустой, но treeLoaded=true - показываем пустое сообщение
     if (ids.length === 0) {
         console.log('[RENDER] No persons, showing empty message');
         emptyMsg.style.display = "block";
         const btn = document.getElementById("btn-add-first");
         if (btn) btn.onclick = (e) => {
-            e.stopPropagation(); // Предотвращаем закрытие контекстного меню
-            closeContextMenu(); // Закрываем контекстное меню перед открытием модального окна
+            e.stopPropagation();
+            closeContextMenu();
             addFirstPerson();
         };
         updateStatusBar();
         return;
     }
+    
     console.log('[RENDER] Rendering tree with', ids.length, 'persons');
     emptyMsg.style.display = "none";
 
     // === ИСПОЛЬЗУЕМ ФУНКЦИЮ ИЗ visible_persons.js (полная копия desktop-версии) ===
     const relatedRaw = getVisiblePersons(centerId, persons, treeData.marriages, focusModeActive, activeFilters);
     console.log('[RENDER] Visible persons:', relatedRaw.size);
+    console.log('[RENDER] Render mode:', renderMode);
 
     // Применяем фильтры к visible persons
     const related = new Set();
@@ -672,165 +825,14 @@ function render() {
         related.add(pid);
     }
 
-    let rootId = centerId || ids[0];
-    const visited = new Set();
-    let queue = [rootId];
-    while (queue.length) {
-        const pid = queue.shift();
-        if (visited.has(pid)) continue;
-        visited.add(pid);
-        const p = persons[pid];
-        if (p && p.parents && p.parents.length) {
-            rootId = p.parents[0];
-            queue.push(rootId);
-        }
-    }
+    // === ВЫБИРАЕМ АЛГОРИТМ ОТРИСОВКИ ===
+    // ФИНАЛЬНАЯ ВЕРСИЯ: простое размещение по поколениям
+    let layoutResult;
 
-    const coords = {};
-    const spouseStep = CARD_W + SPOUSE_GAP;
-
-    function blockWidthOnly(p) {
-        const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
-        if (!spouses.length) return CARD_W;
-        return CARD_W + spouses.length * spouseStep;
-    }
-
-    function gapBetweenSiblings(cid1, cid2) {
-        const p1 = persons[cid1], p2 = persons[cid2];
-        if (!p1 || !p2) return COUSIN_GAP;
-        const set1 = new Set((p1.parents || []).map(String));
-        const set2 = new Set((p2.parents || []).map(String));
-        if (set1.size !== set2.size) return COUSIN_GAP;
-        const sameParents = [...set1].every(x => set2.has(x));
-        return sameParents ? SIBLING_GAP : COUSIN_GAP;
-    }
-
-    function sortChildren(childrenIds) {
-        return [...childrenIds].sort((a, b) => {
-            const da = (persons[a]?.birth_date || "9999.99.99");
-            const db = (persons[b]?.birth_date || "9999.99.99");
-            if (da !== db) return da.localeCompare(db);
-            return (String(a).match(/^\d+$/) ? parseInt(a, 10) : 0) - (String(b).match(/^\d+$/) ? parseInt(b, 10) : 0);
-        });
-    }
-    function getSubtreeWidth(pid) {
-        if (!pid || !persons[pid]) return CARD_W;
-        const p = persons[pid];
-        if (p.collapsed_branches) return blockWidthOnly(p);
-        const kids = sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
-        const bw = blockWidthOnly(p);
-        if (kids.length === 0) return bw;
-        const childWidths = kids.map(k => Math.max(getSubtreeWidth(k), blockWidthOnly(persons[k])));
-        let total = childWidths.reduce((a, b) => a + b, 0);
-        for (let i = 0; i < kids.length - 1; i++) total += gapBetweenSiblings(kids[i], kids[i + 1]);
-        return Math.max(bw, total);
-    }
-
-    function layout(pid, x, y, w) {
-        if (!pid || !persons[pid]) return null;
-        const p = persons[pid];
-        
-        // Если координаты уже есть — пропускаем (уже размещён)
-        if (coords[pid]) return { left: x, right: x + w, top: y, bottom: y + CARD_H };
-        
-        const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
-        const kids = p.collapsed_branches ? [] : sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
-
-        // === ПОЗИЦИОНИРОВАНИЕ РОДИТЕЛЕЙ (выше текущей персоны) ===
-        const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr]);
-        if (visibleParents.length > 0) {
-            // Сначала вычислим где будет центр текущего блока
-            const currentBlockWidth = blockWidthOnly(p);
-            const currentAllocatedWidth = Math.max(w, currentBlockWidth);
-            const currentBlockX = x + Math.max(0, (currentAllocatedWidth - currentBlockWidth) / 2);
-            const currentCenterX = currentBlockX + currentBlockWidth / 2;
-            
-            // Родители ещё не спозиционированы — позиционируем их выше
-            const parentY = y - LEVEL_HEIGHT;
-            const parentWidths = visibleParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
-            let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
-            for (let i = 0; i < visibleParents.length - 1; i++) totalParentW += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
-
-            // Центрируем родителей относительно текущего блока
-            let parentX = currentCenterX - totalParentW / 2;
-            visibleParents.forEach((pr, i) => {
-                const pw = parentWidths[i];
-                layout(pr, parentX, parentY, pw);
-                parentX += pw + (i < visibleParents.length - 1 ? gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]) : 0);
-            });
-        }
-
-        const blockWidth = blockWidthOnly(p);
-        const allocatedWidth = Math.max(w, blockWidth);
-        const blockX = x + Math.max(0, (allocatedWidth - blockWidth) / 2);
-        let dx = blockX;
-        const block = [pid, ...spouses].sort((a, b) => {
-            const ga = (persons[a] || {}).gender === "Мужской" ? 0 : 1;
-            const gb = (persons[b] || {}).gender === "Мужской" ? 0 : 1;
-            return ga - gb;
-        });
-        block.forEach(id => {
-            if (!coords[id]) {
-                coords[id] = { x: dx + CARD_W / 2, y: y + CARD_H / 2 };
-            }
-            dx += spouseStep;
-        });
-        const parentCenterX = (coords[block[0]].x + coords[block[block.length - 1]].x) / 2;
-
-        if (kids.length === 0) return { left: blockX, right: blockX + blockWidth, top: y, bottom: y + CARD_H };
-
-        const childY = y + LEVEL_HEIGHT;
-        const childWidths = kids.map(k => Math.max(getSubtreeWidth(k), blockWidthOnly(persons[k])));
-        let totalChildW = childWidths.reduce((a, b) => a + b, 0);
-        for (let i = 0; i < kids.length - 1; i++) totalChildW += gapBetweenSiblings(kids[i], kids[i + 1]);
-        let childX = parentCenterX - totalChildW / 2;
-
-        let left = blockX, right = blockX + blockWidth, bottom = childY + CARD_H;
-        kids.forEach((kid, i) => {
-            const cw = childWidths[i];
-            const r = layout(kid, childX, childY, cw);
-            if (r) {
-                left = Math.min(left, r.left);
-                right = Math.max(right, r.right);
-                bottom = Math.max(bottom, r.bottom);
-            }
-            childX += cw + (i < kids.length - 1 ? gapBetweenSiblings(kids[i], kids[i + 1]) : 0);
-        });
-        return { left, right, top: y, bottom };
-    }
-
-    // === ВЫЗЫВАЕМ layout() ДЛЯ rootId ===
-    let bounds = layout(rootId, 0, 0, CARD_W * 3);
+    console.log('[RENDER] Using FINAL layout...');
+    layoutResult = renderFinalLayout(centerId, persons, treeData.marriages, related);
     
-    // === ЕСЛИ ОСТАЛИСЬ ПЕРСОНЫ БЕЗ КООРДИНАТ — вызываем layout() для них ===
-    // Это нужно для персон, не связанных с rootId через parents/children/spouse_ids
-    let layoutOffsetX = 0;
-    let layoutOffsetY = 0;
-    
-    for (const pid of related) {
-        if (!coords[pid] && persons[pid]) {
-            console.log('[RENDER] Layout for disconnected person:', pid);
-            const personBounds = layout(pid, layoutOffsetX, layoutOffsetY, CARD_W * 3);
-            if (personBounds) {
-                // Обновляем общие bounds
-                bounds = {
-                    left: Math.min(bounds.left, personBounds.left),
-                    right: Math.max(bounds.right, personBounds.right),
-                    top: Math.min(bounds.top, personBounds.top),
-                    bottom: Math.max(bounds.bottom, personBounds.bottom)
-                };
-                // Смещаем следующую персону вправо
-                layoutOffsetX += CARD_W * 2;
-            }
-        }
-    }
-    
-    bounds = bounds || { left: 0, right: 400, top: 0, bottom: 300 };
-    const offsetX = Math.max(0, -bounds.left) + PAD;
-    const offsetY = Math.max(0, -bounds.top) + PAD;
-    // Вычисляем размеры на основе реальных размеров дерева
-    const totalW = bounds.right - bounds.left + PAD * 2;
-    const totalH = bounds.bottom - bounds.top + PAD * 2;
+    const { coords, bounds, totalW, totalH, offsetX, offsetY } = layoutResult;
 
     // ✅ Сохраняем координаты и bounds для setCenterAndSave
     treeData._coords = coords;
@@ -1093,104 +1095,21 @@ function render() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", totalW);
     svg.setAttribute("height", totalH);
-    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none; z-index:10;";
+    svg.style.cssText = "position:absolute; top:0; left:0; pointer-events:none; z-index:100 !important;";
     svg.setAttribute("class", "tree-lines");
     wrap.appendChild(svg);
 
-    // Отладка: проверяем marriages
-    console.log('[DEBUG] Marriages count:', (treeData.marriages || []).length);
-    console.log('[DEBUG] Marriages:', treeData.marriages);
-    console.log('[DEBUG] Coords keys:', Object.keys(coords));
-    console.log('[DEBUG] Related size:', related.size);
-    console.log('[DEBUG] OffsetX:', offsetX, 'OffsetY:', offsetY);
-    console.log('[DEBUG] TotalW:', totalW, 'TotalH:', totalH);
+    // Отладка: проверяем marriages и связи
 
-    // Линии родитель–ребёнок
-    const parentSetToChildren = {};
+    // Отладка: проверяем связи родителей для каждой персоны
     Object.keys(coords).forEach(pid => {
         const p = persons[pid];
-        if (!p || !p.parents) return;
-        const visibleParents = (p.parents || []).filter(pid2 => coords[pid2] && related.has(pid2));
-        if (!visibleParents.length) return;
-        const key = visibleParents.map(String).sort().join("|");
-        parentSetToChildren[key] = parentSetToChildren[key] || [];
-        parentSetToChildren[key].push(pid);
-    });
-    const childTopOffset = CARD_H / 2;
-
-    Object.values(parentSetToChildren).forEach(childPids => {
-        const first = persons[childPids[0]];
-        if (!first || !first.parents) return;
-        const parentPids = (first.parents || []).filter(pid => coords[pid]);
-        if (!parentPids.length) return;
-        let midX, midY;
-        if (parentPids.length >= 2) {
-            const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
-            midX = (p1.x + p2.x) / 2;
-            midY = (p1.y + p2.y) / 2;
-        } else {
-            midX = coords[parentPids[0]].x;
-            midY = coords[parentPids[0]].y;
+        if (p && p.parents) {
+            console.log(`  ${pid} (${p.name}) parents:`, p.parents);
         }
-        const childrenCoords = childPids
-            .filter(cid => coords[cid])
-            .map(cid => {
-                const c = coords[cid];
-                return { cx: c.x, cy: c.y, topY: c.y - childTopOffset };
-            })
-            .sort((a, b) => a.cx - b.cx);
-        if (!childrenCoords.length) return;
-        const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-        const lineY = (midY + minTopY) / 2;
-
-        // === ОТРИСОВКА ЛИНИЙ РОДИТЕЛЕЙ ===
-        const parentLineColor = getComputedStyle(document.documentElement)
-            .getPropertyValue('--line-parent').trim() || '#475569';
-
-        // Вертикальные линии от каждого родителя до горизонтальной линии
-        parentPids.forEach(prId => {
-            const pr = coords[prId];
-            const prBottomY = pr.y + CARD_H / 2;  // Низ карточки родителя
-            
-            const vertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            vertLine.setAttribute("x1", pr.x + offsetX);
-            vertLine.setAttribute("y1", prBottomY + offsetY);
-            vertLine.setAttribute("x2", pr.x + offsetX);
-            vertLine.setAttribute("y2", lineY + offsetY);
-            vertLine.setAttribute("stroke", parentLineColor);
-            vertLine.setAttribute("stroke-width", 2);
-            vertLine.setAttribute("stroke-linecap", "round");
-            svg.appendChild(vertLine);
-        });
-
-        // Горизонтальная линия
-        const minX = childrenCoords[0].cx;
-        const maxX = childrenCoords[childrenCoords.length - 1].cx;
-        const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        horizLine.setAttribute("x1", minX + offsetX);
-        horizLine.setAttribute("y1", lineY + offsetY);
-        horizLine.setAttribute("x2", maxX + offsetX);
-        horizLine.setAttribute("y2", lineY + offsetY);
-        horizLine.setAttribute("stroke", parentLineColor);
-        horizLine.setAttribute("stroke-width", 2);
-        horizLine.setAttribute("stroke-linecap", "round");
-        svg.appendChild(horizLine);
-
-        // Вертикальные линии к каждому ребёнку
-        childrenCoords.forEach(({ cx, topY }) => {
-            const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            childLine.setAttribute("x1", cx + offsetX);
-            childLine.setAttribute("y1", lineY + offsetY);
-            childLine.setAttribute("x2", cx + offsetX);
-            childLine.setAttribute("y2", topY + offsetY);
-            childLine.setAttribute("stroke", parentLineColor);
-            childLine.setAttribute("stroke-width", 2);
-            childLine.setAttribute("stroke-linecap", "round");
-            svg.appendChild(childLine);
-        });
     });
-    
-    // Линии между супругами
+
+    // === 1. СНАЧАЛА ЛИНИИ СУПРУГОВ (чтобы линии родителей соединялись с ними) ===
     let marriageLinesDrawn = 0;
     (treeData.marriages || []).forEach(m => {
         let a, b;
@@ -1204,7 +1123,7 @@ function render() {
         }
 
         const idA = String(a), idB = String(b);
-        
+
         // Проверяем, что обе персоны имеют координаты (значит они отрисованы)
         if (!coords[idA] || !coords[idB]) {
             console.log('[MARRIAGE] Skipping - no coords for', idA, idB);
@@ -1238,7 +1157,528 @@ function render() {
     });
     console.log('[MARRIAGE] Total marriage lines drawn:', marriageLinesDrawn);
 
+    // === 2. ЛИНИИ РОДИТЕЛЕЙ (рисуются поверх линий супругов) ===
+    const parentSetToChildren = {};
+    Object.keys(coords).forEach(pid => {
+        const p = persons[pid];
+        if (!p || !p.parents) return;
+        // Фильтруем только ВИДИМЫХ родителей (у которых есть coords)
+        const visibleParents = (p.parents || []).filter(pid2 => coords[pid2] && related.has(pid2));
+        if (!visibleParents.length) {
+            console.log(`[DEBUG] ${pid} (${p.name}) has no visible parents, skipping line`);
+            return;
+        }
+        const key = visibleParents.map(String).sort().join("|");
+        parentSetToChildren[key] = parentSetToChildren[key] || [];
+        parentSetToChildren[key].push(pid);
+    });
+    
+    Object.entries(parentSetToChildren).forEach(([key, children]) => {
+        console.log(`  Parents [${key}] → Children:`, children);
+    });
+    
+    const childTopOffset = CARD_H / 2;
+
+    Object.entries(parentSetToChildren).forEach(([parentKey, childPids]) => {
+        const first = persons[childPids[0]];
+        if (!first || !first.parents) return;
+        
+        // Получаем родителей ПЕРВОГО ребёнка (они должны быть одинаковыми для всех в группе)
+        let parentPids = (first.parents || []).filter(pid => coords[pid]);
+        if (!parentPids.length) return;
+
+        // === ПРОВЕРКА: У всех детей в группе должны быть те же родители ===
+        // Если нет — разделяем на подгруппы по родителям
+        const childrenByParents = {};
+        childPids.forEach(cid => {
+            const child = persons[cid];
+            const childParents = (child.parents || [])
+                .filter(pid => coords[pid] && related.has(pid))
+                .map(String)
+                .sort()
+                .join('|');
+            
+            if (!childrenByParents[childParents]) {
+                childrenByParents[childParents] = [];
+            }
+            childrenByParents[childParents].push(cid);
+        });
+
+        // Обрабатываем каждую подгруппу отдельно
+        Object.values(childrenByParents).forEach(subGroupChildPids => {
+            const subFirst = persons[subGroupChildPids[0]];
+            parentPids = (subFirst.parents || []).filter(pid => coords[pid]);
+            if (!parentPids.length) return;
+
+            console.log(`[DEBUG] Drawing parent line for parents:`, parentPids, 'children:', subGroupChildPids);
+
+            // === НАХОДИМ СЕРЕДИНУ МЕЖДУ РОДИТЕЛЯМИ ===
+            let parentCenterX, parentY, spouseLineY;
+            if (parentPids.length >= 2) {
+                const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
+                parentCenterX = (p1.x + p2.x) / 2;  // СЕРЕДИНА между родителями по X
+                parentY = p1.y;  // Оба на одном уровне Y
+
+                // === ЛИНИЯ СУПРУГОВ (между ними) ===
+                const p1RightEdge = p1.x + CARD_W / 2;
+                const p2LeftEdge = p2.x - CARD_W / 2;
+                const spouseLineMidX = (p1RightEdge + p2LeftEdge) / 2;
+                spouseLineY = p1.y;  // На том же уровне что и супруги
+
+                console.log(`[DEBUG] Two parents: p1=(${p1.x},${p1.y}), p2=(${p2.x},${p2.y}), center=${parentCenterX}`);
+            } else {
+                parentCenterX = coords[parentPids[0]].x;
+                parentY = coords[parentPids[0]].y;
+                spouseLineY = parentY;
+                console.log(`[DEBUG] Single parent: (${parentCenterX},${parentY})`);
+            }
+
+            const childrenCoords = subGroupChildPids
+                .filter(cid => coords[cid])
+                .map(cid => {
+                    const c = coords[cid];
+                    return { cx: c.x, cy: c.y, topY: c.y - childTopOffset };
+                })
+                .sort((a, b) => a.cx - b.cx);
+            if (!childrenCoords.length) return;
+            const minTopY = Math.min(...childrenCoords.map(t => t.topY));
+
+            // Горизонтальная линия НА УРОВНЕ детей (над ними)
+            const horizLineY = (parentY + CARD_H/2 + minTopY) / 2;  // Посередине между родителями и детьми
+
+            console.log(`[DEBUG] horizLineY=${horizLineY}, parentY=${parentY}, minTopY=${minTopY}`);
+
+            // === ОТРИСОВКА ЛИНИЙ РОДИТЕЛЕЙ ===
+            const parentLineColor = getComputedStyle(document.documentElement)
+                .getPropertyValue('--line-parent').trim() || '#475569';
+
+            // Вертикальная линия ОТ ЛИНИИ СУПРУГОВ (не от нижнего края!)
+            // spouseLineY — это Y-координата линии между супругами (на уровне центра карточек)
+            const midVertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            midVertLine.setAttribute("x1", (parentCenterX + offsetX));
+            midVertLine.setAttribute("y1", (spouseLineY + offsetY));  // ✅ ОТ линии супругов
+            midVertLine.setAttribute("x2", (parentCenterX + offsetX));
+            midVertLine.setAttribute("y2", (horizLineY + offsetY));
+            midVertLine.setAttribute("stroke", parentLineColor);
+            midVertLine.setAttribute("stroke-width", 2);
+            midVertLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(midVertLine);
+
+            // Горизонтальная линия над всеми детьми
+            const minX = childrenCoords[0].cx;
+            const maxX = childrenCoords[childrenCoords.length - 1].cx;
+            const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            horizLine.setAttribute("x1", (minX + offsetX));
+            horizLine.setAttribute("y1", (horizLineY + offsetY));
+            horizLine.setAttribute("x2", (maxX + offsetX));
+            horizLine.setAttribute("y2", (horizLineY + offsetY));
+            horizLine.setAttribute("stroke", parentLineColor);
+            horizLine.setAttribute("stroke-width", 2);
+            horizLine.setAttribute("stroke-linecap", "round");
+            svg.appendChild(horizLine);
+
+            // Вертикальные линии к каждому ребёнку
+            childrenCoords.forEach(({ cx, topY }) => {
+                const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                childLine.setAttribute("x1", (cx + offsetX));
+                childLine.setAttribute("y1", (horizLineY + offsetY));
+                childLine.setAttribute("x2", (cx + offsetX));
+                childLine.setAttribute("y2", (topY + offsetY));
+                childLine.setAttribute("stroke", parentLineColor);
+                childLine.setAttribute("stroke-width", 2);
+                childLine.setAttribute("stroke-linecap", "round");
+                svg.appendChild(childLine);
+            });
+        }); // Конец обработки подгруппы
+    }); // Конец обработки группы
+
     updateStatusBar();
+}
+
+/**
+ * КЛАССИЧЕСКИЙ АЛГОРИТМ ОТРИСОВКИ (синхронизирован с desktop-версией)
+ * Использует ДВУХПРОХОДНЫЙ алгоритм как в desktop (Дерево/app.py:calculate_layout)
+ * 
+ * Проход 1: Размещение от centerId вниз (дети, внуки)
+ * Проход 2: Доразмещение родителей выше и супругов рядом
+ */
+function runClassicLayout(centerId, persons, marriages, related) {
+    const coords = {};
+    const spouseStep = CARD_W + SPOUSE_GAP;
+
+    // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+    
+    function blockWidthOnly(p) {
+        const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
+        if (!spouses.length) return CARD_W;
+        return CARD_W + spouses.length * spouseStep;
+    }
+
+    function gapBetweenSiblings(cid1, cid2) {
+        const p1 = persons[cid1], p2 = persons[cid2];
+        if (!p1 || !p2) return COUSIN_GAP;
+        const set1 = new Set((p1.parents || []).map(String));
+        const set2 = new Set((p2.parents || []).map(String));
+        if (set1.size !== set2.size) return COUSIN_GAP;
+        const sameParents = [...set1].every(x => set2.has(x));
+        return sameParents ? SIBLING_GAP : COUSIN_GAP;
+    }
+
+    function sortChildren(childrenIds) {
+        return [...childrenIds].sort((a, b) => {
+            const da = (persons[a]?.birth_date || "9999.99.99");
+            const db = (persons[b]?.birth_date || "9999.99.99");
+            if (da !== db) return da.localeCompare(db);
+            return (String(a).match(/^\d+$/) ? parseInt(a, 10) : 0) - (String(b).match(/^\d+$/) ? parseInt(b, 10) : 0);
+        });
+    }
+
+    function getSubtreeWidth(pid) {
+        if (!pid || !persons[pid]) return CARD_W;
+        const p = persons[pid];
+        if (p.collapsed_branches) return blockWidthOnly(p);
+        const kids = sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
+        const bw = blockWidthOnly(p);
+        if (kids.length === 0) return bw;
+        const childWidths = kids.map(k => Math.max(getSubtreeWidth(k), blockWidthOnly(persons[k])));
+        let total = childWidths.reduce((a, b) => a + b, 0);
+        for (let i = 0; i < kids.length - 1; i++) total += gapBetweenSiblings(kids[i], kids[i + 1]);
+        return Math.max(bw, total);
+    }
+
+    // === ПРОХОД 1: РАЗМЕЩЕНИЕ ОТ CENTERId ВНИЗ ===
+    // Используем множество для отслеживания УЖЕ размещённых персон
+    const placed = new Set();
+    
+    function placeSubtree(pid, placeX, yPos, allocatedWidth) {
+        if (!pid || !persons[pid]) {
+            return { left: placeX, right: placeX + CARD_W };
+        }
+        const p = persons[pid];
+
+        // Если уже размещён — НЕ ТРОГАЕМ, возвращаем его текущие границы
+        if (placed.has(pid)) {
+            return { left: coords[pid].x - CARD_W/2, right: coords[pid].x + CARD_W/2, top: coords[pid].y - CARD_H/2, bottom: coords[pid].y + CARD_H/2 };
+        }
+
+        const spouses = (p.spouse_ids || []).filter(s => related.has(s) && persons[s]);
+        const blockWidth = blockWidthOnly(p);
+        const actualWidth = Math.max(allocatedWidth, blockWidth);
+        const blockX = placeX + (actualWidth - blockWidth) / 2;
+
+        // === ПОЗИЦИОНИРОВАНИЕ ПЕРСОНЫ И СУПРУГОВ ===
+        // Сортируем: муж слева, жена справа
+        const allInBlock = [pid, ...spouses].sort((a, b) => {
+            const ga = (persons[a] || {}).gender === "Мужской" ? 0 : 1;
+            const gb = (persons[b] || {}).gender === "Мужской" ? 0 : 1;
+            return ga - gb;
+        });
+
+        let dx = blockX;
+        allInBlock.forEach(id => {
+            if (!placed.has(id)) {
+                coords[id] = { x: dx + CARD_W / 2, y: yPos + CARD_H / 2 };
+                placed.add(id);
+            }
+            dx += spouseStep;
+        });
+
+        // === ПОЗИЦИОНИРОВАНИЕ РОДИТЕЛЕЙ (выше) ===
+        // Размещаем родителей выше текущей персоны
+        const visibleParents = (p.parents || []).filter(pr => related.has(pr) && persons[pr]);
+        if (visibleParents.length > 0) {
+            const parentY = yPos - LEVEL_HEIGHT;
+            const parentWidths = visibleParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
+            let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
+            for (let i = 0; i < visibleParents.length - 1; i++) {
+                totalParentW += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
+            }
+
+            // Центрируем родителей относительно текущего блока
+            const parentCenterX = blockX + blockWidth / 2;
+            let parentX = parentCenterX - totalParentW / 2;
+
+            visibleParents.forEach((pr, i) => {
+                // Если родитель ещё не размещён — размещаем
+                if (!placed.has(pr)) {
+                    const pw = parentWidths[i];
+                    placeSubtree(pr, parentX, parentY, pw);
+                }
+                // Сдвигаем parentX для следующего родителя
+                parentX += parentWidths[i];
+                if (i < visibleParents.length - 1) {
+                    parentX += gapBetweenSiblings(visibleParents[i], visibleParents[i + 1]);
+                }
+            });
+        }
+
+        // === ПОЗИЦИОНИРОВАНИЕ СУПРУГОВ (рядом) ===
+        // Супруги должны быть размещены ВМЕСТЕ с основной персоной в одном блоке
+        spouses.forEach((spouseId, idx) => {
+            if (!placed.has(spouseId)) {
+                // Размещаем супруга справа от последнего в блоке
+                const spouseX = blockX + (idx + 1) * spouseStep;
+                coords[spouseId] = {
+                    x: spouseX + CARD_W / 2,
+                    y: yPos + CARD_H / 2
+                };
+                placed.add(spouseId);
+            }
+        });
+
+        // === ПОЗИЦИОНИРОВАНИЕ ДЕТЕЙ (ниже) ===
+        const kids = p.collapsed_branches ? [] : sortChildren((p.children || []).filter(c => related.has(c) && persons[c]));
+        
+        if (kids.length === 0) {
+            return { left: blockX, right: blockX + blockWidth, top: yPos, bottom: yPos + CARD_H };
+        }
+
+        const childY = yPos + LEVEL_HEIGHT;
+        
+        // Вычисляем центр между родителями для центрирования детей
+        let parentCenterX = blockX + blockWidth / 2;
+        if (visibleParents.length > 0) {
+            const parentKeys = visibleParents.filter(pr => coords[pr]);
+            if (parentKeys.length > 0) {
+                const sumX = parentKeys.reduce((sum, pr) => sum + coords[pr].x, 0);
+                parentCenterX = sumX / parentKeys.length;
+            }
+        }
+
+        const childWidths = kids.map(k => Math.max(getSubtreeWidth(k), blockWidthOnly(persons[k])));
+        let totalChildW = childWidths.reduce((a, b) => a + b, 0);
+        for (let i = 0; i < kids.length - 1; i++) {
+            totalChildW += gapBetweenSiblings(kids[i], kids[i + 1]);
+        }
+
+        let left = blockX, right = blockX + blockWidth, bottom = childY + CARD_H;
+
+        if (kids.length === 1) {
+            // Один ребёнок — центрируем под родителями
+            const cw = childWidths[0];
+            const childBw = blockWidthOnly(persons[kids[0]]);
+            const childResult = placeSubtree(kids[0], parentCenterX - childBw / 2, childY, childBw);
+            
+            // Сдвигаем ребёнка если нужно для точного центрирования
+            if (kids[0] in coords) {
+                const childX = coords[kids[0]].x;
+                const delta = parentCenterX - childX;
+                if (Math.abs(delta) > 0.01) {
+                    coords[kids[0]].x += delta;
+                    // Сдвигаем также супругов ребёнка
+                    const childSpouses = (persons[kids[0]].spouse_ids || []).filter(s => related.has(s) && persons[s] && coords[s]);
+                    childSpouses.forEach(s => {
+                        coords[s].x += delta;
+                    });
+                }
+            }
+            
+            left = Math.min(left, childResult.left);
+            right = Math.max(right, childResult.right);
+            bottom = Math.max(bottom, childResult.bottom);
+        } else {
+            // Несколько детей — симметрично относительно центра
+            let childX = parentCenterX - totalChildW / 2;
+            kids.forEach((kid, i) => {
+                const cw = childWidths[i];
+                const r = placeSubtree(kid, childX, childY, cw);
+                if (r) {
+                    left = Math.min(left, r.left);
+                    right = Math.max(right, r.right);
+                    bottom = Math.max(bottom, r.bottom);
+                }
+                childX += cw;
+                if (i < kids.length - 1) {
+                    childX += gapBetweenSiblings(kids[i], kids[i + 1]);
+                }
+            });
+        }
+
+        return { left, right, top: yPos, bottom };
+    }
+
+    // === ИНИЦИАЛИЗАЦИЯ: НАЧИНАЕМ ОТ CENTERId ===
+    const rootKey = centerId && persons[centerId] && related.has(centerId) ? centerId : (Array.from(related)[0] || Object.keys(persons)[0]);
+
+    // === ПРЕДВАРИТЕЛЬНОЕ РАЗМЕЩЕНИЕ КОРНЕВЫХ ПРЕДКОВ ===
+    // Находим корневых предков НО ТОЛЬКО тех кто в related
+    // related уже отфильтрован visible_persons.js (только один родитель)
+    const rootAncestors = [];
+    for (const pid of related) {
+        const p = persons[pid];
+        if (p && (!p.parents || p.parents.length === 0)) {
+            rootAncestors.push(pid);
+        }
+    }
+    console.log('[CLASSIC] Root ancestors (no parents):', rootAncestors);
+    console.log('[CLASSIC] related size:', related.size, 'persons:', Array.from(related));
+
+    // === ИЗМЕНЕНИЕ: Не размещаем корневых предков в ряд! ===
+    // Вместо этого начинаем от rootKey и позволяем алгоритму естественно разместить всех
+    // Корневые предки будут размещены как родители своих детей
+
+    if (!rootKey || !persons[rootKey]) {
+        // Если нет корневой персоны — размещаем всех подряд
+        let offsetX = 0;
+        for (const pid of related) {
+            if (persons[pid] && !coords[pid]) {
+                coords[pid] = { x: offsetX + CARD_W / 2, y: CARD_H / 2 };
+                offsetX += CARD_W + SIBLING_GAP;
+            }
+        }
+    } else {
+        // === ПРОХОД 1: Размещаем от корня вниз (если не размещён) ===
+        if (!coords[rootKey]) {
+            const canvasWidth = Math.max(800, getSubtreeWidth(rootKey));
+            placeSubtree(rootKey, 0, 50, canvasWidth);
+        }
+    }
+
+    // === ПРОХОД 1.5: ДОРАЗМЕЩЕНИЕ РОДИТЕЛЕЙ ===
+    // Проверяем ВСЕ персоны и размещаем их родителей если они ещё не размещены
+    // Также проверяем супругов - размещаем ИХ родителей тоже
+    let parentsPlaced = 0;
+    
+    for (const pid of related) {
+        const p = persons[pid];
+        if (!p) continue;
+        
+        // Получаем список персон для проверки (сама персона + супруги)
+        const personsToCheck = [pid];
+        if (p.spouse_ids) {
+            p.spouse_ids.forEach(sid => {
+                if (related.has(sid) && persons[sid]) {
+                    personsToCheck.push(sid);
+                }
+            });
+        }
+        
+        // Для каждой персоны проверяем родителей
+        for (const checkPid of personsToCheck) {
+            const checkP = persons[checkPid];
+            if (!checkP || !checkP.parents) continue;
+            
+            // Если у этой персоны ещё нет координат - пропускаем (будет размещена позже)
+            if (!coords[checkPid]) continue;
+            
+            const unplacedParents = (checkP.parents || [])
+                .filter(pr => related.has(pr) && persons[pr] && !coords[pr]);
+            
+            if (unplacedParents.length > 0) {
+                console.log('[CLASSIC] Placing unplaced parents for', checkPid, ':', unplacedParents);
+                parentsPlaced++;
+                
+                const parentY = coords[checkPid].y - LEVEL_HEIGHT;
+                const parentWidths = unplacedParents.map(pr => Math.max(getSubtreeWidth(pr), blockWidthOnly(persons[pr])));
+                let totalParentW = parentWidths.reduce((a, b) => a + b, 0);
+                for (let i = 0; i < unplacedParents.length - 1; i++) {
+                    totalParentW += gapBetweenSiblings(unplacedParents[i], unplacedParents[i + 1]);
+                }
+                let parentX = coords[checkPid].x - totalParentW / 2;
+                unplacedParents.forEach((pr, i) => {
+                    if (!coords[pr]) {
+                        const pw = parentWidths[i];
+                        placeSubtree(pr, parentX, parentY, pw);
+                    }
+                    parentX += parentWidths[i];
+                    if (i < unplacedParents.length - 1) {
+                        parentX += gapBetweenSiblings(unplacedParents[i], unplacedParents[i + 1]);
+                    }
+                });
+            }
+        }
+    }
+    
+    console.log('[CLASSIC] Total parents placed in pass 1.5:', parentsPlaced);
+
+    // === ПРОХОД 2: ДОРАЗМЕЩЕНИЕ СУПРУГОВ ===
+    // Добавляем супругов которые не были размещены
+    let added = 0;
+    let iterations = 0;
+    const maxIterations = related.size * 2;
+    
+    do {
+        added = 0;
+        iterations++;
+        
+        // Через marriages
+        (marriages || []).forEach(m => {
+            let a, b;
+            if (Array.isArray(m)) {
+                [a, b] = m;
+            } else if (m.persons && Array.isArray(m.persons)) {
+                [a, b] = m.persons;
+            }
+            const aStr = String(a), bStr = String(b);
+            
+            if (related.has(aStr) && related.has(bStr) && persons[aStr] && persons[bStr]) {
+                // Если один размещён, а другой нет
+                if (coords[aStr] && !coords[bStr]) {
+                    coords[bStr] = { x: coords[aStr].x + spouseStep, y: coords[aStr].y };
+                    added++;
+                } else if (coords[bStr] && !coords[aStr]) {
+                    coords[aStr] = { x: coords[bStr].x - spouseStep, y: coords[bStr].y };
+                    added++;
+                }
+            }
+        });
+        
+        // Через spouse_ids
+        for (const pid of related) {
+            if (coords[pid] || !persons[pid]) continue;
+            const p = persons[pid];
+            
+            for (const spouseId of (p.spouse_ids || [])) {
+                const sStr = String(spouseId);
+                if (related.has(sStr) && persons[sStr] && coords[sStr] && !coords[pid]) {
+                    coords[pid] = { x: coords[sStr].x + spouseStep, y: coords[sStr].y };
+                    added++;
+                    break;
+                }
+            }
+        }
+    } while (added > 0 && iterations < maxIterations);
+
+    // === ПРОХОД 3: ДОРАЗМЕЩЕНИЕ ОСТАВШИХСЯ ===
+    let layoutOffsetX = 0;
+    let layoutOffsetY = 0;
+    
+    for (const pid of related) {
+        if (!coords[pid] && persons[pid]) {
+            console.log('[CLASSIC] Disconnected person, placing at offset:', pid);
+            coords[pid] = { x: layoutOffsetX + CARD_W / 2, y: layoutOffsetY + CARD_H / 2 };
+            layoutOffsetX += CARD_W * 2;
+        }
+    }
+
+    // === ВЫЧИСЛЕНИЕ ГРАНИЦ ===
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    
+    for (const pid in coords) {
+        if (related.has(pid)) {
+            const pos = coords[pid];
+            minX = Math.min(minX, pos.x - CARD_W / 2);
+            minY = Math.min(minY, pos.y - CARD_H / 2);
+            maxX = Math.max(maxX, pos.x + CARD_W / 2);
+            maxY = Math.max(maxY, pos.y + CARD_H / 2);
+        }
+    }
+    
+    if (!isFinite(minX)) minX = 0;
+    if (!isFinite(minY)) minY = 0;
+    if (!isFinite(maxX)) maxX = CARD_W * 3;
+    if (!isFinite(maxY)) maxY = CARD_H * 3;
+
+    const bounds = { left: minX, top: minY, right: maxX, bottom: maxY };
+    const offsetX = Math.max(0, -bounds.left) + PAD;
+    const offsetY = Math.max(0, -bounds.top) + PAD;
+    const totalW = bounds.right - bounds.left + PAD * 2;
+    const totalH = bounds.bottom - bounds.top + PAD * 2;
+
+    console.log('[CLASSIC] Layout complete:', Object.keys(coords).length, 'persons,', 'bounds:', bounds);
+
+    return { coords, bounds, totalW, totalH, offsetX, offsetY };
 }
 
 function updateStatusBar() {
@@ -1267,40 +1707,30 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     // Изначально transform-origin в 0 0
     wrap.style.transformOrigin = "0 0";
 
-    const applyZoom = (newZoom, centerX, centerY) => {
+    const applyZoom = (newZoom, mouseX, mouseY) => {
         const oldZoom = treeZoom;
         const clampedZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
-        
-        // Если зум не изменился, всё равно обновляем панорамирование для точки
+
+        // Если зум не изменился — ничего не делаем
         if (clampedZoom === oldZoom) {
-            // Даже если зум не изменился, точка должна остаться на месте
-            if (centerX !== undefined && centerY !== undefined) {
-                const contentX = (centerX - treePanX) / oldZoom;
-                const contentY = (centerY - treePanY) / oldZoom;
-                treePanX = centerX - contentX * oldZoom;
-                treePanY = centerY - contentY * oldZoom;
-                panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
-            }
             return;
         }
-        
+
+        // Зум в точку курсора: корректируем panX/panY так, чтобы точка под мышью осталась на месте
+        const scaleChange = clampedZoom / oldZoom;
+        treePanX = mouseX - (mouseX - treePanX) * scaleChange;
+        treePanY = mouseY - (mouseY - treePanY) * scaleChange;
+
         treeZoom = clampedZoom;
+
+        // Убираем transition чтобы зум был мгновенным без плавного смещения
+        panZoomWrapper.style.transition = 'none';
 
         zoomContainer.style.width = (totalW * treeZoom) + "px";
         zoomContainer.style.height = (totalH * treeZoom) + "px";
         wrap.style.transform = `scale(${treeZoom})`;
 
-        // Корректируем панорамирование: точка (centerX, centerY) должна остаться на месте
-        if (centerX !== undefined && centerY !== undefined) {
-            // Координата точки в масштабируемом контенте до зума
-            const contentX = (centerX - treePanX) / oldZoom;
-            const contentY = (centerY - treePanY) / oldZoom;
-
-            // После зума эта точка контента должна быть на (centerX, centerY)
-            treePanX = centerX - contentX * treeZoom;
-            treePanY = centerY - contentY * treeZoom;
-        }
-
+        // Смещаем холст с учётом нового зума
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
     };
 
@@ -1309,10 +1739,11 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
     viewport.addEventListener("wheel", (e) => {
         e.preventDefault();
         const rect = viewport.getBoundingClientRect();
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
+        // Координаты мыши относительно viewport (экрана)
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        applyZoom(treeZoom * factor, cx, cy);
+        applyZoom(treeZoom * factor, mouseX, mouseY);
     }, { passive: false, capture: true });
 
     // Pinch zoom (mobile) - вешаем на panZoomWrapper (работает и на пустом поле)
@@ -1401,10 +1832,24 @@ function setupZoom(panZoomWrapper, zoomContainer, wrap, totalW, totalH) {
 function setupPan(wrap, panZoomWrapper) {
     let active = false, startX, startY, startPanX, startPanY;
     const viewport = wrap.closest("#tree-root");
-    if (!viewport) return;
+    console.log('[PAN] setupPan called, viewport found:', !!viewport, 'wrap:', wrap.className);
+    if (!viewport) {
+        console.error('[PAN] viewport not found! Cannot setup pan.');
+        return;
+    }
 
     const applyPan = () => {
         panZoomWrapper.style.transform = `translate(${treePanX}px,${treePanY}px)`;
+    };
+    
+    // Убираем transition во время перетаскивания
+    const disableTransition = () => {
+        panZoomWrapper.style.transition = 'none';
+    };
+    
+    // Включаем transition для анимации
+    const enableTransition = () => {
+        panZoomWrapper.style.transition = 'transform 0.6s ease-in-out';
     };
 
     const onMove = (e) => {
@@ -1421,6 +1866,7 @@ function setupPan(wrap, panZoomWrapper) {
         document.removeEventListener("mouseup", onUp);
         // Сбрасываем флаг через небольшую задержку, чтобы double-tap не сработал сразу после pan
         setTimeout(() => { window._treeDidPan = false; }, 100);
+        enableTransition(); // Возвращаем transition для анимации
     };
 
     const startPan = (clientX, clientY) => {
@@ -1431,6 +1877,7 @@ function setupPan(wrap, panZoomWrapper) {
         startPanX = treePanX;
         startPanY = treePanY;
         viewport.style.cursor = "grabbing";
+        disableTransition(); // Убираем transition для мгновенной реакции
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
     };
@@ -1457,6 +1904,7 @@ function setupPan(wrap, panZoomWrapper) {
         document.removeEventListener("touchcancel", onTouchEnd);
         // Сбрасываем флаг через небольшую задержку, чтобы double-tap не сработал сразу после pan
         setTimeout(() => { window._treeDidPan = false; }, 100);
+        enableTransition(); // Возвращаем transition для анимации
     };
     const onTouchEnd = stopTouchPan;
     viewport.style.cursor = "grab";
@@ -1488,72 +1936,118 @@ function setupPan(wrap, panZoomWrapper) {
 
 function setCenterAndSave(pid) {
     console.log('[SET_CENTER] Called with pid:', pid);
+    console.log('[SET_CENTER] Person:', treeData.persons[pid]);
+
+    // === ЗАПОМИНАЕМ ЭКРАННЫЕ КООРДИНАТЫ ПЕРСОНЫ ДО ПЕРЕРИСОВКИ ===
+    const oldCoords = treeData._coords || {};
+    const oldPos = oldCoords[pid];
+    const oldBounds = treeData._bounds || { left: 0, right: 0, top: 0, bottom: 0 };
+    const oldOffsetX = Math.max(0, -oldBounds.left) + 60;
+    const oldOffsetY = Math.max(0, -oldBounds.top) + 60;
+    const zoomBefore = treeZoom;
+    
+    // Экранная позиция персоны ДО перерисовки (если персона видима)
+    let screenXBefore = null, screenYBefore = null;
+    if (oldPos && oldPos.x !== undefined) {
+        screenXBefore = (oldPos.x + oldOffsetX) * zoomBefore + treePanX;
+        screenYBefore = (oldPos.y + oldOffsetY) * zoomBefore + treePanY;
+    }
+    console.log('[SET_CENTER] screenBefore:', screenXBefore, screenYBefore);
 
     // === УСТАНАВЛИВАЕМ НОВЫЙ ЦЕНТР ===
     centerId = pid;
     treeData.current_center = pid;
-    
+
     // Сохраняем на сервер
     saveTree();
-    
+
     // Перерисовываем дерево с новым центром
     render();
+
+    console.log('[SET_CENTER] Tree re-rendered, visible persons:', treeData._coords ? Object.keys(treeData._coords).length : 0);
+
+    // === ВЫЧИСЛЯЕМ НОВЫЕ КООРДИНАТЫ ===
+    const persons = treeData.persons;
+    const p = persons[pid];
+    const coords = treeData._coords || {};
+    const pos = coords[pid];
     
-    // На десктопе — плавная анимация перемещения в центр (после рендера)
+    if (!p || !pos || pos.x === undefined) {
+        console.log('[SET_CENTER] Person not found in coords');
+        return;
+    }
+
+    const bounds = treeData._bounds || { left: 0, right: 0, top: 0, bottom: 0 };
+    const offsetX = Math.max(0, -bounds.left) + 60;
+    const offsetY = Math.max(0, -bounds.top) + 60;
+
+    // Если у нас есть экранные координаты ДО, корректируем pan чтобы персона осталась на месте
+    if (screenXBefore !== null) {
+        // Новая экранная позиция с текущим pan (от render())
+        const newScreenX = (pos.x + offsetX) * zoomBefore + treePanX;
+        const newScreenY = (pos.y + offsetY) * zoomBefore + treePanY;
+        
+        // Разница между старой и новой экранной позицией
+        const deltaX = screenXBefore - newScreenX;
+        const deltaY = screenYBefore - newScreenY;
+        
+        // Корректируем pan чтобы персона осталась на том же месте экрана
+        treePanX += deltaX;
+        treePanY += deltaY;
+        
+        console.log('[SET_CENTER] delta:', deltaX, deltaY, 'adjusted pan:', treePanX, treePanY);
+        
+        // Применяем корректировку сразу (без анимации)
+        const panZoomWrapper = document.querySelector('.tree-pan-zoom');
+        if (panZoomWrapper) {
+            panZoomWrapper.style.transition = 'none';
+            panZoomWrapper.style.transform = `translate(${treePanX}px, ${treePanY}px)`;
+        }
+    }
+
+    // === ТЕПЕРЬ ВЫЧИСЛЯЕМ ЦЕЛЕВЫЕ КООРДИНАТЫ ДЛЯ ЦЕНТРИРОВАНИЯ ===
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Целевые координаты: центр экрана минус координаты персоны с учётом зума
+    const targetPanX = (viewportWidth / 2) - (pos.x + offsetX) * zoomBefore;
+    const targetPanY = (viewportHeight / 2) - (pos.y + offsetY) * zoomBefore;
+
+    console.log('[SET_CENTER] panAfter:', treePanX, treePanY, 'targetPan:', targetPanX, targetPanY);
+
+    // На десктопе — плавная анимация перемещения в центр
     if (window.innerWidth > 480) {
-        // Анимация будет в следующем кадре, чтобы render() успел отработать
-        requestAnimationFrame(() => animateToCenter(pid));
+        // Анимация будет в следующем кадре (от ТЕКУЩИХ координат к целевым)
+        requestAnimationFrame(() => animateToCenterTarget(pid, treePanX, treePanY, targetPanX, targetPanY));
+    } else {
+        // На мобильном — сразу центрируем без анимации
+        treePanX = targetPanX;
+        treePanY = targetPanY;
+        const panZoomWrapper = document.querySelector('.tree-pan-zoom');
+        if (panZoomWrapper) {
+            panZoomWrapper.style.transition = 'none';
+            panZoomWrapper.style.transform = `translate(${treePanX}px, ${treePanY}px)`;
+        }
     }
 }
 
 /**
- * Анимация перемещения к центральной персоне (после render())
+ * Анимация перемещения к центральной персоне
+ * @param {string} pid - ID персоны
+ * @param {number} startX - Начальная X координата панорамирования
+ * @param {number} startY - Начальная Y координата панорамирования
+ * @param {number} targetX - Целевая X координата
+ * @param {number} targetY - Целевая Y координата
  */
-function animateToCenter(pid) {
-    const persons = treeData.persons;
-    const p = persons[pid];
-    if (!p) {
-        console.log('[ANIMATE_CENTER] Person not found:', pid);
-        return;
-    }
-
-    // Получаем текущие координаты персоны из render()
-    const coords = treeData._coords || {};
-    const pos = coords[pid];
-    if (!pos) {
-        console.log('[ANIMATE_CENTER] Coords not found for pid:', pid);
-        return;
-    }
-
+function animateToCenterTarget(pid, startX, startY, targetX, targetY) {
     console.log('[ANIMATE_CENTER] Starting animation for pid:', pid);
-
-    // pos.x и pos.y — это координаты центра карточки в пространстве дерева (без учёта pan/zoom)
-    // Нам нужно сместить дерево так, чтобы эта точка оказалась в центре viewport
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Вычисляем bounds как в render()
-    const bounds = treeData._bounds || { left: 0, right: 0, top: 0, bottom: 0 };
-    const offsetX = Math.max(0, -bounds.left) + 60;  // PAD = 60
-    const offsetY = Math.max(0, -bounds.top) + 60;
-
-    // Реальные координаты карточки на холсте с учётом offset и зума
-    const realX = (pos.x + offsetX) * treeZoom;
-    const realY = (pos.y + offsetY) * treeZoom;
-
-    // Целевая точка панорамирования: центр экрана минус реальные координаты карточки
-    const targetPanX = (viewportWidth / 2) - realX;
-    const targetPanY = (viewportHeight / 2) - realY;
-
     console.log('[ANIMATE_CENTER] ======');
-    console.log('[ANIMATE_CENTER] pos.x:', pos.x, 'pos.y:', pos.y);
-    console.log('[ANIMATE_CENTER] realX:', realX, 'realY:', realY);
-    console.log('[ANIMATE_CENTER] targetPanX:', targetPanX, 'targetPanY:', targetPanY);
-    console.log('[ANIMATE_CENTER] current treePanX:', treePanX, 'treePanY:', treePanY);
+    console.log('[ANIMATE_CENTER] start:', startX, startY);
+    console.log('[ANIMATE_CENTER] target:', targetX, targetY);
 
     // Проверяем, нужно ли вообще перемещать
-    const dx = Math.abs(targetPanX - treePanX);
-    const dy = Math.abs(targetPanY - treePanY);
+    const dx = Math.abs(targetX - startX);
+    const dy = Math.abs(targetY - startY);
     if (dx < 1 && dy < 1) {
         console.log('[ANIMATE_CENTER] Already centered, skipping animation');
         return;
@@ -1562,8 +2056,6 @@ function animateToCenter(pid) {
     // Анимация с ускорением и замедлением (ease-in-out)
     const duration = 600; // мс
     const startTime = performance.now();
-    const startX = treePanX;
-    const startY = treePanY;
 
     console.log('[ANIMATE_CENTER] Starting animation, duration:', duration, 'ms');
 
@@ -1576,11 +2068,13 @@ function animateToCenter(pid) {
         const progress = Math.min(elapsed / duration, 1);
         const easedProgress = easeInOutCubic(progress);
 
-        treePanX = startX + (targetPanX - startX) * easedProgress;
-        treePanY = startY + (targetPanY - startY) * easedProgress;
+        treePanX = startX + (targetX - startX) * easedProgress;
+        treePanY = startY + (targetY - startY) * easedProgress;
 
         const panZoomWrapper = document.querySelector('.tree-pan-zoom');
         if (panZoomWrapper) {
+            // Убираем transition для плавной анимации
+            panZoomWrapper.style.transition = 'none';
             panZoomWrapper.style.transform = `translate(${treePanX}px, ${treePanY}px)`;
         }
 
@@ -3050,7 +3544,7 @@ function generatePatronymic(fatherName, childGender) {
 }
 
 function generateNameFromPatronymic(patronymic, gender) {
-    if (!patronymic || !patronymic.trim()) return gender === "Мужской" ? "Неизвестный" : "��������������еизвестная";
+    if (!patronymic || !patronymic.trim()) return gender === "Мужской" ? "Неизвестный" : "Неизвестная";
     const pat = patronymic.trim().toLowerCase();
     const REVERSE = { никитич: "Никита", ильич: "Илья" };
     if (REVERSE[pat]) return REVERSE[pat];
@@ -3834,7 +4328,9 @@ function setupMenubar() {
             } else if (act === "backup-list") {
                 showBackupManager();
             } else if (act === "refresh") {
-loadTree();
+                loadTree();
+            } else if (act === "render-mode") {
+                openRenderModeDialog();
             } else if (act === "zoom-reset") {
                 treeZoom = 1;
                 treePanX = 0;
@@ -4116,6 +4612,85 @@ function openSearchDialog() {
     qInp.focus();
 }
 
+/**
+ * Открывает диалог выбора режима отрисовки
+ */
+function openRenderModeDialog() {
+    const currentMode = getRenderMode();
+    
+    const ov = document.createElement("div");
+    ov.className = "tree-modal-overlay";
+    ov.innerHTML = `
+        <div class="tree-modal tree-render-mode-modal">
+            <h3>🎨 Режим отрисовки</h3>
+            <p style="color: #64748b; font-size: 14px; margin-bottom: 16px;">
+                Выберите способ отображения семейного дерева
+            </p>
+            
+            <div class="render-mode-options">
+                <label class="render-mode-option ${currentMode === 'generations' ? 'active' : ''}">
+                    <input type="radio" name="render-mode" value="generations" ${currentMode === 'generations' ? 'checked' : ''}>
+                    <div class="mode-card">
+                        <div class="mode-icon">🌳</div>
+                        <div class="mode-name">По поколениям</div>
+                        <div class="mode-desc">
+                            Чёткая иерархия: предки сверху, потомки снизу. 
+                            Все в одном поколении на одной линии.
+                        </div>
+                    </div>
+                </label>
+                
+                <label class="render-mode-option ${currentMode === 'classic' ? 'active' : ''}">
+                    <input type="radio" name="render-mode" value="classic" ${currentMode === 'classic' ? 'checked' : ''}>
+                    <div class="mode-card">
+                        <div class="mode-icon">🔀</div>
+                        <div class="mode-name">Классический</div>
+                        <div class="mode-desc">
+                            Традиционное дерево с автоматической 
+                            компоновкой поддеревьев.
+                        </div>
+                    </div>
+                </label>
+            </div>
+            
+            <div class="tree-modal-btns">
+                <button type="button" class="cancel">Отмена</button>
+                <button type="button" class="ok" id="apply-render-mode">Применить</button>
+            </div>
+        </div>`;
+    
+    // Обработчик выбора режима
+    const applyBtn = ov.querySelector("#apply-render-mode");
+    applyBtn.onclick = () => {
+        const selectedMode = ov.querySelector('input[name="render-mode"]:checked')?.value;
+        if (selectedMode && selectedMode !== currentMode) {
+            setRenderMode(selectedMode);
+        }
+        ov.remove();
+    };
+    
+    // Клик по карточке тоже выбирает режим
+    ov.querySelectorAll(".render-mode-option").forEach(option => {
+        option.onclick = (e) => {
+            const radio = option.querySelector('input[type="radio"]');
+            radio.checked = true;
+            ov.querySelectorAll(".render-mode-option").forEach(o => o.classList.remove("active"));
+            option.classList.add("active");
+        };
+    });
+    
+    ov.querySelector(".cancel").onclick = () => ov.remove();
+    ov.querySelector(".tree-modal").onclick = (e) => e.stopPropagation();
+    
+    ov.onclick = (e) => {
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
+        if (e.target === ov) ov.remove();
+    };
+    
+    document.body.appendChild(ov);
+}
+
 function setupDesktopAppButtons() {
     const btnExe = document.getElementById("btn-download-exe");
     const btnOpen = document.getElementById("btn-pwa-open");
@@ -4245,8 +4820,7 @@ function initApp() {
         checkAdminView();
     }
 
-    // Проверка первого запуска
-    checkFirstRun();
+    // ❌ УБРАЛИ checkFirstRun() отсюда - вызовем после загрузки дерева
 }
 
 async function checkAdminView() {

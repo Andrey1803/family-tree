@@ -15,12 +15,8 @@ DEFAULT_SERVER_URL = "https://ravishing-caring-production-3656.up.railway.app"
 CONFIG_FILE = "sync_config.json"
 REMEMBER_FILE = "login_remember.json"
 
-# Учётные данные пользователей
-USER_CREDENTIALS = {
-    "Гость": {"login": "guest", "password": "guest123"},
-    "Емельянов Андрей": {"login": "andrey", "password": "andrey123"},
-    "Андрей Емельянов": {"login": "Андрей Емельянов", "password": "18031981asdF"},  # Правильный пароль
-}
+# Учётные данные не хранятся в коде — только через окно входа / users.json / сервер.
+USER_CREDENTIALS = {}
 
 
 class SyncClient:

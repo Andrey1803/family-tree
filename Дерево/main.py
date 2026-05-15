@@ -17,8 +17,15 @@ _parent = _here.parent
 if str(_parent) not in sys.path:
     sys.path.insert(0, str(_parent))
 
-# Палитра УЖЕ загружена в корневом main.py, просто используем constants
+# === ЗАГРУЖАЕМ ПАЛИТРУ ИЗ ФАЙЛА ПЕРЕД ЗАПУСКОМ ===
 import constants
+saved_palette = constants.load_palette_from_file()
+if saved_palette:
+    constants.apply_palette(saved_palette)
+    print(f"[MAIN] Палитра загружена из файла")
+print(f"[MAIN] MARRIAGE_LINE_COLOR = {constants.MARRIAGE_LINE_COLOR}")
+print(f"[MAIN] CANVAS_BG = {constants.CANVAS_BG}")
+# ================================================
 
 import tkinter as tk
 from tkinter import ttk

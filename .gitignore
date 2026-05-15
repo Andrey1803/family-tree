@@ -7,7 +7,6 @@ __pycache__/
 check_*.py
 check_*.ps1
 verify_*.py
-test_*.py
 get_*.ps1
 git_*.bat
 git_*.ps1
@@ -27,28 +26,24 @@ admin_panel_log.txt
 # Сборки
 dist/
 build/
-build/
-*.spec
-__pycache__/
+*.exe
 
 # IDE
 .idea/
 .vscode/
+.qwen/
 *.swp
 *.swo
 
 # ОС
 Thumbs.db
 .DS_Store
+$null
 
-# Сборки и старые версии (не добавлять в репозиторий)
+# Старые версии и бэкапы (не коммитить)
 FamilyTree_v*/
 _old_versions/
 exe_builds/
-dist/
-build/
-*.exe
-*.spec
 
 # Базы данных и кэш
 *.db
@@ -56,8 +51,19 @@ build/
 *.sqlite
 *.sqlite3
 
-# Локальные конфиги и настройки
+# Данные пользователей (только локально / Railway volume)
+data/
+users.json
+user_settings_*.json
+family_tree*.json
+palette.json
+photos/
 login_remember.json
 window_settings.json
 theme_settings.json
 sync_config.json
+
+# Секреты
+.env
+.env.local
+*.pem

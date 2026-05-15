@@ -13,8 +13,9 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-# Импортируем общие утилиты аутентификации
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Импортируем общие утилиты аутентификации из корня проекта
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _project_root)
 from auth_utils import SUPER_ADMINS, _password_hash, _verify_password
 
 try:
@@ -30,7 +31,15 @@ import sqlite3
 # === КОНФИГУРАЦИЯ ===
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-CORS(app, supports_credentials=True)
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get(
+        "CORS_ORIGINS",
+        "http://127.0.0.1:5000,http://localhost:5000,https://ravishing-caring-production-3656.up.railway.app",
+    ).split(",")
+    if o.strip()
+]
+CORS(app, supports_credentials=True, origins=_cors_origins)
 
 # Пути к данным
 DATA_DIR = os.environ.get("DATA_DIR") or os.path.dirname(os.path.abspath(__file__))

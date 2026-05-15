@@ -288,12 +288,10 @@ class AdminDashboard:
             "admin",  # Резерв
         ]
         
-        # Пароль по умолчанию для Андрея Емельянова
-        default_password = "18031981asdF"
-        
         for login_attempt in login_variants:
-            # Используем введённый пароль или пароль по умолчанию
-            password_to_use = self.password if self.password else default_password
+            password_to_use = self.password
+            if not password_to_use:
+                continue
             
             try:
                 url = f"{SYNC_URL}/api/auth/login"

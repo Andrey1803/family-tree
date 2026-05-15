@@ -1,0 +1,13 @@
+[project]
+name = "family-tree"
+version = "1.3.0"
+description = "Семейное древо — desktop и web"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "Дерево", "web"]
+
+[tool.coverage.run]
+source = ["Дерево", "web"]
+omit = ["tests/*", "scripts/*"]

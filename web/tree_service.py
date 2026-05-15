@@ -4,11 +4,19 @@
 import json
 import os
 
-# Корень проекта
-_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Абсолютный путь к папке данных - как в app.py
+# _web_dir = папка web
+_web_dir = os.path.dirname(os.path.abspath(__file__))
+# _project_root = родительская папка (корень проекта)
+_project_root = os.path.dirname(_web_dir)
 
-# Папка данных. На Railway: DATA_DIR=/data (volume)
-DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(_project_root, "data")
+# DATA_DIR - как в app.py (синхронизировано)
+if os.environ.get("DATA_DIR"):
+    DATA_DIR = os.environ.get("DATA_DIR")
+else:
+    # Локально: cwd может быть web или корень проекта
+    # Используем абсолютный путь относительно _web_dir
+    DATA_DIR = os.path.join(_project_root, "data")
 
 # Создаём папку данных, если её нет
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -64,13 +72,27 @@ def load_tree(username):
         
         marriages_raw = data.get("marriages", [])
         
+        # ОТЛАДКА: покажем, что прочитали
+        print(f"[TREE_SERVICE] Raw marriages from JSON: {marriages_raw[:3] if len(marriages_raw) > 3 else marriages_raw}")
+        print(f"[TREE_SERVICE] Marriages type: {type(marriages_raw)}, first item type: {type(marriages_raw[0]) if marriages_raw else 'N/A'}")
+
         # Валидация marriages
         if not isinstance(marriages_raw, list):
             print(f"[TREE_SERVICE] WARNING: 'marriages' should be list, got {type(marriages_raw)}")
             marriages_raw = []
+
+        # Надёжное чтение браков: поддерживаем форматы [["1","2"], {"persons":["1","2"]}]
+        marriages = []
+        for m in marriages_raw:
+            if isinstance(m, (list, tuple)) and len(m) == 2:
+                marriages.append(list(m))
+            elif isinstance(m, dict) and "persons" in m:
+                persons_list = m["persons"]
+                if isinstance(persons_list, (list, tuple)) and len(persons_list) == 2:
+                    marriages.append(list(persons_list))
         
-        marriages = [tuple(p) for p in marriages_raw if isinstance(p, (list, tuple)) and len(p) == 2]
-        
+        print(f"[TREE_SERVICE] After filter: {len(marriages)} marriages: {marriages[:3] if len(marriages) > 3 else marriages}")
+
         print(f"[TREE_SERVICE] Loaded {len(persons)} persons, {len(marriages)} marriages for {username}")
         
         return {

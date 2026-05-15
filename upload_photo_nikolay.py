@@ -7,9 +7,9 @@ import json
 import base64
 import os
 
-SYNC_URL = "https://ravishing-caring-production-3656.up.railway.app"
-USERNAME = "Андрей Емельянов"
-PASSWORD = "18031981asdF"
+SYNC_URL = os.environ.get("SYNC_SERVER_URL", "https://ravishing-caring-production-3656.up.railway.app")
+USERNAME = os.environ.get("FAMILY_TREE_LOGIN", "")
+PASSWORD = os.environ.get("FAMILY_TREE_PASSWORD", "")
 
 def get_token():
     req = urllib.request.Request(

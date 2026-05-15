@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Flask-приложение «Семейное древо» (web-версия)."""
 
 import json
@@ -69,14 +69,30 @@ SYNC_SERVER_URL = os.environ.get("SYNC_SERVER_URL") or "https://ravishing-caring
 
 app = Flask(__name__)
 
-# Включаем CORS для поддержки кросс-доменных запросов с кук/ами
-# origins="*" с supports_credentials=True требует явного указания доменов
-CORS(app, 
-     supports_credentials=True, 
-     origins=["*"],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     max_age=3600)
+_IS_PRODUCTION = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_PROJECT_ID")
+    or os.environ.get("FLASK_ENV", "").lower() == "production"
+)
+_FLASK_DEBUG = os.environ.get("FLASK_DEBUG", "false" if _IS_PRODUCTION else "true").lower() in (
+    "1", "true", "yes",
+)
+
+# CORS: с credentials нельзя использовать origins="*"
+_default_cors = "http://127.0.0.1:5000,http://localhost:5000"
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get("CORS_ORIGINS", _default_cors).split(",")
+    if o.strip()
+]
+CORS(
+    app,
+    supports_credentials=True,
+    origins=_cors_origins,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    max_age=3600,
+)
 
 # Генерация секретного ключа
 _secret_key = os.environ.get("SECRET_KEY")
@@ -90,9 +106,25 @@ app.secret_key = _secret_key
 
 # Настройки кук сессии для работы с JavaScript fetch() запросами
 app.config["JSON_AS_ASCII"] = False
-app.config["SESSION_COOKIE_SECURE"] = True  # HTTPS на Railway
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("SESSION_COOKIE_SECURE", "true" if _IS_PRODUCTION else "false").lower()
+    in ("1", "true", "yes")
+)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = None  # Разрешить куки на POST запросах из JavaScript
+app.config["SESSION_COOKIE_SAMESITE"] = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+
+# === ЗАГОЛОВКИ КЭШИРОВАНИЯ ДЛЯ СТАТИКИ ===
+@app.after_request
+def add_cache_headers(response):
+    # Для статических файлов добавляем заголовки для кэширования
+    if request.path.startswith('/static/'):
+        # Если есть версия в query параметре (?v=...) - кэшируем надолго
+        if 'v=' in request.query_string.decode():
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        else:
+            # Без версии - не кэшируем
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 # Папка данных. На Railway: DATA_DIR=/data (volume)
 # Если DATA_DIR не установлен — используем папку рядом с web/
@@ -542,12 +574,12 @@ def api_send_code():
     logger.info(f"[API] Login: {login}")
 
     if not email:
-        logger.warning("[API] ❌ Email не указан")
+        logger.warning("[API] [ERROR] Email не указан")
         return jsonify({"error": "Введите email"}), 400
 
     # Проверяем формат email
     if '@' not in email or '.' not in email:
-        logger.warning(f"[API] ❌ Неверный формат email: {email}")
+        logger.warning(f"[API] [ERROR] Неверный формат email: {email}")
         return jsonify({"error": "Неверный формат email"}), 400
 
     # Проверяем, не занят ли email
@@ -562,7 +594,7 @@ def api_send_code():
         with urllib.request.urlopen(req, timeout=5) as resp:
             check_data = json.loads(resp.read().decode())
             if check_data.get('exists'):
-                logger.warning(f"[API] ❌ Email уже зарегистрирован: {email}")
+                logger.warning(f"[API] [ERROR] Email уже зарегистрирован: {email}")
                 return jsonify({"error": "Этот email уже зарегистрирован"}), 400
     except Exception as e:
         logger.error(f"[API] Ошибка проверки email: {e}")
@@ -574,17 +606,17 @@ def api_send_code():
         code = send_verification_code(email)
         logger.info(f"[API] send_verification_code вернул: {'код' if code else 'None'}")
     except Exception as e:
-        logger.error(f"[API] ❌ Исключение в send_verification_code: {type(e).__name__}: {e}")
+        logger.error(f"[API] [ERROR] Исключение в send_verification_code: {type(e).__name__}: {e}")
         code = None
 
     if code:
         # Код отправлен на email (не показываем код на экране)
-        logger.info(f"[API] ✅ Код сгенерирован и отправлен на {email}")
+        logger.info(f"[API] [OK] Код сгенерирован и отправлен на {email}")
         return jsonify({
             "message": "Код отправлен на email"
         }), 200
     else:
-        logger.error(f"[API] ❌ Ошибка при отправке кода для {email}")
+        logger.error(f"[API] [ERROR] Ошибка при отправке кода для {email}")
         return jsonify({"error": "Ошибка отправки кода. Проверьте настройки email."}), 500
 
 
@@ -601,10 +633,10 @@ def api_verify_code():
         return jsonify({"error": "Введите email и код"}), 400
 
     if verify_code(email, code):
-        logger.info(f"[API] ✅ Код подтверждён для {email}")
+        logger.info(f"[API] [OK] Код подтверждён для {email}")
         return jsonify({"message": "Код подтверждён"}), 200
     else:
-        logger.warning(f"[API] ❌ Код не подтверждён для {email}")
+        logger.warning(f"[API] [ERROR] Код не подтверждён для {email}")
         return jsonify({"error": "Неверный код или истёк срок действия"}), 400
 
 
@@ -1137,9 +1169,11 @@ def api_tree():
     # Обработка CORS preflight (OPTIONS) запроса
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "*")
+        origin = request.headers.get("Origin")
+        if origin and origin in _cors_origins:
+            response.headers.add("Access-Control-Allow-Origin", origin)
+            response.headers.add("Access-Control-Allow-Credentials", "true")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         return response, 200
     
@@ -1211,13 +1245,14 @@ def api_tree():
                     print(f"[API_TREE] Error loading tree for {tree_owner}: {e}")
         
         # Обычная загрузка дерева текущего пользователя
-        # Пробуем загрузить с сервера синхронизации
+        # Пробуем загрузить с сервера синхронизации ТОЛЬКО если есть токен
+        use_local = True  # По умолчанию используем локальные данные
+        
         if server_token:
             try:
                 print(f"[API_TREE] Downloading from sync server...")
-                
+
                 # ВАЖНО: Сначала проверяем, что токен соответствует текущему пользователю
-                # Запрашиваем информацию о пользователе на сервере
                 try:
                     me_req = urllib.request.Request(
                         f"{SYNC_SERVER_URL}/api/auth/me",
@@ -1228,18 +1263,20 @@ def api_tree():
                         me_data = json.loads(me_resp.read().decode())
                         server_login = me_data.get('login', '')
                         print(f"[API_TREE] Server login: {server_login}, session username: {username}")
-                        
+
                         # Если логин на сервере не совпадает с сессией — это ошибка!
                         if server_login != username:
                             print(f"[API_TREE] SECURITY: Server login '{server_login}' != session username '{username}'")
-                            print(f"[API_TREE] Clearing session and forcing re-login")
-                            # Очищаем сессию и требуем повторный вход
                             session.clear()
                             return jsonify({"error": "Сессия недействительна. Войдите снова."}), 401
                 except Exception as e:
                     print(f"[API_TREE] Could not verify server login: {e}")
-                    # Если не удалось проверить, продолжаем с осторожностью
-                
+                    # Не удалось проверить токен - используем локальные данные
+                    use_local = True
+
+                if use_local:
+                    raise Exception("Using local data due to auth error")
+
                 req = urllib.request.Request(
                     f"{SYNC_SERVER_URL}/api/sync/download",
                     headers={'Authorization': f'Bearer {server_token}'},
@@ -1250,53 +1287,33 @@ def api_tree():
                     tree_data = data.get('tree', {})
                     persons_count = len(tree_data.get("persons", {}))
                     print(f"[API_TREE] Sync server returned {persons_count} persons")
-                    
-                    # Если сервер вернул пустое дерево, пробуем загрузить локальное
+
+                    # Если сервер вернул пустое дерево, используем локальное
                     if persons_count == 0:
-                        print(f"[API_TREE] Server returned empty tree, trying local file...")
-                        local_data = load_tree(username)
-                        if len(local_data.get("persons", {})) > 0:
-                            print(f"[API_TREE] Loaded {len(local_data['persons'])} persons from local file")
-                            persons = {str(k): v for k, v in local_data.get("persons", {}).items()}
-                            for p in persons.values():
-                                if isinstance(p, dict):
-                                    for k in ("parents", "children", "spouse_ids"):
-                                        if k in p and isinstance(p[k], list):
-                                            p[k] = [str(x) for x in p[k]]
-                            cc = local_data.get("current_center")
-                            return jsonify({
-                                "persons": persons,
-                                "marriages": local_data.get("marriages", []),
-                                "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
-                            })
-                        else:
-                            print(f"[API_TREE] Local file also empty, creating empty tree for {username}")
-                            # Создаём пустое дерево для нового пользователя
-                            empty_tree = {"persons": {}, "marriages": [], "current_center": None}
-                            save_tree(username, empty_tree)
-                    
-                    # Если сервер вернул дерево с персонами, используем его
-                    if persons_count > 0:
-                        persons = {str(k): v for k, v in tree_data.get("persons", {}).items()}
-                        for p in persons.values():
-                            if isinstance(p, dict):
-                                for k in ("parents", "children", "spouse_ids"):
-                                    if k in p and isinstance(p[k], list):
-                                        p[k] = [str(x) for x in p[k]]
-                        cc = tree_data.get("current_center")
-                        marriages = tree_data.get("marriages", [])
-                        print(f"[API_TREE] Marriages from server: {len(marriages)}")
-                        print(f"[API_TREE] Marriages data: {marriages}")
-                        return jsonify({
-                            "persons": persons,
-                            "marriages": marriages,
-                            "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
-                        })
+                        print(f"[API_TREE] Server returned empty tree, using local file")
+                        raise Exception("Empty tree from server")  # Переходим к локальным данным
+
+                    # Сервер вернул данные - используем их
+                    persons = {str(k): v for k, v in tree_data.get("persons", {}).items()}
+                    for p in persons.values():
+                        if isinstance(p, dict):
+                            for k in ("parents", "children", "spouse_ids"):
+                                if k in p and isinstance(p[k], list):
+                                    p[k] = [str(x) for x in p[k]]
+                    cc = tree_data.get("current_center")
+                    marriages = [list(m) if isinstance(m, tuple) else m for m in tree_data.get("marriages", [])]
+                    print(f"[API_TREE] Marriages from server: {len(marriages)}")
+                    return jsonify({
+                        "persons": persons,
+                        "marriages": marriages,
+                        "current_center": str(cc) if cc is not None and str(cc) != "None" else None,
+                    })
             except Exception as e:
-                print(f"[API_TREE] Download from sync server failed: {e}")
+                print(f"[API_TREE] Sync server failed: {e}")
+                print(f"[API_TREE] Falling back to local file")
 
         # Fallback на локальный файл
-        print(f"[API_TREE] Fallback to local file for username='{username}'")
+        print(f"[API_TREE] Loading local file for username='{username}'")
         data = load_tree(username)
         persons_count = len(data.get("persons", {}))
         print(f"[API_TREE] Local file loaded {persons_count} persons for '{username}'")
@@ -1310,8 +1327,9 @@ def api_tree():
                     if k in p and isinstance(p[k], list):
                         p[k] = [str(x) for x in p[k]]
         cc = data.get("current_center")
-        local_marriages = data.get("marriages", [])
-        print(f"[API_TREE] Returning local marriages: {len(local_marriages)}")
+        # Преобразуем кортежи браков в массивы для JSON
+        local_marriages = [list(m) if isinstance(m, tuple) else m for m in data.get("marriages", [])]
+        print(f"[API_TREE] Returning local marriages: {len(local_marriages)} (converted)")
         return jsonify({
             "persons": persons,
             "marriages": local_marriages,
@@ -1319,16 +1337,33 @@ def api_tree():
         })
     
     # POST — сохранить
-    j = request.get_json() or {}
+    print(f"[API_TREE_POST] ===== START SAVE =====")
+    print(f"[API_TREE_POST] Request method: {request.method}")
+    print(f"[API_TREE_POST] Request content-type: {request.content_type}")
+    print(f"[API_TREE_POST] Request data length: {len(request.data) if request.data else 0}")
+    
+    try:
+        j = request.get_json(force=True, silent=True) or {}
+        print(f"[API_TREE_POST] JSON parsed successfully, keys: {list(j.keys())}")
+    except Exception as e:
+        print(f"[API_TREE_POST] Error parsing JSON: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Неверный формат данных"}), 400
+        
     persons = j.get("persons", {})
     marriages = j.get("marriages", [])
     current_center = j.get("current_center")
-    
-    print(f"[API_TREE_POST] Saving tree for {username}: {len(persons)} persons, {len(marriages)} marriages")
 
-    # Сохраняем на сервер синхронизации
+    print(f"[API_TREE_POST] Saving tree for {username}: {len(persons)} persons, {len(marriages)} marriages")
+    print(f"[API_TREE_POST] Current center: {current_center}")
+
+    # Сохраняем на сервер синхронизации (если есть токен)
+    saved_locally = False
+    
     if server_token:
         try:
+            print(f"[API_TREE_POST] Trying to save to sync server...")
             tree_data = {"persons": persons, "marriages": marriages, "current_center": current_center}
             req = urllib.request.Request(
                 f"{SYNC_SERVER_URL}/api/sync/upload",
@@ -1343,20 +1378,34 @@ def api_tree():
                 result = json.loads(response.read().decode())
                 print(f"[API_TREE_POST] Sync server response: {result}")
                 if result.get('success') or result.get('message'):
-                    print(f"[API_TREE_POST] ✅ Saved to sync server")
+                    print(f"[API_TREE_POST] [OK] Saved to sync server")
                     return jsonify({"ok": True})
         except Exception as e:
-            print(f"[API_TREE_POST] ❌ Upload to sync server failed: {e}")
+            print(f"[API_TREE_POST] [ERROR] Upload to sync server failed: {e}")
+            # Не возвращаем ошибку, пробуем сохранить локально
 
     # Fallback на локальный файл
     print(f"[API_TREE_POST] Saving to local file...")
-    out = {"persons": persons, "marriages": marriages, "current_center": current_center}
-    if save_tree(username, out):
-        print(f"[API_TREE_POST] ✅ Saved to local file")
+    try:
+        out = {"persons": persons, "marriages": marriages, "current_center": current_center}
+        save_result = save_tree(username, out)
+        print(f"[API_TREE_POST] save_tree returned: {save_result}")
+        if save_result:
+            print(f"[API_TREE_POST] [OK] Saved to local file")
+            saved_locally = True
+        else:
+            print(f"[API_TREE_POST] [ERROR] save_tree returned False")
+    except Exception as e:
+        print(f"[API_TREE_POST] [ERROR] Error saving locally: {e}")
+        import traceback
+        traceback.print_exc()
+
+    if saved_locally:
+        print(f"[API_TREE_POST] ===== END SAVE SUCCESS =====")
         return jsonify({"ok": True})
-    
-    print(f"[API_TREE_POST] ❌ Failed to save locally")
-    return jsonify({"error": "Ошибка сохранения"}), 500
+    else:
+        print(f"[API_TREE_POST] ===== END SAVE FAILED =====")
+        return jsonify({"error": "Ошибка сохранения"}), 500
 
 
 @app.route("/download/desktop")
@@ -2031,4 +2080,5 @@ if __name__ == "__main__":
     lan_ip = _get_lan_ip()
     if lan_ip:
         print(f"Доступ с других устройств в сети: http://{lan_ip}:5000")
-    app.run(host="0.0.0.0", debug=True, port=5000)
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", debug=_FLASK_DEBUG, port=port)

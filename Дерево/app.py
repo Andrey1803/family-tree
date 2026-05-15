@@ -127,14 +127,6 @@ except ImportError:
     THEME_AVAILABLE = False
     def apply_theme(*args, **kwargs):
         pass
-    def toggle_theme(*args, **kwargs):
-        return 'light'
-    def load_theme():
-        return 'light'
-    def get_theme_name(x):
-        return 'Светлая'
-    def get_theme_colors(x):
-        return {}
 
 class FamilyTreeApp:
     def __init__(self, root, data_file=None, username=None):
@@ -155,15 +147,22 @@ class FamilyTreeApp:
         self.root.title(self.base_title)
         self.modified_indicator = " *"  # Индикатор несохранённых изменений
 
-        # === ПРИМЕНЯЕМ ПАЛИТРУ В САМОМ НАЧАЛЕ (до создания виджетов) ===
-        print(f"[APP.__INIT__] MARRIAGE_LINE_COLOR = {constants.MARRIAGE_LINE_COLOR}")
-        print(f"[APP.__INIT__] CANVAS_BG = {constants.CANVAS_BG}")
+        # === ЗАГРУЖАЕМ ПАЛИТРУ ИЗ ФАЙЛА (ПЕРЕД СОЗДАНИЕМ ВИДЖЕТОВ) ===
+        saved_palette = constants.load_palette_from_file()
+        if saved_palette:
+            constants.apply_palette(saved_palette)
+            if constants.DEBUG_LAYOUT:
+                print(f"[APP.__INIT__] Палитра загружена из файла")
+        if constants.DEBUG_LAYOUT:
+            print(f"[APP.__INIT__] MARRIAGE_LINE_COLOR = {constants.MARRIAGE_LINE_COLOR}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[APP.__INIT__] CANVAS_BG = {constants.CANVAS_BG}")
         # ================================================================
 
         # Авто-синхронизация при запуске (если есть username)
         # ВКЛЮЧЕНО: загрузка дерева с сервера при старте
         if username:
-            self.root.after(1000, self.auto_sync_on_startup)  # Через 1 секунду
+            self.root.after(1000, self.auto_sync_on_startup)
 
         # Создание стилей для кнопок
         style = ttk.Style()
@@ -185,9 +184,11 @@ class FamilyTreeApp:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         # --- ПЕРЕМЕННЫЕ (файл дерева — свой у каждого пользователя) ---
         actual_data_file = data_file or "family_tree.json"
-        print(f"[DEBUG] __init__: data_file={data_file}, actual={actual_data_file}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] __init__: data_file={data_file}, actual={actual_data_file}")
         self.model = FamilyTreeModel(data_file=actual_data_file)
-        print(f"[DEBUG] __init__: model.data_file={self.model.data_file}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] __init__: model.data_file={self.model.data_file}")
         
         # Автосохранение каждые 5 минут
         self.auto_save_interval = 300000  # 5 минут в миллисекундах
@@ -377,7 +378,8 @@ class FamilyTreeApp:
         # --- ЗАГРУЗКА ---
         # СНАЧАЛА загружаем данные из файла
         self.model.load_from_file()
-        print(f"[APP.__INIT__] Загружено {len(self.model.persons)} персон, {len(self.model.marriages)} браков")
+        if constants.DEBUG_LAYOUT:
+            print(f"[APP.__INIT__] Загружено {len(self.model.persons)} персон, {len(self.model.marriages)} браков")
 
         # Если current_center не установлен, но есть персоны с супругами — установить на первую
         if not self.model.current_center:
@@ -464,12 +466,10 @@ class FamilyTreeApp:
         # Сбрасываем режим фокуса (предки видны по умолчанию)
         self.focus_mode_active = False
 
-        # Перерисовка без пересчёта раскладки — выбранная персона остаётся на месте; не центрируем её на экране
-        already_placed = any(str(k) == str(pid) for k in self.coords)
-        if not already_placed:
-            self._skip_centering_once = True
-        self.refresh_view(skip_layout=already_placed)
-        
+        # Перерисовка С ПЕРЕСЧЁТОМ раскладки — при смене центра дерево строится заново
+        self._skip_centering_once = True
+        self.refresh_view(skip_layout=False)
+
         # Плавное центрирование на персоне (как в web-версии)
         self.center_canvas_on_person_animated(pid)
 
@@ -486,74 +486,115 @@ class FamilyTreeApp:
             self.center_label.config(text=f"Центр: {center_person.display_name()}")
         self.edit_person()
 
+    def center_canvas_on_person(self, pid):
+        """
+        Мгновенное центрирование холста на персоне.
+
+        Args:
+            pid: ID персоны
+        """
+        if pid is None or str(pid) not in self.coords:
+            return
+
+        x, y = self.coords[str(pid)]
+
+        try:
+            canvas_width = self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+            bbox = self.canvas.bbox("all")
+
+            if not bbox:
+                return
+
+            bbox_x0, bbox_y0, bbox_x2, bbox_y2 = bbox
+            content_width = bbox_x2 - bbox_x0
+            content_height = bbox_y2 - bbox_y0
+
+            if content_width <= 0 or content_height <= 0:
+                return
+
+            # Вычисляем позицию для центрирования
+            scroll_x = ((x - bbox_x0) - canvas_width / 2) / content_width
+            scroll_y = ((y - bbox_y0) - canvas_height / 2) / content_height
+
+            # Ограничиваем [0, 1]
+            scroll_x = max(0, min(1, scroll_x))
+            scroll_y = max(0, min(1, scroll_y))
+
+            self.canvas.xview_moveto(scroll_x)
+            self.canvas.yview_moveto(scroll_y)
+
+        except Exception as e:
+            print(f"[CENTER] Error: {e}")
+
     def center_canvas_on_person_animated(self, pid, duration=600):
         """
         Плавное центрирование холста на персоне (как в web-версии).
-        
+
         Args:
             pid: ID персоны
             duration: Длительность анимации в мс
         """
         if pid is None or str(pid) not in self.coords:
             return
-        
+
         # Получаем координаты персоны
         x, y = self.coords[str(pid)]
-        
+
         # Получаем размеры холста и контента
         try:
             canvas_width = self.canvas.winfo_width()
             canvas_height = self.canvas.winfo_height()
             bbox = self.canvas.bbox("all")
-            
+
             if not bbox:
                 return
-            
+
             bbox_x0, bbox_y0, bbox_x2, bbox_y2 = bbox
             content_width = bbox_x2 - bbox_x0
             content_height = bbox_y2 - bbox_y0
-            
+
             if content_width <= 0 or content_height <= 0:
                 return
-            
+
             # Вычисляем целевую позицию
             target_scroll_x = ((x - bbox_x0) - canvas_width / 2) / content_width
             target_scroll_y = ((y - bbox_y0) - canvas_height / 2) / content_height
-            
+
             # Ограничиваем [0, 1]
             target_scroll_x = max(0, min(1, target_scroll_x))
             target_scroll_y = max(0, min(1, target_scroll_y))
-            
+
             # Текущая позиция
             start_scroll_x = self.canvas.xview()[0]
             start_scroll_y = self.canvas.yview()[0]
-            
+
             # Проверяем, нужно ли перемещать
             if abs(target_scroll_x - start_scroll_x) < 0.01 and abs(target_scroll_y - start_scroll_y) < 0.01:
                 return
-            
+
             # Анимация
             start_time = self.root.tk.call('clock', 'milliseconds')
-            
+
             def animate():
                 current_time = self.root.tk.call('clock', 'milliseconds')
                 elapsed = current_time - start_time
                 progress = min(elapsed / duration, 1.0)
-                
+
                 # Ease-in-out cubic
                 eased = 4 * progress * progress * progress if progress < 0.5 else 1 - pow(-2 * progress + 2, 3) / 2
-                
+
                 current_scroll_x = start_scroll_x + (target_scroll_x - start_scroll_x) * eased
                 current_scroll_y = start_scroll_y + (target_scroll_y - start_scroll_y) * eased
-                
+
                 self.canvas.xview_moveto(current_scroll_x)
                 self.canvas.yview_moveto(current_scroll_y)
-                
+
                 if progress < 1.0:
                     self.root.after(16, animate)  # ~60 FPS
-            
+
             animate()
-            
+
         except Exception as e:
             print(f"[ANIMATION] Error: {e}")
 
@@ -1548,15 +1589,25 @@ class FamilyTreeApp:
             p.spouse_ids = set(pdata.get('spouse_ids', []))
             self.model.persons[pid] = p
 
-        # === ЗАГРУЖАЕМ БРАКИ ИЗ СЕРВЕРА (список словарей) ===
+        # === ЗАГРУЖАЕМ БРАКИ ИЗ СЕРВЕРА ===
+        # Сервер возвращает в формате: [["1", "4"], ["2", "3"], ...] (список списков)
+        # Либо в формате: [{"persons": ["1", "4"], "date": ""}, ...] (список словарей)
         marriages_loaded = 0
         if marriages_data and isinstance(marriages_data, list):
             for marriage_item in marriages_data:
-                # marriage_item = {'persons': [h_id, w_id], 'date': '...'}
-                persons_in_marriage = marriage_item.get('persons', [])
+                if isinstance(marriage_item, dict):
+                    # Формат словаря: {'persons': [h_id, w_id], 'date': '...'}
+                    persons_in_marriage = marriage_item.get('persons', [])
+                    marriage_date = marriage_item.get('date', '')
+                elif isinstance(marriage_item, (list, tuple)):
+                    # Формат списка: [h_id, w_id] или (h_id, w_id)
+                    persons_in_marriage = marriage_item
+                    marriage_date = ''
+                else:
+                    continue
+
                 if len(persons_in_marriage) == 2:
                     h_id, w_id = str(persons_in_marriage[0]), str(persons_in_marriage[1])
-                    marriage_date = marriage_item.get('date', '')
                     self.model.marriages[(h_id, w_id)] = {'date': marriage_date}
                     marriages_loaded += 1
             print(f"[SYNC_LOAD] Загружено {marriages_loaded} браков из сервера")
@@ -2062,10 +2113,12 @@ class FamilyTreeApp:
         self.refresh_view()
 
     def refresh_view(self, skip_layout=False):
-        print(f"[REFRESH] skip_layout={skip_layout}, units до delete={len(self.units)}, coords={len(self.coords)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[REFRESH] skip_layout={skip_layout}, units до delete={len(self.units)}, coords={len(self.coords)}")
         self.update_adaptive_settings()
         self.canvas.delete("all")
-        print(f"[REFRESH] После delete all, units={len(self.units)}, coords={len(self.coords)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[REFRESH] После delete all, units={len(self.units)}, coords={len(self.coords)}")
 
         persons = self.model.get_all_persons()
         if not persons:
@@ -2131,7 +2184,26 @@ class FamilyTreeApp:
                         if spouse_id in persons:
                             spouses.add(spouse_id)
 
+            # === ОБЪЯВЛЯЕМ visible_set РАНЬШЕ ===
             visible_set = ancestors | descendants | siblings | spouses | {center_pid}
+            
+            # === ИСПРАВЛЕНИЕ: добавляем ВСЕХ супругов из модели браков ===
+            # Это гарантирует, что все супруги будут добавлены, даже если они не в основной области
+            changed = True
+            while changed:
+                changed = False
+                for (h_id, w_id) in self.model.marriages.keys():
+                    # Если один из супругов уже в visible_set, добавляем второго
+                    if h_id in visible_set and w_id not in visible_set and w_id in persons:
+                        spouses.add(w_id)
+                        visible_set.add(w_id)
+                        changed = True
+                    if w_id in visible_set and h_id not in visible_set and h_id in persons:
+                        spouses.add(h_id)
+                        visible_set.add(h_id)
+                        changed = True
+            # === /ИСПРАВЛЕНИЕ ===
+
             visible_set |= set(self.coords.keys())  # все размещённые всегда видимы
             
             # === ИСПРАВЛЕНИЕ: добавляем всех супругов из self.units в visible_set ===
@@ -2386,15 +2458,26 @@ class FamilyTreeApp:
                 scaled_y1 = y1 * self.current_scale + self.offset_y
                 scaled_x2 = x2 * self.current_scale + self.offset_x
                 scaled_y2 = y2 * self.current_scale + self.offset_y
-                # Отладка: проверяем цвет линии
-                print(f"[MARRIAGE_LINE] Цвет: {constants.MARRIAGE_LINE_COLOR}, Ширина: {self.MARRIAGE_LINE_WIDTH * self.current_scale}")
-                self.canvas.create_line(scaled_x1, scaled_y1, scaled_x2, scaled_y2,
-                                        fill=constants.MARRIAGE_LINE_COLOR,
-                                        width=self.MARRIAGE_LINE_WIDTH * self.current_scale,
+                
+                # === ОТЛАДКА: рисуем линию с более ярким цветом и большей шириной ===
+                # Используем ярко-красный для видимости
+                debug_color = "#ff0000"
+                line_width = max(5, self.MARRIAGE_LINE_WIDTH * self.current_scale)
+                if constants.DEBUG_LAYOUT:
+                    print(f"[MARRIAGE_LINE] Цвет: {debug_color}, Ширина: {line_width}")
+                line_id = self.canvas.create_line(scaled_x1, scaled_y1, scaled_x2, scaled_y2,
+                                        fill=debug_color,
+                                        width=line_width,
                                         dash=constants.DEFAULT_MARRIAGE_LINE_DASH,
                                         tags="marriage_line")
+                # Поднимаем линию на передний план
+                self.canvas.tag_raise(line_id)
                 marriage_lines_drawn += 1
-        print(f"[DEBUG] Нарисовано линий супругов: {marriage_lines_drawn}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] Нарисовано линий супругов: {marriage_lines_drawn}")
+        
+        # Поднимаем все супружеские линии на передний план
+        self.canvas.tag_raise("marriage_line")
 
         # === ОБНОВЛЕНИЕ СЧЁТЧИКА ПЕРСОН ===
         total_persons = len(self.model.persons)
@@ -2423,16 +2506,21 @@ class FamilyTreeApp:
             return
 
         marriages = self.model.get_marriages()
-        print(f"[DEBUG] marriages из модели: {marriages}")
-        print(f"[DEBUG] model.persons count: {len(self.model.persons)}")
-        print(f"[DEBUG] model.marriages count: {len(self.model.marriages)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] marriages из модели: {marriages}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] model.persons count: {len(self.model.persons)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] model.marriages count: {len(self.model.marriages)}")
         # Проверка spouse_ids у ВСЕХ персон
         persons_with_spouse = 0
         for pid, p in self.model.persons.items():
             if p.spouse_ids:
-                print(f"[DEBUG] {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
+                if constants.DEBUG_LAYOUT:
+                    print(f"[DEBUG] {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
                 persons_with_spouse += 1
-        print(f"[DEBUG] Персон с супругами: {persons_with_spouse}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] Персон с супругами: {persons_with_spouse}")
 
         # === ШАГ 1: ОПРЕДЕЛЕНИЕ ЦЕНТРА (поиск по нормализованному id из‑за возможного int/str) ===
         center_pid = self.model.current_center
@@ -2710,15 +2798,19 @@ class FamilyTreeApp:
                 total_children_width = sum(child_widths) + total_gaps
 
                 if len(children) == 1:
-                    # Один ребёнок — размещаем, затем сдвигаем весь блок так, чтобы центр карточки ребёнка был строго под центром родителей
+                    # Один ребёнок — размещаем СТРОГО по центру родителя
                     cw = child_widths[0]
                     child_bw = _block_width_only(filtered_persons[children[0]])
+                    # Размещаем ребёнка строго по центру родителя
                     place_subtree(children[0], parent_center_x - child_bw / 2, child_y, child_bw)
+                    # Проверяем, что ребёнок действительно по центру
                     one_child_key = children[0]
                     if one_child_key in self.coords:
                         child_x_now = self.coords[one_child_key][0]
+                        # Если есть отклонение — корректируем
                         delta = parent_center_x - child_x_now
                         if abs(delta) > 0.01:
+                            # Сдвигаем ребёнка и его супругов/семью
                             block_keys = [one_child_key] + list(_display_spouse_ids(filtered_persons[one_child_key]))
                             for k in block_keys:
                                 if k in self.coords:
@@ -2822,21 +2914,28 @@ class FamilyTreeApp:
         # === ШАГ 9: ФОРМИРОВАНИЕ СУПРУЖЕСКИХ ПАР ===
         # ИСПРАВЛЕНО: сохраняем units, если skip_centering=True (не пересчитываем при выборе персоны или перетаскивании)
         if skip_centering:
-            print(f"[DEBUG] skip_centering=True, сохраняем units={len(self.units)}")
+            if constants.DEBUG_LAYOUT:
+                print(f"[DEBUG] skip_centering=True, сохраняем units={len(self.units)}")
         else:
-            print(f"[DEBUG] skip_centering=False, очищаем units перед пересчётом")
+            if constants.DEBUG_LAYOUT:
+                print(f"[DEBUG] skip_centering=False, очищаем units перед пересчётом")
             self.units = {}
-        print(f"[DEBUG] Загружено браков из модели: {len(marriages)}")
-        print(f"[DEBUG] filtered_persons: {len(filtered_persons)}")
-        print(f"[DEBUG] units перед циклом: {len(self.units)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] Загружено браков из модели: {len(marriages)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] filtered_persons: {len(filtered_persons)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] units перед циклом: {len(self.units)}")
         
         # Проверка spouse_ids у персон в filtered_persons
         persons_with_spouse_in_filtered = 0
         for pid, p in filtered_persons.items():
             if p.spouse_ids:
-                print(f"[DEBUG] filtered_persons {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
+                if constants.DEBUG_LAYOUT:
+                    print(f"[DEBUG] filtered_persons {pid} ({p.display_name()}): spouse_ids={p.spouse_ids}")
                 persons_with_spouse_in_filtered += 1
-        print(f"[DEBUG] Персон с супругами в filtered_persons: {persons_with_spouse_in_filtered}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] Персон с супругами в filtered_persons: {persons_with_spouse_in_filtered}")
         
         # marriages — это dict {(id1, id2): {"date": "..."}}, итерируем по ключам
         for marriage_key in sorted(marriages.keys()):
@@ -2857,7 +2956,8 @@ class FamilyTreeApp:
             # === /ИСПРАВЛЕНИЕ ===
             
             if h_id not in filtered_persons or w_id not in filtered_persons:
-                print(f"[DEBUG] Пропущен брак {h_id}-{w_id} (нет в filtered_persons): h_id in filtered={h_id in filtered_persons}, w_id in filtered={w_id in filtered_persons}")
+                if constants.DEBUG_LAYOUT:
+                    print(f"[DEBUG] Пропущен брак {h_id}-{w_id} (нет в filtered_persons): h_id in filtered={h_id in filtered_persons}, w_id in filtered={w_id in filtered_persons}")
                 continue
             p1, p2 = h_id, w_id
             p1_obj = filtered_persons.get(p1)
@@ -2869,11 +2969,15 @@ class FamilyTreeApp:
 
             unit_key = f"{min(p1, p2)}_{max(p1, p2)}"
             self.units[unit_key] = [p1, p2]
-            print(f"[DEBUG] Добавлен брак {unit_key}: {self.units[unit_key]}")
-        print(f"[DEBUG] units после цикла: {len(self.units)}")
-        print(f"[DEBUG] Сформировано units: {len(self.units)}")
+            if constants.DEBUG_LAYOUT:
+                print(f"[DEBUG] Добавлен брак {unit_key}: {self.units[unit_key]}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] units после цикла: {len(self.units)}")
+        if constants.DEBUG_LAYOUT:
+            print(f"[DEBUG] Сформировано units: {len(self.units)}")
         for uk, uv in list(self.units.items())[:5]:
-            print(f"[DEBUG]   {uk}: {uv}")
+            if constants.DEBUG_LAYOUT:
+                print(f"[DEBUG]   {uk}: {uv}")
 
     def _is_ancestor(self, ancestor_id, descendant_id):
         """
@@ -5454,8 +5558,9 @@ class FamilyTreeApp:
         if dark:
             constants.apply_dark_theme()
         else:
-            constants.apply_palette(constants.PALETTE_DEFAULTS)
-        constants.save_palette_to_file()
+            saved = constants.load_palette_from_file()
+            constants.apply_palette(saved if saved else constants.PALETTE_DEFAULTS)
+        # Не перезаписываем palette.json при переключении темы — только через диалог палитры
         
         # Применяем цвета ко всему интерфейсу
         self.apply_ui_colors_from_palette()
@@ -5822,22 +5927,25 @@ class FamilyTreeApp:
         except Exception as e:
             print(f"Sync error: {e}")
 
+    def _parse_date(self, date_str):
+        """Парсит дату в формате dd.mm.yyyy или dd.mm.yy."""
+        if not date_str:
+            return None
+        try:
+            return datetime.strptime(date_str.strip(), "%d.%m.%Y")
+        except ValueError:
+            try:
+                return datetime.strptime(date_str.strip(), "%d.%m.%y")
+            except ValueError:
+                return None
+
     def _calculate_age_and_zodiac(self, birth_date_str, death_date_str=""):
         """
         Рассчитывает возраст и знак зодиака по дате рождения.
         Возвращает кортеж (возраст, знак_зодиака).
         """
-        def parse_date(date_str):
-            """Парсит дату в формате dd.mm.yyyy."""
-            if not date_str:
-                return None
-            try:
-                return datetime.strptime(date_str.strip(), "%d.%m.%Y")
-            except ValueError:
-                try:
-                    return datetime.strptime(date_str.strip(), "%d.%m.%y")
-                except ValueError:
-                    return None
+        birth_date = self._parse_date(birth_date_str)
+        death_date = self._parse_date(death_date_str) if death_date_str else None
         
         def get_zodiac_sign(date):
             """Определяет знак зодиака по дате."""
@@ -5903,19 +6011,7 @@ class FamilyTreeApp:
         Рассчитывает количество лет, прожитых вместе в браке.
         Возвращает строку с количеством лет.
         """
-        def parse_date(date_str):
-            """Парсит дату в формате dd.mm.yyyy."""
-            if not date_str:
-                return None
-            try:
-                return datetime.strptime(date_str.strip(), "%d.%m.%Y")
-            except ValueError:
-                try:
-                    return datetime.strptime(date_str.strip(), "%d.%m.%y")
-                except ValueError:
-                    return None
-        
-        marriage_date = parse_date(marriage_date_str)
+        marriage_date = self._parse_date(marriage_date_str)
         if not marriage_date:
             return ""
         

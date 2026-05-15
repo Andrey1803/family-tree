@@ -15,9 +15,9 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-SYNC_URL = "https://ravishing-caring-production-3656.up.railway.app"
-USERNAME = "Андрей Емельянов"
-PASSWORD = "18031981asdF"
+SYNC_URL = os.environ.get("SYNC_SERVER_URL", "https://ravishing-caring-production-3656.up.railway.app")
+USERNAME = os.environ.get("FAMILY_TREE_LOGIN", "")
+PASSWORD = os.environ.get("FAMILY_TREE_PASSWORD", "")
 PHOTOS_DIR = Path("photos")
 
 def get_token():
@@ -71,7 +71,10 @@ def main():
     print("="*60)
     print("Загрузка всех фото со сжатием")
     print("="*60)
-    
+    if not USERNAME or not PASSWORD:
+        print("Задайте FAMILY_TREE_LOGIN и FAMILY_TREE_PASSWORD в окружении (.env)")
+        return
+
     token = get_token()
     print("\n[1] Скачивание дерева...")
     tree = download_tree(token)

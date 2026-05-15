@@ -278,9 +278,9 @@ docker run -p 8000:8000 -v /path/to/data:/data family-tree-web
 | Проблема | Статус | Файлы |
 |----------|--------|-------|
 | ~~Центрирование при клике~~ | ✅ **ИСПРАВЛЕНА** 11.03.2026 | `Дерево/app.py` (`center_canvas_on_person`) |
-| Палитра не сохраняется | 🔍 | `constants.py`, `app.py` |
-| Нет линий супругов | 🔍 | `constants.py` (MARRIAGE_LINE_COLOR) |
-| Долгая отрисовка (2-5 сек) | ⚠️ | `app.py` |
+| ~~Палитра не сохраняется~~ | ✅ Исправлено: тема не перезаписывает palette.json | `app.py` `toggle_theme` |
+| Нет линий супругов | 🔍 | `constants.py`, web `tree.js` |
+| Долгая отрисовка (2-5 сек) | ⚠️ | `app.py` — включить отладку: `FAMILY_TREE_DEBUG=1` |
 
 ### 📊 ЛОГИ
 

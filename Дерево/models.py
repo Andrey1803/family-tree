@@ -108,6 +108,12 @@ class FamilyTreeModel:
         self.next_id = 1
 
     def get_person(self, pid):
+        if pid is None:
+            return None
+        key = str(pid)
+        person = self.persons.get(key)
+        if person is not None:
+            return person
         return self.persons.get(pid)
 
     @staticmethod
@@ -423,6 +429,7 @@ class FamilyTreeModel:
                 data = json.load(f)
             self.persons = {}
             for pid, pdata in data.get("persons", {}).items():
+                pid = str(pid)
                 p = Person(
                     name=pdata.get("name", ""),
                     surname=pdata.get("surname", ""),
@@ -489,6 +496,19 @@ class FamilyTreeModel:
                             self.persons[w_id].spouse_ids.add(h_id)
                 except Exception as e:
                     print(f"Ошибка загрузки брака {pair}: {e}")
+
+            # === ИСПРАВЛЕНИЕ: восстанавливаем marriages из spouse_ids, если marriages пуст ===
+            if not self.marriages:
+                print("[LOAD] marriages пуст, восстанавливаем из spouse_ids")
+                restored_count = 0
+                for pid, person in self.persons.items():
+                    for spouse_id in person.spouse_ids:
+                        marriage_key = tuple(sorted((pid, spouse_id)))
+                        if marriage_key not in self.marriages:
+                            self.marriages[marriage_key] = {"date": ""}
+                            restored_count += 1
+                print(f"[LOAD] Восстановлено {restored_count} браков из spouse_ids")
+            # === /ИСПРАВЛЕНИЕ ===
 
             center_val = data.get("current_center")
             self.current_center = str(center_val) if center_val and center_val != "None" else None

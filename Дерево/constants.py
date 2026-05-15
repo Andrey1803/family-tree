@@ -5,6 +5,9 @@ import json
 import os
 import sys
 
+# Отладочные print в app.py (FAMILY_TREE_DEBUG=1)
+DEBUG_LAYOUT = os.environ.get("FAMILY_TREE_DEBUG", "").lower() in ("1", "true", "yes")
+
 # URL для проверки обновлений (GitHub API — надёжнее, чем Railway)
 GITHUB_REPO = "Andrey1803/family-tree"
 UPDATE_CHECK_URL = "https://family-tree-production-0e7d.up.railway.app"  # запасной вариант

@@ -10,11 +10,17 @@ from pathlib import Path
 SYNC_URL = "https://ravishing-caring-production-3656.up.railway.app"
 DATA_DIR = Path("data")
 
-# Пользователи и их пароли
-USERS = {
-    "Андрей Емельянов": "18031981asdF",
-    # Добавьте других пользователей при необходимости
-}
+# Логин → пароль из переменных окружения (не хранить в коде)
+# Пример: set FAMILY_TREE_LOGIN=Андрей Емельянов && set FAMILY_TREE_PASSWORD=...
+def _users_from_env():
+    login = os.environ.get("FAMILY_TREE_LOGIN", "").strip()
+    password = os.environ.get("FAMILY_TREE_PASSWORD", "")
+    if login and password:
+        return {login: password}
+    return {}
+
+
+USERS = _users_from_env()
 
 def upload_tree(username, password):
     """Загружает дерево пользователя на сервер."""
