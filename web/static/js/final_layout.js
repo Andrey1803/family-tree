@@ -713,7 +713,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     }
 
     // === POST: фиксируем расстояние между супругами (между центрами = CARD_W + SPOUSE_GAP, как «одна карточка + зазор») ===
-    (function normalizeMarriedCoupleSpacing() {
+    function normalizeMarriedCoupleSpacing() {
         const CENTER_DIST = CARD_W + SPOUSE_GAP; // два соседних блока парного ряда, без искусственного разъезда
 
         function gatherUnitsOnRow(py) {
@@ -761,10 +761,11 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         if (n) {
             console.log('[FINAL] Normalized', n, 'married pairs → fixed center distance', CENTER_DIST, 'px');
         }
-    })();
+    }
+    normalizeMarriedCoupleSpacing();
 
     // === POST: разъезжаем блоки родителей, если горизонтальные «коридоры» связи к детям пересекаются ===
-    (function spreadParentBlocksForconnectorSpans() {
+    function spreadParentBlocksForconnectorSpans() {
         const CONNECTOR_PAD = 10;
         const MIN_GAP = Math.max(FAMILY_GROUP_GAP, 36);
 
@@ -923,10 +924,11 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         if (movedEver) {
             console.log('[FINAL] Parent/block horizontal spread applied (≤25 refinement passes)');
         }
-    })();
+    }
+    spreadParentBlocksForconnectorSpans();
 
     // === POST: зазор между соседними блоками на ряду (пара супругов = один блок, иначе карточки липнут) ===
-    (function separateMarriedClustersOnEachRow() {
+    function separateMarriedClustersOnEachRow() {
         const CARD_EDGE_PAD = 10; // рамка + запас, реальная ширина ближе к «визуальной»
         const MIN_UNIT_GAP = FAMILY_GROUP_GAP + 32;
 
@@ -1015,10 +1017,11 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             if (!any) break;
         }
         console.log('[FINAL] Married-cluster row separation applied');
-    })();
+    }
+    separateMarriedClustersOnEachRow();
 
     // === POST: «развести» соседние семейные группы на ряду детей — сдвиг целого поддерева родителей ===
-    (function enforceChildFamilyIntervalsOnRows() {
+    function enforceChildFamilyIntervalsOnRows() {
         const CLUSTER_PAD = 8;
         const MIN_BETWEEN = Math.max(SIBLING_GAP, FAMILY_GROUP_GAP + 36);
 
@@ -1163,10 +1166,11 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 `[FINAL] Child-family intervals enforced on rows (${movedPasses} passes, gap≥${MIN_BETWEEN}px)`
             );
         }
-    })();
+    }
+    enforceChildFamilyIntervalsOnRows();
 
     // === POST: заново ставим ряд детей под актуальной серединой брака (spread/separate могли сместить родителей) ===
-    (function reAnchorChildrenUnderPlacedParents() {
+    function reAnchorChildrenUnderPlacedParents() {
         function dataParentKey(pid) {
             return (persons[pid].parents || [])
                 .map(String)
@@ -1471,9 +1475,6 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 rg.forEach(entry => {
                     const ex = horizExtentsForCluster(entry.childList, entry.csMap, cryRelax);
                     entry._extent = ex;
-                    entry._centChild =
-                        entry.childList.reduce((s, cid) => s + coords[cid].x, 0) /
-                        Math.max(1, entry.childList.length);
                 });
 
                 rg.sort(
@@ -1487,8 +1488,8 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     if (!ext) return;
                     let lo = ext.lo;
                     let hi = ext.hi;
-                    const centroid = entry._centChild;
-                    let deltaIdeal = entry.midX - centroid;
+                    const clusterMid = (lo + hi) / 2;
+                    let deltaIdeal = entry.midX - clusterMid;
 
                     const next = rg[idx + 1];
                     const nextLo = next && next._extent ? next._extent.lo : Infinity;
@@ -1523,7 +1524,14 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 'groups (+ relax toward marriage mid)'
             );
         }
-    })();
+    }
+    reAnchorChildrenUnderPlacedParents();
+
+    // Вторая волна: spread считался по старым детям; после финального якоря снова разводим родителей
+    // по фактическим коридорам к детям и пересчитываем ряд детей.
+    normalizeMarriedCoupleSpacing();
+    spreadParentBlocksForconnectorSpans();
+    reAnchorChildrenUnderPlacedParents();
 
     // === ПРОВЕРКА ПОСЛЕ РАЗМЕЩЕНИЯ: где кто оказался ===
     console.log('[FINAL] === FINAL COORDINATES CHECK ===');
