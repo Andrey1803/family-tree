@@ -44,6 +44,8 @@ $null
 FamilyTree_v*/
 _old_versions/
 exe_builds/
+.venv/
+venv/
 
 # Базы данных и кэш
 *.db
