@@ -1213,16 +1213,63 @@ function render() {
     
     const childTopOffset = CARD_H / 2;
 
+    /** Полосы для горизонталей: пересекающиеся по X сегменты — на разной высоте */
+    function laneSegmentOverlap(a0, a1, b0, b1) {
+        return !(a1 <= b0 || b1 <= a0);
+    }
+
+    function assignParentConnectorLanes(jobs) {
+        const sorted = [...jobs].sort((a, b) => a.minSpanX - b.minSpanX);
+        const laneIntervals = [];
+        for (const job of sorted) {
+            let L = 0;
+            while (true) {
+                if (!laneIntervals[L]) laneIntervals[L] = [];
+                const clash = laneIntervals[L].some(
+                    ([lo, hi]) => laneSegmentOverlap(job.minSpanX, job.maxSpanX, lo, hi)
+                );
+                if (!clash) {
+                    laneIntervals[L].push([job.minSpanX, job.maxSpanX]);
+                    job.laneIndex = L;
+                    break;
+                }
+                L++;
+            }
+        }
+        const laneCount = laneIntervals.filter(Boolean).length;
+        if (laneCount === 0) return;
+
+        const ref = jobs[0];
+        const parentBottom = ref.parentY + CARD_H / 2;
+        const corridorTop = parentBottom + 3;
+        const minChildTop = Math.min(...jobs.map(j => j.minTopY));
+        const corridorBot = minChildTop - 3;
+        let span = corridorBot - corridorTop;
+        if (span < 4) span = 4;
+
+        let step = Math.min(14, Math.max(4, span / laneCount));
+        let stack = (laneCount - 1) * step;
+        if (stack > span - 2) {
+            step = Math.max(3, (span - 2) / laneCount);
+            stack = (laneCount - 1) * step;
+        }
+        const startY = corridorTop + Math.max(0, (span - stack) / 2);
+
+        jobs.forEach(job => {
+            job.horizLineY = startY + job.laneIndex * step;
+            job.horizLineY = Math.min(corridorBot - 1, Math.max(corridorTop + 1, job.horizLineY));
+        });
+    }
+
+    const connectorJobsByBand = {};
+
     Object.entries(parentSetToChildren).forEach(([parentKey, childPids]) => {
         const first = persons[childPids[0]];
         if (!first || !first.parents) return;
-        
-        // Получаем родителей ПЕРВОГО ребёнка (они должны быть одинаковыми для всех в группе)
+
         let parentPids = (first.parents || []).filter(pid => coords[pid]);
         if (!parentPids.length) return;
 
-        // === ПРОВЕРКА: У всех детей в группе должны быть те же родители ===
-        // Если нет — разделяем на подгруппы по родителям
         const childrenByParents = {};
         childPids.forEach(cid => {
             const child = persons[cid];
@@ -1231,40 +1278,28 @@ function render() {
                 .map(String)
                 .sort()
                 .join('|');
-            
+
             if (!childrenByParents[childParents]) {
                 childrenByParents[childParents] = [];
             }
             childrenByParents[childParents].push(cid);
         });
 
-        // Обрабатываем каждую подгруппу отдельно
         Object.values(childrenByParents).forEach(subGroupChildPids => {
             const subFirst = persons[subGroupChildPids[0]];
             parentPids = (subFirst.parents || []).filter(pid => coords[pid]);
             if (!parentPids.length) return;
 
-            console.log(`[DEBUG] Drawing parent line for parents:`, parentPids, 'children:', subGroupChildPids);
-
-            // === НАХОДИМ СЕРЕДИНУ МЕЖДУ РОДИТЕЛЯМИ ===
             let parentCenterX, parentY, spouseLineY;
             if (parentPids.length >= 2) {
                 const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
-                parentCenterX = (p1.x + p2.x) / 2;  // СЕРЕДИНА между родителями по X
-                parentY = p1.y;  // Оба на одном уровне Y
-
-                // === ЛИНИЯ СУПРУГОВ (между ними) ===
-                const p1RightEdge = p1.x + CARD_W / 2;
-                const p2LeftEdge = p2.x - CARD_W / 2;
-                const spouseLineMidX = (p1RightEdge + p2LeftEdge) / 2;
-                spouseLineY = p1.y;  // На том же уровне что и супруги
-
-                console.log(`[DEBUG] Two parents: p1=(${p1.x},${p1.y}), p2=(${p2.x},${p2.y}), center=${parentCenterX}`);
+                parentCenterX = (p1.x + p2.x) / 2;
+                parentY = p1.y;
+                spouseLineY = p1.y;
             } else {
                 parentCenterX = coords[parentPids[0]].x;
                 parentY = coords[parentPids[0]].y;
                 spouseLineY = parentY;
-                console.log(`[DEBUG] Single parent: (${parentCenterX},${parentY})`);
             }
 
             const childrenCoords = subGroupChildPids
@@ -1275,22 +1310,50 @@ function render() {
                 })
                 .sort((a, b) => a.cx - b.cx);
             if (!childrenCoords.length) return;
+
             const minTopY = Math.min(...childrenCoords.map(t => t.topY));
+            const cx0 = childrenCoords[0].cx;
+            const cx1 = childrenCoords[childrenCoords.length - 1].cx;
+            const minSpanX = Math.min(parentCenterX, cx0) - 2;
+            const maxSpanX = Math.max(parentCenterX, cx1) + 2;
+            const childRowCy = Math.round(childrenCoords[0].cy);
 
-            // Горизонтальная линия НА УРОВНЕ детей (над ними)
-            const horizLineY = (parentY + CARD_H/2 + minTopY) / 2;  // Посередине между родителями и детьми
+            const bandKey = `${parentY}_${childRowCy}`;
+            if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
+            connectorJobsByBand[bandKey].push({
+                parentCenterX,
+                parentY,
+                spouseLineY,
+                parentPids: [...parentPids],
+                childrenCoords,
+                minTopY,
+                minSpanX,
+                maxSpanX,
+            });
+        });
+    });
 
-            console.log(`[DEBUG] horizLineY=${horizLineY}, parentY=${parentY}, minTopY=${minTopY}`);
+    Object.keys(connectorJobsByBand).forEach(bandKey => {
+        assignParentConnectorLanes(connectorJobsByBand[bandKey]);
+    });
 
-            // === ОТРИСОВКА ЛИНИЙ РОДИТЕЛЕЙ ===
-            const parentLineColor = getComputedStyle(document.documentElement)
-                .getPropertyValue('--line-parent').trim() || '#475569';
+    const parentLineColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--line-parent').trim() || '#475569';
 
-            // Вертикальная линия ОТ ЛИНИИ СУПРУГОВ (не от нижнего края!)
-            // spouseLineY — это Y-координата линии между супругами (на уровне центра карточек)
+    Object.keys(connectorJobsByBand).forEach(bandKey => {
+        connectorJobsByBand[bandKey].forEach(job => {
+            const {
+                parentCenterX,
+                spouseLineY,
+                horizLineY,
+                childrenCoords,
+            } = job;
+
+            console.log(`[DEBUG] Parent lines band=${bandKey} horizLineY=${horizLineY.toFixed(1)} span=[${job.minSpanX.toFixed(0)},${job.maxSpanX.toFixed(0)}]`);
+
             const midVertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
             midVertLine.setAttribute("x1", (parentCenterX + offsetX));
-            midVertLine.setAttribute("y1", (spouseLineY + offsetY));  // ✅ ОТ линии супругов
+            midVertLine.setAttribute("y1", (spouseLineY + offsetY));
             midVertLine.setAttribute("x2", (parentCenterX + offsetX));
             midVertLine.setAttribute("y2", (horizLineY + offsetY));
             midVertLine.setAttribute("stroke", parentLineColor);
@@ -1298,9 +1361,9 @@ function render() {
             midVertLine.setAttribute("stroke-linecap", "round");
             svg.appendChild(midVertLine);
 
-            // Горизонталь — от центра родителей до крайних детей (мост при смещении группы)
             const minX = Math.min(parentCenterX, childrenCoords[0].cx);
             const maxX = Math.max(parentCenterX, childrenCoords[childrenCoords.length - 1].cx);
+
             const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
             horizLine.setAttribute("x1", (minX + offsetX));
             horizLine.setAttribute("y1", (horizLineY + offsetY));
@@ -1311,7 +1374,6 @@ function render() {
             horizLine.setAttribute("stroke-linecap", "round");
             svg.appendChild(horizLine);
 
-            // Вертикальные линии к каждому ребёнку
             childrenCoords.forEach(({ cx, topY }) => {
                 const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 childLine.setAttribute("x1", (cx + offsetX));
@@ -1323,8 +1385,8 @@ function render() {
                 childLine.setAttribute("stroke-linecap", "round");
                 svg.appendChild(childLine);
             });
-        }); // Конец обработки подгруппы
-    }); // Конец обработки группы
+        });
+    });
 
     updateStatusBar();
 }
