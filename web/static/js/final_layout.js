@@ -1263,7 +1263,46 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             });
         }
 
+        /** Геометрия блока «ребёнок по mid» без записи в coords */
+        function geomOneFamilyAnchoredMid(midX, childId, spArr) {
+            const order = spouseRowOrderLocal(childId, spArr || []);
+            const k = order.indexOf(childId);
+            if (k < 0) {
+                return { left: midX - CARD_W / 2, width: CARD_W };
+            }
+            const centers = new Array(order.length);
+            centers[k] = midX;
+            for (let j = k - 1; j >= 0; j--) {
+                centers[j] = centers[j + 1] - CARD_W - SPOUSE_GAP;
+            }
+            for (let j = k + 1; j < order.length; j++) {
+                centers[j] = centers[j - 1] + CARD_W + SPOUSE_GAP;
+            }
+            const lo = Math.min(...centers) - CARD_W / 2;
+            const hi = Math.max(...centers) + CARD_W / 2;
+            return { left: lo, width: hi - lo };
+        }
+
+        function resolvePackLeft(idealLeft, groupWidth, occupied, gap) {
+            let start = idealLeft;
+            let guard = 0;
+            while (guard++ < 320) {
+                let hit = false;
+                for (const r of occupied) {
+                    if (rangesOverlap(start, start + groupWidth, r.left, r.right)) {
+                        start = r.right + gap;
+                        hit = true;
+                        break;
+                    }
+                }
+                if (!hit) break;
+            }
+            return start;
+        }
+
         let groups = 0;
+        const PACK_GAP = Math.max(FAMILY_GROUP_GAP + 48, SIBLING_GAP + 32);
+
         layoutRowKeys().forEach(py => {
             const cry = py + LEVEL_HEIGHT;
 
@@ -1283,6 +1322,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 byKey.get(pk).push(cid);
             });
 
+            const rowGroups = [];
             byKey.forEach((childList, pk) => {
                 childList.sort((a, b) => {
                     const da = persons[a]?.birth_date || '9999.99.99';
@@ -1308,26 +1348,55 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
                 const csMap = new Map();
                 childList.forEach(cid => csMap.set(cid, spousesNextToChildOnRow(cid)));
+                rowGroups.push({ pk, childList, midX, csMap });
+            });
 
-                if (childList.length === 1) {
-                    writeOneChildAnchoredMid(midX, cry, childList[0], csMap.get(childList[0]) || []);
-                } else {
-                    const { avgChildCenterFromRowLeft } = childrenRowAvgChildCenterLocal(
-                        childList,
-                        csMap
+            rowGroups.sort((a, b) => a.midX - b.midX);
+            const rowOccupied = [];
+
+            rowGroups.forEach(g => {
+                if (g.childList.length === 1) {
+                    const cid = g.childList[0];
+                    const sp = g.csMap.get(cid) || [];
+                    const geom0 = geomOneFamilyAnchoredMid(g.midX, cid, sp);
+                    const resolvedLeft = resolvePackLeft(
+                        geom0.left,
+                        geom0.width,
+                        rowOccupied,
+                        PACK_GAP
                     );
-                    let x = midX - avgChildCenterFromRowLeft;
-                    childList.forEach((cid, idx) => {
-                        const sp = csMap.get(cid) || [];
+                    const dMid = resolvedLeft - geom0.left;
+                    writeOneChildAnchoredMid(g.midX + dMid, cry, cid, sp);
+                    registerOccupied(resolvedLeft, geom0.width, rowOccupied);
+                } else {
+                    const { avgChildCenterFromRowLeft, totalRowWidth } =
+                        childrenRowAvgChildCenterLocal(g.childList, g.csMap);
+                    const idealLeft = g.midX - avgChildCenterFromRowLeft;
+                    const resolvedLeft = resolvePackLeft(
+                        idealLeft,
+                        totalRowWidth,
+                        rowOccupied,
+                        PACK_GAP
+                    );
+                    let x = resolvedLeft;
+                    g.childList.forEach(cid => {
+                        const sp = g.csMap.get(cid) || [];
                         const bw = writeChildBlockFromLeft(x, cry, cid, sp);
                         x += bw + SIBLING_GAP;
                     });
+                    registerOccupied(resolvedLeft, totalRowWidth, rowOccupied);
                 }
                 groups++;
             });
         });
         if (groups) {
-            console.log('[FINAL] Re-anchored children under parents:', groups, 'parent-keys');
+            console.log(
+                '[FINAL] Re-anchored children under parents (row pack, gap≥',
+                PACK_GAP,
+                '):',
+                groups,
+                'groups'
+            );
         }
     })();
 
