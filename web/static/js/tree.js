@@ -29,6 +29,89 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 3;
 let treeLoaded = false;  // Флаг: дерево загружено
 
+/** Нормализация ID и связей (desktop-совместимость). */
+function normalizeTreeData(data) {
+    const persons = {};
+    Object.entries(data.persons || {}).forEach(([id, p]) => {
+        if (!p) return;
+        persons[String(id)] = {
+            ...p,
+            id: String(p.id != null ? p.id : id),
+            parents: (p.parents || []).map(String),
+            children: (p.children || []).map(String),
+            spouse_ids: (p.spouse_ids || []).map(String),
+        };
+    });
+    const marriages = (data.marriages || []).map(m => {
+        if (Array.isArray(m)) return m.map(String);
+        if (m && m.persons && Array.isArray(m.persons)) return m.persons.map(String);
+        return null;
+    }).filter(m => m && m.length === 2);
+    const cc = data.current_center;
+    return {
+        ...data,
+        persons,
+        marriages,
+        current_center: cc != null && cc !== '' ? String(cc) : null,
+    };
+}
+
+/** Синхронизация marriages ↔ spouse_ids; восстановление из parents при необходимости. */
+function syncTreeRelations(td) {
+    if (!td || !td.persons) return;
+
+    td.marriages = (td.marriages || []).map(m => {
+        if (Array.isArray(m)) return m.map(String);
+        if (m && m.persons && Array.isArray(m.persons)) return m.persons.map(String);
+        return null;
+    }).filter(m => m && m.length === 2);
+
+    if (td.marriages.length === 0) {
+        const pairs = new Set();
+        Object.values(td.persons).forEach(p => {
+            if (!p) return;
+            const parents = (p.parents || []).map(String).filter(pid => td.persons[pid]);
+            if (parents.length >= 2) {
+                const sorted = [parents[0], parents[1]].sort();
+                pairs.add(sorted.join('|'));
+            }
+        });
+        td.marriages = Array.from(pairs).map(s => s.split('|'));
+        if (td.marriages.length) {
+            console.log('[SYNC] Inferred', td.marriages.length, 'marriages from parents');
+        }
+    }
+
+    Object.values(td.persons).forEach(p => { if (p) p.spouse_ids = []; });
+
+    let restored = 0;
+    td.marriages.forEach(([a, b]) => {
+        const idA = String(a), idB = String(b);
+        const pA = td.persons[idA], pB = td.persons[idB];
+        if (pA && pB) {
+            if (!pA.spouse_ids.includes(idB)) pA.spouse_ids.push(idB);
+            if (!pB.spouse_ids.includes(idA)) pB.spouse_ids.push(idA);
+            restored++;
+        }
+    });
+    console.log('[SYNC] Restored', restored, 'spouse relationships from marriages');
+
+    if (td.marriages.length === 0) {
+        const marriageSet = new Set();
+        Object.entries(td.persons).forEach(([id, p]) => {
+            if (p && p.spouse_ids) {
+                p.spouse_ids.forEach(spouseId => {
+                    marriageSet.add([id, String(spouseId)].sort().join('|'));
+                });
+            }
+        });
+        td.marriages = Array.from(marriageSet).map(s => s.split('|'));
+        if (td.marriages.length) {
+            console.log('[SYNC] Restored', td.marriages.length, 'marriages from spouse_ids');
+        }
+    }
+}
+
 // === РЕЖИМ ОТРИСОВКИ ===
 // По умолчанию classic (синхронизирован с desktop-версией)
 let renderMode = localStorage.getItem('family_tree_render_mode') || 'classic'; // 'generations' | 'classic'
@@ -654,63 +737,8 @@ async function loadTree() {
         treeData._username = username;
     }
 
-    // === СИНХРОНИЗАЦИЯ spouse_ids И marriages (как в desktop models.py) ===
-    // Восстанавливаем spouse_ids из marriages
     console.log('[SYNC] Synchronizing spouse_ids with marriages...');
-    const marriages = treeData.marriages || [];
-    
-    // Очищаем spouse_ids у всех персон
-    Object.values(treeData.persons).forEach(p => {
-        if (p) p.spouse_ids = [];
-    });
-    
-    // Восстанавливаем spouse_ids из marriages
-    let restoredCount = 0;
-    marriages.forEach(m => {
-        let a, b;
-        if (Array.isArray(m)) {
-            [a, b] = m;
-        } else if (m.persons && Array.isArray(m.persons)) {
-            [a, b] = m.persons;
-        } else {
-            return;
-        }
-        
-        const idA = String(a), idB = String(b);
-        const pA = treeData.persons[idA];
-        const pB = treeData.persons[idB];
-        
-        if (pA && pB) {
-            if (!pA.spouse_ids.includes(idB)) pA.spouse_ids.push(idB);
-            if (!pB.spouse_ids.includes(idA)) pB.spouse_ids.push(idA);
-            restoredCount++;
-        }
-    });
-    
-    console.log('[SYNC] Restored', restoredCount, 'spouse relationships from marriages');
-    
-    // === ИСПРАВЛЕНИЕ: восстанавливаем marriages из spouse_ids, если marriages пуст ===
-    if (marriages.length === 0 && Object.keys(treeData.persons).length > 0) {
-        console.log('[SYNC] Marriages empty, restoring from spouse_ids...');
-        const marriageSet = new Set();
-        
-        Object.entries(treeData.persons).forEach(([id, p]) => {
-            if (p && p.spouse_ids) {
-                p.spouse_ids.forEach(spouseId => {
-                    const pair = [id, spouseId].sort();
-                    marriageSet.add(pair.join('|'));
-                });
-            }
-        });
-        
-        treeData.marriages = Array.from(marriageSet).map(pairStr => {
-            const [a, b] = pairStr.split('|');
-            return [a, b];
-        });
-        
-        console.log('[SYNC] Restored', treeData.marriages.length, 'marriages from spouse_ids');
-    }
-    // === КОНЕЦ СИНХРОНИЗАЦИИ ===
+    syncTreeRelations(treeData);
 
     // Сохраняем объединённые данные в backup
     treeData._username = username;
@@ -4845,11 +4873,9 @@ async function checkAdminView() {
             console.log('[ADMIN_VIEW] Parsed treeData from localStorage:', treeDataFromStorage);
             console.log('[ADMIN_VIEW] Persons count:', Object.keys(treeDataFromStorage.persons || {}).length);
             
-            // Загружаем данные из localStorage
-            treeData = treeDataFromStorage;
+            treeData = normalizeTreeData(treeDataFromStorage);
             centerId = treeData.current_center;
-            
-            finalizeAdminView(treeDataFromStorage);
+            finalizeAdminView(treeData);
             return;
         } catch (e) {
             console.error('[ADMIN_VIEW] Error parsing localStorage:', e);
@@ -4867,13 +4893,14 @@ async function checkAdminView() {
             console.log('[ADMIN_VIEW] Loaded from /api/tree:', serverData);
             console.log('[ADMIN_VIEW] Persons count from server:', Object.keys(serverData.persons || {}).length);
             
-            treeData = {
+            treeData = normalizeTreeData({
                 persons: serverData.persons || {},
                 marriages: serverData.marriages || [],
-                current_center: serverData.current_center
-            };
+                current_center: serverData.current_center,
+                treeName: urlParams.get('tree_owner'),
+                treeOwner: urlParams.get('tree_owner'),
+            });
             centerId = treeData.current_center || Object.keys(treeData.persons)[0];
-            
             finalizeAdminView(treeData);
         } else {
             console.error('[ADMIN_VIEW] Failed to load from /api/tree:', response.status);

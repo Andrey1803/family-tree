@@ -35,14 +35,20 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     const marriageMap = new Map();  // pid -> [spouse_ids]
     if (Array.isArray(marriages)) {
         marriages.forEach(marriage => {
+            let p1, p2;
             if (Array.isArray(marriage) && marriage.length >= 2) {
-                const p1 = String(marriage[0]);
-                const p2 = String(marriage[1]);
-                if (!marriageMap.has(p1)) marriageMap.set(p1, []);
-                if (!marriageMap.has(p2)) marriageMap.set(p2, []);
-                marriageMap.get(p1).push(p2);
-                marriageMap.get(p2).push(p1);
+                p1 = String(marriage[0]);
+                p2 = String(marriage[1]);
+            } else if (marriage && marriage.persons && marriage.persons.length >= 2) {
+                p1 = String(marriage.persons[0]);
+                p2 = String(marriage.persons[1]);
+            } else {
+                return;
             }
+            if (!marriageMap.has(p1)) marriageMap.set(p1, []);
+            if (!marriageMap.has(p2)) marriageMap.set(p2, []);
+            marriageMap.get(p1).push(p2);
+            marriageMap.get(p2).push(p1);
         });
     }
     console.log('[FINAL] Marriage map built:', marriageMap.size, 'persons with spouses');
