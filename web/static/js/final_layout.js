@@ -668,6 +668,144 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     }
 
     console.log('[FINAL] Placed persons:', Object.keys(coords).length);
+
+    // === POST: разъезжаем блоки родителей, если горизонтальные «коридоры» связи к детям пересекаются ===
+    (function spreadParentBlocksForconnectorSpans() {
+        const CONNECTOR_PAD = 10;
+        const MIN_GAP = Math.max(FAMILY_GROUP_GAP, 36);
+
+        function gatherUnitsOnRow(py) {
+            const onRow = Object.keys(coords).filter(
+                id => Math.abs(coords[id].y - py) < 8
+            );
+            const assigned = new Set();
+            const units = [];
+            for (const pid of onRow) {
+                if (assigned.has(pid)) continue;
+                const spouses = marriageMap.get(pid) || [];
+                const partner = spouses.find(sid =>
+                    onRow.includes(sid) &&
+                    Math.abs(coords[sid].y - py) < 8 &&
+                    !assigned.has(sid)
+                );
+                const ids = partner ? [pid, partner].sort() : [pid];
+                ids.forEach(id => assigned.add(id));
+                units.push({ ids, y: py });
+            }
+            return units;
+        }
+
+        /** Все узлы родителей + их потомки (один общий dx) */
+        function idsInSubtreeStartingFromParents(parentIds) {
+            const out = new Set();
+            const q = [];
+            parentIds.forEach(pid => {
+                if (!related.has(pid) || !coords[pid]) return;
+                if (!out.has(pid)) {
+                    out.add(pid);
+                    q.push(pid);
+                }
+            });
+            while (q.length) {
+                const id = q.shift();
+                for (const c of persons[id].children || []) {
+                    const cid = String(c);
+                    if (!related.has(cid) || !coords[cid] || out.has(cid)) continue;
+                    out.add(cid);
+                    q.push(cid);
+                }
+            }
+            return out;
+        }
+
+        function spanForUnit(unit) {
+            const py = unit.y;
+            const cry = py + LEVEL_HEIGHT;
+            let sum = 0;
+            unit.ids.forEach(id => {
+                sum += coords[id].x;
+            });
+            const parentCx = unit.ids.length ? sum / unit.ids.length : 0;
+
+            const xs = [];
+            const seenKid = new Set();
+            unit.ids.forEach(pid => {
+                (persons[pid].children || []).forEach(c => {
+                    const cid = String(c);
+                    if (!related.has(cid) || !coords[cid]) return;
+                    if (Math.abs(coords[cid].y - cry) > 8) return;
+                    const addX = xx => xs.push(xx);
+                    if (!seenKid.has(cid)) {
+                        seenKid.add(cid);
+                        addX(coords[cid].x);
+                    }
+                    const sps = marriageMap.get(cid) || [];
+                    sps.forEach(sidRaw => {
+                        const sid = String(sidRaw);
+                        if (!related.has(sid) || !coords[sid]) return;
+                        if (Math.abs(coords[sid].y - coords[cid].y) > 8) return;
+                        addX(coords[sid].x);
+                    });
+                });
+            });
+
+            if (xs.length === 0) return null;
+
+            const minC = Math.min(...xs);
+            const maxC = Math.max(...xs);
+            const lo = Math.min(parentCx, minC) - CONNECTOR_PAD;
+            const hi = Math.max(parentCx, maxC) + CONNECTOR_PAD;
+            return { lo, hi, unit };
+        }
+
+        function applyDx(subtreeIds, dx) {
+            if (dx <= 0.01) return;
+            subtreeIds.forEach(id => {
+                if (coords[id]) coords[id].x += dx;
+            });
+        }
+
+        let movedEver = false;
+        for (let iter = 0; iter < 25; iter++) {
+            const rowYs = [...new Set(Object.values(coords).map(p => p.y))]
+                .sort((a, b) => a - b);
+            let movedThisPass = false;
+
+            rowYs.forEach(py => {
+                const cry = py + LEVEL_HEIGHT;
+                const childRowPresent = rowYs.some(ry => Math.abs(ry - cry) < 8);
+                if (!childRowPresent) return;
+
+                const units = gatherUnitsOnRow(py);
+                const spans = [];
+                units.forEach(u => {
+                    const s = spanForUnit(u);
+                    if (s) spans.push(s);
+                });
+                spans.sort((a, b) => a.lo - b.lo);
+
+                let trailingRight = -Infinity;
+                spans.forEach(s => {
+                    if (s.lo < trailingRight + MIN_GAP) {
+                        const dx = trailingRight + MIN_GAP - s.lo;
+                        const subtree = idsInSubtreeStartingFromParents(s.unit.ids);
+                        applyDx(subtree, dx);
+                        movedThisPass = true;
+                        movedEver = true;
+                        trailingRight = s.hi + dx;
+                    } else {
+                        trailingRight = Math.max(trailingRight, s.hi);
+                    }
+                });
+            });
+
+            if (!movedThisPass) break;
+        }
+
+        if (movedEver) {
+            console.log('[FINAL] Parent/block horizontal spread applied (≤25 refinement passes)');
+        }
+    })();
     
     // === ПРОВЕРКА ПОСЛЕ РАЗМЕЩЕНИЯ: где кто оказался ===
     console.log('[FINAL] === FINAL COORDINATES CHECK ===');
