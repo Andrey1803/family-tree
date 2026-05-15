@@ -13,9 +13,13 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-# Импортируем общие утилиты аутентификации из корня проекта
-_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _project_root)
+# auth_utils: в папке sync_server (Railway root) или в корне monorepo (локально)
+_sync_dir = os.path.dirname(os.path.abspath(__file__))
+if _sync_dir not in sys.path:
+    sys.path.insert(0, _sync_dir)
+_repo_root = os.path.dirname(_sync_dir)
+if os.path.isfile(os.path.join(_repo_root, "auth_utils.py")) and _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 from auth_utils import SUPER_ADMINS, _password_hash, _verify_password
 
 try:
