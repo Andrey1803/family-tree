@@ -1273,6 +1273,24 @@ function render() {
     const connectorJobsByBand = {};
     const snapRow = (y) => Math.round(y / LEVEL_HEIGHT) * LEVEL_HEIGHT;
 
+    /** Границы карточки(ок) «ребёнок + супруги на том же ряду» — для ширины горизонтали и полос */
+    function cardBlockLeftRightAtRow(pid) {
+        const c = coords[pid];
+        if (!c) return { left: 0, right: 0, cx: 0 };
+        const row = snapRow(c.y);
+        let left = c.x - CARD_W / 2;
+        let right = c.x + CARD_W / 2;
+        const sps = (persons[pid] && persons[pid].spouse_ids) || [];
+        sps.forEach(sidRaw => {
+            const sid = String(sidRaw);
+            if (!related.has(sid) || !coords[sid]) return;
+            if (snapRow(coords[sid].y) !== row) return;
+            left = Math.min(left, coords[sid].x - CARD_W / 2);
+            right = Math.max(right, coords[sid].x + CARD_W / 2);
+        });
+        return { left, right, cx: c.x };
+    }
+
     Object.entries(parentSetToChildren).forEach(([parentKey, childPids]) => {
         const first = persons[childPids[0]];
         if (!first || !first.parents) return;
@@ -1316,16 +1334,23 @@ function render() {
                 .filter(cid => coords[cid])
                 .map(cid => {
                     const c = coords[cid];
-                    return { cx: c.x, cy: c.y, topY: c.y - childTopOffset };
+                    const bl = cardBlockLeftRightAtRow(cid);
+                    return {
+                        cx: c.x,
+                        cy: c.y,
+                        topY: c.y - childTopOffset,
+                        blockLeft: bl.left,
+                        blockRight: bl.right,
+                    };
                 })
                 .sort((a, b) => a.cx - b.cx);
             if (!childrenCoords.length) return;
 
             const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-            const cx0 = childrenCoords[0].cx;
-            const cx1 = childrenCoords[childrenCoords.length - 1].cx;
-            const minSpanX = Math.min(parentCenterX, cx0) - 2;
-            const maxSpanX = Math.max(parentCenterX, cx1) + 2;
+            const minSpanX =
+                Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft)) - 2;
+            const maxSpanX =
+                Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight)) + 2;
 
             const bandKey = String(snapRow(childrenCoords[0].cy));
             if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
@@ -1370,8 +1395,8 @@ function render() {
             midVertLine.setAttribute("stroke-linecap", "round");
             svg.appendChild(midVertLine);
 
-            const minX = Math.min(parentCenterX, childrenCoords[0].cx);
-            const maxX = Math.max(parentCenterX, childrenCoords[childrenCoords.length - 1].cx);
+            const minX = Math.min(parentCenterX, ...childrenCoords.map(t => t.blockLeft));
+            const maxX = Math.max(parentCenterX, ...childrenCoords.map(t => t.blockRight));
 
             const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
             horizLine.setAttribute("x1", (minX + offsetX));

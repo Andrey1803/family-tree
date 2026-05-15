@@ -14,7 +14,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     const CARD_H = 90;
     const SPOUSE_GAP = 36;
     const SIBLING_GAP = 120;
-    const FAMILY_GROUP_GAP = 48;  // зазор между семьями на одном уровне
+    const FAMILY_GROUP_GAP = 56;  // зазор между семьями на одном уровне (пара шире одной карточки)
     const LEVEL_HEIGHT = 252;
     const PAD = 60;
 
@@ -619,6 +619,14 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
     console.log('[FINAL] Placed persons:', Object.keys(coords).length);
 
+    /** Один логический ряд = уровень (избегаем двойной обработки при чуть разных y) */
+    function snapLayoutRowY(y) {
+        return Math.round(y / LEVEL_HEIGHT) * LEVEL_HEIGHT;
+    }
+    function layoutRowKeys() {
+        return [...new Set(Object.keys(coords).map(id => snapLayoutRowY(coords[id].y)))].sort((a, b) => a - b);
+    }
+
     // === POST: разъезжаем блоки родителей, если горизонтальные «коридоры» связи к детям пересекаются ===
     (function spreadParentBlocksForconnectorSpans() {
         const CONNECTOR_PAD = 10;
@@ -626,21 +634,29 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
         function gatherUnitsOnRow(py) {
             const onRow = Object.keys(coords).filter(
-                id => Math.abs(coords[id].y - py) < 8
+                id => snapLayoutRowY(coords[id].y) === py
             );
             const assigned = new Set();
             const units = [];
             for (const pid of onRow) {
                 if (assigned.has(pid)) continue;
-                const spouses = marriageMap.get(pid) || [];
-                const partner = spouses.find(sid =>
-                    onRow.includes(sid) &&
-                    Math.abs(coords[sid].y - py) < 8 &&
-                    !assigned.has(sid)
-                );
-                const ids = partner ? [pid, partner].sort() : [pid];
-                ids.forEach(id => assigned.add(id));
-                units.push({ ids, y: py });
+                const cset = new Set([pid]);
+                let grow = true;
+                while (grow) {
+                    grow = false;
+                    for (const q of [...cset]) {
+                        for (const sidRaw of marriageMap.get(q) || []) {
+                            const sid = String(sidRaw);
+                            if (!onRow.includes(sid) || cset.has(sid)) continue;
+                            if (snapLayoutRowY(coords[sid].y) === py) {
+                                cset.add(sid);
+                                grow = true;
+                            }
+                        }
+                    }
+                }
+                cset.forEach(id => assigned.add(id));
+                units.push({ ids: [...cset].sort(), y: py });
             }
             return units;
         }
@@ -700,7 +716,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 (persons[pid].children || []).forEach(c => {
                     const cid = String(c);
                     if (!related.has(cid) || !coords[cid]) return;
-                    if (Math.abs(coords[cid].y - cry) > 8) return;
+                    if (snapLayoutRowY(coords[cid].y) !== cry) return;
                     const addX = xx => xs.push(xx);
                     if (!seenKid.has(cid)) {
                         seenKid.add(cid);
@@ -710,7 +726,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     sps.forEach(sidRaw => {
                         const sid = String(sidRaw);
                         if (!related.has(sid) || !coords[sid]) return;
-                        if (Math.abs(coords[sid].y - coords[cid].y) > 8) return;
+                        if (snapLayoutRowY(coords[sid].y) !== snapLayoutRowY(coords[cid].y)) return;
                         addX(coords[sid].x);
                     });
                 });
@@ -734,13 +750,12 @@ function renderFinalLayout(centerId, persons, marriages, related) {
 
         let movedEver = false;
         for (let iter = 0; iter < 25; iter++) {
-            const rowYs = [...new Set(Object.values(coords).map(p => p.y))]
-                .sort((a, b) => a - b);
+            const rowYs = layoutRowKeys();
             let movedThisPass = false;
 
             rowYs.forEach(py => {
                 const cry = py + LEVEL_HEIGHT;
-                const childRowPresent = rowYs.some(ry => Math.abs(ry - cry) < 8);
+                const childRowPresent = rowYs.some(ry => Math.abs(ry - cry) < 4);
                 if (!childRowPresent) return;
 
                 const units = gatherUnitsOnRow(py);
@@ -772,6 +787,98 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         if (movedEver) {
             console.log('[FINAL] Parent/block horizontal spread applied (≤25 refinement passes)');
         }
+    })();
+
+    // === POST: зазор между соседними блоками на ряду (пара супругов = один блок, иначе карточки липнут) ===
+    (function separateMarriedClustersOnEachRow() {
+        const CARD_EDGE_PAD = 10; // рамка + запас, реальная ширина ближе к «визуальной»
+        const MIN_UNIT_GAP = FAMILY_GROUP_GAP + 32;
+
+        function collectDescendantsAndSpousesOnRow(seedCluster) {
+            const out = new Set(seedCluster.filter(id => related.has(id) && coords[id]));
+            const q = [...out];
+            while (q.length) {
+                const id = q.shift();
+                for (const c of persons[id].children || []) {
+                    const cid = String(c);
+                    if (!related.has(cid) || !coords[cid] || out.has(cid)) continue;
+                    out.add(cid);
+                    q.push(cid);
+                }
+            }
+            let spGrow = true;
+            while (spGrow) {
+                spGrow = false;
+                for (const id of [...out]) {
+                    if (!coords[id]) continue;
+                    const y = coords[id].y;
+                    for (const sidRaw of marriageMap.get(id) || []) {
+                        const sid = String(sidRaw);
+                        if (!related.has(sid) || !coords[sid] || out.has(sid)) continue;
+                        if (Math.abs(coords[sid].y - y) <= 12) {
+                            out.add(sid);
+                            spGrow = true;
+                        }
+                    }
+                }
+            }
+            return out;
+        }
+
+        for (let iter = 0; iter < 28; iter++) {
+            let any = false;
+            layoutRowKeys().forEach(yRow => {
+                const ids = Object.keys(coords).filter(id => snapLayoutRowY(coords[id].y) === yRow);
+                if (ids.length < 2) return;
+                ids.sort((a, b) => coords[a].x - coords[b].x);
+
+                const clusters = [];
+                const inCluster = new Set();
+                for (const id of ids) {
+                    if (inCluster.has(id)) continue;
+                    const cset = new Set([id]);
+                    let grow = true;
+                    while (grow) {
+                        grow = false;
+                        for (const pid of [...cset]) {
+                            for (const sidRaw of marriageMap.get(pid) || []) {
+                                const sid = String(sidRaw);
+                                if (!ids.includes(sid) || cset.has(sid)) continue;
+                                if (snapLayoutRowY(coords[sid].y) === snapLayoutRowY(coords[pid].y)) {
+                                    cset.add(sid);
+                                    grow = true;
+                                }
+                            }
+                        }
+                    }
+                    cset.forEach(p => inCluster.add(p));
+                    let lo = Infinity;
+                    let hi = -Infinity;
+                    cset.forEach(p => {
+                        lo = Math.min(lo, coords[p].x - CARD_W / 2 - CARD_EDGE_PAD);
+                        hi = Math.max(hi, coords[p].x + CARD_W / 2 + CARD_EDGE_PAD);
+                    });
+                    clusters.push({ cset, lo, hi });
+                }
+                clusters.sort((u, v) => u.lo - v.lo);
+
+                let trail = -Infinity;
+                clusters.forEach(cl => {
+                    if (cl.lo < trail + MIN_UNIT_GAP) {
+                        const dx = trail + MIN_UNIT_GAP - cl.lo;
+                        collectDescendantsAndSpousesOnRow([...cl.cset]).forEach(pid => {
+                            if (coords[pid]) coords[pid].x += dx;
+                        });
+                        any = true;
+                        cl.lo += dx;
+                        cl.hi += dx;
+                    }
+                    trail = Math.max(trail, cl.hi);
+                });
+            });
+            if (!any) break;
+        }
+        console.log('[FINAL] Married-cluster row separation applied');
     })();
     
     // === ПРОВЕРКА ПОСЛЕ РАЗМЕЩЕНИЯ: где кто оказался ===
