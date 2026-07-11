@@ -1223,61 +1223,136 @@ function render() {
     
     const childTopOffset = CARD_H / 2;
 
-    /** Полосы для горизонталей: пересекающиеся по X сегменты — на разной высоте */
-    function laneSegmentOverlap(a0, a1, b0, b1) {
-        return !(a1 <= b0 || b1 <= a0);
+    /** Полосы для линий родитель→дети: разводим по Y, если сегменты пересекаются */
+    const CONNECTOR_JUNCTION_EPS = 1.5;
+
+    function buildConnectorSegments(job, horizLineY) {
+        const segs = [];
+        const pcx = job.parentCenterX;
+        const y0 = job.spouseLineY;
+        const y1 = horizLineY;
+        if (Math.abs(y1 - y0) > 1e-3) {
+            segs.push({
+                kind: 'v',
+                x: pcx,
+                yLo: Math.min(y0, y1),
+                yHi: Math.max(y0, y1),
+            });
+        }
+        const childXs = job.childrenCoords.map(t => t.cx);
+        const minX = Math.min(pcx, ...childXs);
+        const maxX = Math.max(pcx, ...childXs);
+        if (maxX - minX > 1e-3) {
+            segs.push({ kind: 'h', y: horizLineY, xLo: minX, xHi: maxX });
+        }
+        job.childrenCoords.forEach(({ cx, topY }) => {
+            const yt = topY;
+            const yh = horizLineY;
+            if (Math.abs(yt - yh) > 1e-3) {
+                segs.push({
+                    kind: 'v',
+                    x: cx,
+                    yLo: Math.min(yt, yh),
+                    yHi: Math.max(yt, yh),
+                });
+            }
+        });
+        return segs;
+    }
+
+    function connectorSegmentsCross(a, b) {
+        const eps = CONNECTOR_JUNCTION_EPS;
+        if (a.kind === 'h' && b.kind === 'v') {
+            if (b.x <= a.xLo + eps || b.x >= a.xHi - eps) return false;
+            if (a.y <= b.yLo + eps || a.y >= b.yHi - eps) return false;
+            return true;
+        }
+        if (a.kind === 'v' && b.kind === 'h') return connectorSegmentsCross(b, a);
+        if (a.kind === 'h' && b.kind === 'h') {
+            if (Math.abs(a.y - b.y) > eps) return false;
+            return !(a.xHi <= b.xLo + eps || b.xHi <= a.xLo + eps);
+        }
+        if (a.kind === 'v' && b.kind === 'v') {
+            if (Math.abs(a.x - b.x) > eps) return false;
+            return !(a.yHi <= b.yLo + eps || b.yHi <= a.yLo + eps);
+        }
+        return false;
+    }
+
+    function connectorSegmentsClash(segsA, segsB) {
+        for (const sa of segsA) {
+            for (const sb of segsB) {
+                if (connectorSegmentsCross(sa, sb)) return true;
+            }
+        }
+        return false;
     }
 
     function assignParentConnectorLanes(jobs) {
-        const sorted = [...jobs].sort((a, b) => a.minSpanX - b.minSpanX);
-        const laneIntervals = [];
-        for (const job of sorted) {
-            let L = 0;
-            while (true) {
-                if (!laneIntervals[L]) laneIntervals[L] = [];
-                const clash = laneIntervals[L].some(
-                    ([lo, hi]) => laneSegmentOverlap(job.minSpanX, job.maxSpanX, lo, hi)
-                );
-                if (!clash) {
-                    laneIntervals[L].push([job.minSpanX, job.maxSpanX]);
-                    job.laneIndex = L;
-                    break;
-                }
-                L++;
-            }
-        }
-        const laneIndices = [...new Set(jobs.map(j => j.laneIndex))].sort((a, b) => a - b);
-        const laneCount = laneIndices.length;
-        if (laneCount === 0) return;
+        if (!jobs.length) return;
 
-        const MIN_LANE_SEP = 10;
+        const MIN_LANE_SEP = 12;
+        const LANE_STEP = 3;
         const maxParentBottom = Math.max(...jobs.map(j => j.parentY + CARD_H / 2));
         const minChildTop = Math.min(...jobs.map(j => j.minTopY));
 
-        let corridorTop = maxParentBottom + 3;
-        let corridorBot = minChildTop - 3;
-        let span = corridorBot - corridorTop;
-        const requiredSpan = (laneCount - 1) * MIN_LANE_SEP + 10;
-        if (span < requiredSpan) {
-            const deficit = requiredSpan - span;
+        let corridorTop = maxParentBottom + 4;
+        let corridorBot = minChildTop - 4;
+        const minCorridor = jobs.length * MIN_LANE_SEP + 14;
+        if (corridorBot - corridorTop < minCorridor) {
+            const deficit = minCorridor - (corridorBot - corridorTop);
             corridorTop -= deficit * 0.55;
             corridorBot += deficit * 0.45;
-            span = corridorBot - corridorTop;
         }
-        if (span < 4) span = 4;
 
-        let step = Math.min(16, Math.max(MIN_LANE_SEP, span / Math.max(laneCount, 1)));
-        let stack = (laneCount - 1) * step;
-        if (stack > span - 2) {
-            step = Math.max(MIN_LANE_SEP, (span - 2) / Math.max(laneCount, 1));
-            stack = (laneCount - 1) * step;
-        }
-        const startY = corridorTop + Math.max(0, (span - stack) / 2);
+        const sorted = [...jobs].sort(
+            (a, b) => (a.maxSpanX - a.minSpanX) - (b.maxSpanX - b.minSpanX)
+        );
+        const placedSegs = [];
 
-        jobs.forEach(job => {
-            job.horizLineY = startY + job.laneIndex * step;
-            job.horizLineY = Math.min(corridorBot - 1, Math.max(corridorTop + 1, job.horizLineY));
+        sorted.forEach((job, idx) => {
+            let placed = false;
+            const fallbackY = corridorTop
+                + ((idx + 1) / (jobs.length + 1)) * Math.max(8, corridorBot - corridorTop);
+
+            for (let trialY = corridorTop + 4; trialY <= corridorBot - 4; trialY += LANE_STEP) {
+                const segs = buildConnectorSegments(job, trialY);
+                if (!connectorSegmentsClash(segs, placedSegs)) {
+                    job.horizLineY = trialY;
+                    placedSegs.push(...segs);
+                    placed = true;
+                    break;
+                }
+            }
+
+            if (!placed) {
+                job.horizLineY = Math.min(corridorBot - 2, Math.max(corridorTop + 2, fallbackY));
+                placedSegs.push(...buildConnectorSegments(job, job.horizLineY));
+            }
         });
+
+        for (let pass = 0; pass < 12; pass++) {
+            let changed = false;
+            for (const job of sorted) {
+                const otherSegs = [];
+                jobs.forEach(j => {
+                    if (j === job) return;
+                    otherSegs.push(...buildConnectorSegments(j, j.horizLineY));
+                });
+                const cur = buildConnectorSegments(job, job.horizLineY);
+                if (!connectorSegmentsClash(cur, otherSegs)) continue;
+
+                for (let trialY = corridorTop + 4; trialY <= corridorBot - 4; trialY += LANE_STEP) {
+                    const trial = buildConnectorSegments(job, trialY);
+                    if (!connectorSegmentsClash(trial, otherSegs)) {
+                        job.horizLineY = trialY;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (!changed) break;
+        }
     }
 
     const connectorJobsByBand = {};
