@@ -103,13 +103,12 @@ def auth_check(login: str, password: str) -> bool:
                 print(f"[AUTH] Server error: {data['error']}")
                 return False
     except urllib.error.HTTPError as e:
-        # HTTP ошибка (401, 403, etc.) — неверный логин/пароль
         try:
-            error_data = json.loads(e.read().decode())
-            print(f"[AUTH] HTTP Error {e.code}: {error_data.get('error', 'Unknown')}")
+            body = e.read().decode()
+            error_data = json.loads(body) if body else {}
+            print(f"[AUTH] HTTP Error {e.code}: {error_data.get('error', body[:200] or 'Unknown')} — trying local")
         except Exception:
-            print(f"[AUTH] HTTP Error {e.code}")
-        return False
+            print(f"[AUTH] HTTP Error {e.code} — trying local")
     except urllib.error.URLError as e:
         # Проблема с подключением к серверу
         print(f"[AUTH] URL Error: {e.reason} — trying local")

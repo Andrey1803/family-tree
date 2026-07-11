@@ -245,9 +245,13 @@ def auth_check(login: str, password: str) -> bool:
                 print(f"[AUTH] Server error: {data['error']}")
                 return False
     except urllib.error.HTTPError as e:
-        # HTTP 401 — неверный пароль
-        print(f"[AUTH] Server HTTP {e.code}: неверный логин/пароль")
-        return False
+        # 401/403 — неверные данные на сервере; 5xx — сервер недоступен. Пробуем локально.
+        try:
+            body = e.read().decode()
+            error_data = json.loads(body) if body else {}
+            print(f"[AUTH] Server HTTP {e.code}: {error_data.get('error', body[:200] or e.reason)} — trying local")
+        except Exception:
+            print(f"[AUTH] Server HTTP {e.code} — trying local")
     except urllib.error.URLError as e:
         print(f"[AUTH] Server URL Error: {e.reason} — trying local")
         pass  # Пробуем локально

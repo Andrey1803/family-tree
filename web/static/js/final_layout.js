@@ -171,51 +171,86 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         });
     }
     
-    // === 1.5. ДОБАВЛЯЕМ ОСТАЛЬНЫХ ===
-    // Добавляем только тех, кто не был добавлен и не является предком по женской линии
-    const remaining = Array.from(related).filter(pid => {
-        if (!visited.has(pid) && persons[pid]) {
-            const person = persons[pid];
-            const isFemale = person.gender === 'Женский';
-
-            // Проверяем, является ли эта персона предком по женской линии
-            if (person.children) {
-                for (const childId of person.children) {
-                    const child = persons[childId];
-                    if (child && child.gender === 'Женский' && String(childId) !== String(centerId)) {
-                        // Эта персона - родитель женской персоны (не центр)
-                        // Скрываем по правилу 1
-                        console.log('[FINAL] Skipping ancestor of female:', pid, '→', childId);
-                        return false;
-                    }
-                }
-            }
-
-            // Проверяем, является ли эта персона предком супруга центральной женской персоны
-            if (isCenterFemale && centerSpouseId && person.children) {
-                for (const childId of person.children) {
-                    if (String(childId) === String(centerSpouseId)) {
-                        // Эта персона - родитель супруга центральной женской персоны
-                        // Скрываем по правилу 3
-                        console.log('[FINAL] Skipping ancestor of center spouse:', pid, '→', centerSpouseId);
-                        return false;
-                    }
-                }
-            }
-
-            return true;
+    // === 1.5. ДОБАВЛЯЕМ ОСТАЛЬНЫХ ИЗ visible_persons ===
+    // BFS может не дойти до предков по женской линии, но если они в related — размещаем.
+    function findPersonLevel(pid) {
+        const key = String(pid);
+        for (const [level, pids] of levels) {
+            if (pids.includes(key)) return level;
         }
-        return false;
-    });
+        return null;
+    }
+
+    function inferLevelForRemaining(pid) {
+        const person = persons[pid];
+        if (!person) return 0;
+
+        let fromChild = null;
+        if (person.children) {
+            for (const childId of person.children) {
+                const childStr = String(childId);
+                if (!related.has(childStr)) continue;
+                const childLevel = findPersonLevel(childStr);
+                if (childLevel !== null) {
+                    const candidate = childLevel - 1;
+                    fromChild = fromChild === null ? candidate : Math.min(fromChild, candidate);
+                }
+            }
+        }
+
+        let fromParent = null;
+        if (person.parents) {
+            for (const parentId of person.parents) {
+                const parentStr = String(parentId);
+                if (!related.has(parentStr)) continue;
+                const parentLevel = findPersonLevel(parentStr);
+                if (parentLevel !== null) {
+                    const candidate = parentLevel + 1;
+                    fromParent = fromParent === null ? candidate : Math.max(fromParent, candidate);
+                }
+            }
+        }
+
+        const spouses = marriageMap.get(String(pid)) || [];
+        for (const spId of spouses) {
+            const spouseLevel = findPersonLevel(spId);
+            if (spouseLevel !== null) return spouseLevel;
+        }
+
+        if (fromChild !== null && fromParent !== null) {
+            return Math.min(fromChild, fromParent);
+        }
+        if (fromChild !== null) return fromChild;
+        if (fromParent !== null) return fromParent;
+        return 0;
+    }
+
+    const remaining = Array.from(related).filter(pid => !visited.has(pid) && persons[pid]);
     console.log('[FINAL] Remaining persons:', remaining.length);
 
     if (remaining.length > 0) {
-        // Размещаем их на уровне 0 справа от остальных
-        if (!levels.has(0)) levels.set(0, []);
+        for (let pass = 0; pass < 8; pass++) {
+            let placedThisPass = 0;
+            for (const pid of remaining) {
+                if (findPersonLevel(pid) !== null) continue;
+                const level = inferLevelForRemaining(pid);
+                if (!levels.has(level)) levels.set(level, []);
+                const key = String(pid);
+                if (!levels.get(level).includes(key)) {
+                    levels.get(level).push(key);
+                    placedThisPass++;
+                    console.log('[FINAL] Remaining placed:', pid, persons[pid]?.name, '→ level', level);
+                }
+            }
+            if (!placedThisPass) break;
+        }
         remaining.forEach(pid => {
-            // === ПРОВЕРКА: не добавлен ли уже на этот уровень ===
-            if (!levels.get(0).includes(pid)) {
-                levels.get(0).push(pid);
+            if (findPersonLevel(pid) !== null) return;
+            if (!levels.has(0)) levels.set(0, []);
+            const key = String(pid);
+            if (!levels.get(0).includes(key)) {
+                levels.get(0).push(key);
+                console.log('[FINAL] Remaining fallback level 0:', pid, persons[pid]?.name);
             }
         });
     }

@@ -16,12 +16,16 @@ SUPER_ADMINS = ["admin", "Андрей Емельянов"]
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
 
+def _legacy_sha256_hash(login: str, password: str) -> str:
+    raw = (AUTH_SALT + login + password).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _password_hash(login: str, password: str) -> str:
     if BCRYPT_AVAILABLE:
         salt = bcrypt.gensalt(rounds=12)
         return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-    raw = (AUTH_SALT + login + password).encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
+    return _legacy_sha256_hash(login, password)
 
 
 def _verify_password(login: str, password: str, stored_data) -> bool:
@@ -42,7 +46,7 @@ def _verify_password(login: str, password: str, stored_data) -> bool:
             except Exception:
                 return False
         return False
-    return _password_hash(login, password) == stored_hash
+    return _legacy_sha256_hash(login, password) == stored_hash
 
 
 def _load_users(users_file: str) -> Dict[str, str]:

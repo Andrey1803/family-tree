@@ -19,6 +19,12 @@ SUPER_ADMINS = ["admin", "Андрей Емельянов"]
 AUTH_SALT = "FamilyTreeApp_Salt_v1"
 
 
+def _legacy_sha256_hash(login: str, password: str) -> str:
+    """SHA256-хеш для старых записей в users.json."""
+    raw = (AUTH_SALT + login + password).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _password_hash(login: str, password: str) -> str:
     """
     Хеширует пароль.
@@ -31,8 +37,7 @@ def _password_hash(login: str, password: str) -> str:
         return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
     else:
         # Fallback для обратной совместимости
-        raw = (AUTH_SALT + login + password).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
+        return _legacy_sha256_hash(login, password)
 
 
 def _verify_password(login: str, password: str, stored_data) -> bool:
@@ -62,8 +67,8 @@ def _verify_password(login: str, password: str, stored_data) -> bool:
                 return False
         return False
     else:
-        # SHA256 хеш (локальный формат)
-        return _password_hash(login, password) == stored_hash
+        # SHA256 хеш (локальный формат) — не смешивать с bcrypt при проверке
+        return _legacy_sha256_hash(login, password) == stored_hash
 
 
 def _load_users(users_file: str) -> Dict[str, str]:
