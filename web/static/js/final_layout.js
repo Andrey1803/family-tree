@@ -780,46 +780,6 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return units;
         }
 
-        /** Все узлы родителей + их потомки (один общий dx) */
-        function idsInSubtreeStartingFromParents(parentIds) {
-            const out = new Set();
-            const q = [];
-            parentIds.forEach(pid => {
-                if (!related.has(pid) || !coords[pid]) return;
-                if (!out.has(pid)) {
-                    out.add(pid);
-                    q.push(pid);
-                }
-            });
-            while (q.length) {
-                const id = q.shift();
-                for (const c of persons[id].children || []) {
-                    const cid = String(c);
-                    if (!related.has(cid) || !coords[cid] || out.has(cid)) continue;
-                    out.add(cid);
-                    q.push(cid);
-                }
-            }
-
-            let spChanged = true;
-            while (spChanged) {
-                spChanged = false;
-                for (const id of [...out]) {
-                    if (!coords[id]) continue;
-                    const y = coords[id].y;
-                    for (const sidRaw of marriageMap.get(id) || []) {
-                        const sid = String(sidRaw);
-                        if (!related.has(sid) || !coords[sid] || out.has(sid)) continue;
-                        if (Math.abs(coords[sid].y - y) <= 12) {
-                            out.add(sid);
-                            spChanged = true;
-                        }
-                    }
-                }
-            }
-            return out;
-        }
-
         function spanForUnit(unit) {
             const py = unit.y;
             const cry = py + LEVEL_HEIGHT;
@@ -836,18 +796,10 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     const cid = String(c);
                     if (!related.has(cid) || !coords[cid]) return;
                     if (snapLayoutRowY(coords[cid].y) !== cry) return;
-                    const addX = xx => xs.push(xx);
                     if (!seenKid.has(cid)) {
                         seenKid.add(cid);
-                        addX(coords[cid].x);
+                        xs.push(coords[cid].x);
                     }
-                    const sps = marriageMap.get(cid) || [];
-                    sps.forEach(sidRaw => {
-                        const sid = String(sidRaw);
-                        if (!related.has(sid) || !coords[sid]) return;
-                        if (snapLayoutRowY(coords[sid].y) !== snapLayoutRowY(coords[cid].y)) return;
-                        addX(coords[sid].x);
-                    });
                 });
             });
 
@@ -860,9 +812,9 @@ function renderFinalLayout(centerId, persons, marriages, related) {
             return { lo, hi, unit };
         }
 
-        function applyDx(subtreeIds, dx) {
+        function applyDxToParentUnit(unit, dx) {
             if (dx <= 0.01) return;
-            subtreeIds.forEach(id => {
+            unit.ids.forEach(id => {
                 if (coords[id]) coords[id].x += dx;
             });
         }
@@ -889,11 +841,12 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                 spans.forEach(s => {
                     if (s.lo < trailingRight + MIN_GAP) {
                         const dx = trailingRight + MIN_GAP - s.lo;
-                        const subtree = idsInSubtreeStartingFromParents(s.unit.ids);
-                        applyDx(subtree, dx);
+                        applyDxToParentUnit(s.unit, dx);
+                        s.lo += dx;
+                        s.hi += dx;
                         movedThisPass = true;
                         movedEver = true;
-                        trailingRight = s.hi + dx;
+                        trailingRight = s.hi;
                     } else {
                         trailingRight = Math.max(trailingRight, s.hi);
                     }
@@ -1317,7 +1270,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
         }
 
         let groups = 0;
-        const PACK_GAP = Math.max(FAMILY_GROUP_GAP + 48, SIBLING_GAP + 32);
+        const PACK_GAP = Math.max(FAMILY_GROUP_GAP + 12, SIBLING_GAP);
 
         layoutRowKeys().forEach(py => {
             const cry = py + LEVEL_HEIGHT;
@@ -1375,12 +1328,15 @@ function renderFinalLayout(centerId, persons, marriages, related) {
                     const cid = g.childList[0];
                     const sp = g.csMap.get(cid) || [];
                     const geom0 = geomOneFamilyAnchoredMid(g.midX, cid, sp);
-                    const resolvedLeft = resolvePackNearest(
-                        geom0.left,
-                        geom0.width,
-                        rowOccupied,
-                        PACK_GAP
-                    );
+                    let resolvedLeft = geom0.left;
+                    if (!packStartValid(resolvedLeft, geom0.width, rowOccupied, PACK_GAP)) {
+                        resolvedLeft = resolvePackNearest(
+                            geom0.left,
+                            geom0.width,
+                            rowOccupied,
+                            PACK_GAP
+                        );
+                    }
                     const dMid = resolvedLeft - geom0.left;
                     writeOneChildAnchoredMid(g.midX + dMid, cry, cid, sp);
                     registerOccupied(resolvedLeft, geom0.width, rowOccupied);
@@ -1541,8 +1497,7 @@ function renderFinalLayout(centerId, persons, marriages, related) {
     }
     reAnchorChildrenUnderPlacedParents();
 
-    // Вторая волна: spread считался по старым детям; после финального якоря снова разводим родителей
-    // по фактическим коридорам к детям и пересчитываем ряд детей.
+    // Вторая волна: разводим только пары родителей; дети пересчитываются якорем под mid брака.
     normalizeMarriedCoupleSpacing();
     spreadParentBlocksForconnectorSpans();
     reAnchorChildrenUnderPlacedParents();

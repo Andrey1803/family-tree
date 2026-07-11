@@ -1222,159 +1222,7 @@ function render() {
     });
     
     const childTopOffset = CARD_H / 2;
-
-    /** Полосы для линий родитель→дети: разводим по Y, если сегменты пересекаются */
-    const CONNECTOR_JUNCTION_EPS = 1.5;
-
-    function buildConnectorSegments(job, horizLineY) {
-        const segs = [];
-        const pcx = job.parentCenterX;
-        const y0 = job.spouseLineY;
-        const y1 = horizLineY;
-        if (Math.abs(y1 - y0) > 1e-3) {
-            segs.push({
-                kind: 'v',
-                x: pcx,
-                yLo: Math.min(y0, y1),
-                yHi: Math.max(y0, y1),
-            });
-        }
-        const childXs = job.childrenCoords.map(t => t.cx);
-        const minX = Math.min(pcx, ...childXs);
-        const maxX = Math.max(pcx, ...childXs);
-        if (maxX - minX > 1e-3) {
-            segs.push({ kind: 'h', y: horizLineY, xLo: minX, xHi: maxX });
-        }
-        job.childrenCoords.forEach(({ cx, topY }) => {
-            const yt = topY;
-            const yh = horizLineY;
-            if (Math.abs(yt - yh) > 1e-3) {
-                segs.push({
-                    kind: 'v',
-                    x: cx,
-                    yLo: Math.min(yt, yh),
-                    yHi: Math.max(yt, yh),
-                });
-            }
-        });
-        return segs;
-    }
-
-    function connectorSegmentsCross(a, b) {
-        const eps = CONNECTOR_JUNCTION_EPS;
-        if (a.kind === 'h' && b.kind === 'v') {
-            if (b.x <= a.xLo + eps || b.x >= a.xHi - eps) return false;
-            if (a.y <= b.yLo + eps || a.y >= b.yHi - eps) return false;
-            return true;
-        }
-        if (a.kind === 'v' && b.kind === 'h') return connectorSegmentsCross(b, a);
-        if (a.kind === 'h' && b.kind === 'h') {
-            if (Math.abs(a.y - b.y) > eps) return false;
-            return !(a.xHi <= b.xLo + eps || b.xHi <= a.xLo + eps);
-        }
-        if (a.kind === 'v' && b.kind === 'v') {
-            if (Math.abs(a.x - b.x) > eps) return false;
-            return !(a.yHi <= b.yLo + eps || b.yHi <= a.yLo + eps);
-        }
-        return false;
-    }
-
-    function connectorSegmentsClash(segsA, segsB) {
-        for (const sa of segsA) {
-            for (const sb of segsB) {
-                if (connectorSegmentsCross(sa, sb)) return true;
-            }
-        }
-        return false;
-    }
-
-    function assignParentConnectorLanes(jobs) {
-        if (!jobs.length) return;
-
-        const MIN_LANE_SEP = 12;
-        const LANE_STEP = 3;
-        const maxParentBottom = Math.max(...jobs.map(j => j.parentY + CARD_H / 2));
-        const minChildTop = Math.min(...jobs.map(j => j.minTopY));
-
-        let corridorTop = maxParentBottom + 4;
-        let corridorBot = minChildTop - 4;
-        const minCorridor = jobs.length * MIN_LANE_SEP + 14;
-        if (corridorBot - corridorTop < minCorridor) {
-            const deficit = minCorridor - (corridorBot - corridorTop);
-            corridorTop -= deficit * 0.55;
-            corridorBot += deficit * 0.45;
-        }
-
-        const sorted = [...jobs].sort(
-            (a, b) => (a.maxSpanX - a.minSpanX) - (b.maxSpanX - b.minSpanX)
-        );
-        const placedSegs = [];
-
-        sorted.forEach((job, idx) => {
-            let placed = false;
-            const fallbackY = corridorTop
-                + ((idx + 1) / (jobs.length + 1)) * Math.max(8, corridorBot - corridorTop);
-
-            for (let trialY = corridorTop + 4; trialY <= corridorBot - 4; trialY += LANE_STEP) {
-                const segs = buildConnectorSegments(job, trialY);
-                if (!connectorSegmentsClash(segs, placedSegs)) {
-                    job.horizLineY = trialY;
-                    placedSegs.push(...segs);
-                    placed = true;
-                    break;
-                }
-            }
-
-            if (!placed) {
-                job.horizLineY = Math.min(corridorBot - 2, Math.max(corridorTop + 2, fallbackY));
-                placedSegs.push(...buildConnectorSegments(job, job.horizLineY));
-            }
-        });
-
-        for (let pass = 0; pass < 12; pass++) {
-            let changed = false;
-            for (const job of sorted) {
-                const otherSegs = [];
-                jobs.forEach(j => {
-                    if (j === job) return;
-                    otherSegs.push(...buildConnectorSegments(j, j.horizLineY));
-                });
-                const cur = buildConnectorSegments(job, job.horizLineY);
-                if (!connectorSegmentsClash(cur, otherSegs)) continue;
-
-                for (let trialY = corridorTop + 4; trialY <= corridorBot - 4; trialY += LANE_STEP) {
-                    const trial = buildConnectorSegments(job, trialY);
-                    if (!connectorSegmentsClash(trial, otherSegs)) {
-                        job.horizLineY = trialY;
-                        changed = true;
-                        break;
-                    }
-                }
-            }
-            if (!changed) break;
-        }
-    }
-
-    const connectorJobsByBand = {};
-    const snapRow = (y) => Math.round(y / LEVEL_HEIGHT) * LEVEL_HEIGHT;
-
-    /** Границы карточки(ок) «ребёнок + супруги на том же ряду» — для ширины горизонтали и полос */
-    function cardBlockLeftRightAtRow(pid) {
-        const c = coords[pid];
-        if (!c) return { left: 0, right: 0, cx: 0 };
-        const row = snapRow(c.y);
-        let left = c.x - CARD_W / 2;
-        let right = c.x + CARD_W / 2;
-        const sps = (persons[pid] && persons[pid].spouse_ids) || [];
-        sps.forEach(sidRaw => {
-            const sid = String(sidRaw);
-            if (!related.has(sid) || !coords[sid]) return;
-            if (snapRow(coords[sid].y) !== row) return;
-            left = Math.min(left, coords[sid].x - CARD_W / 2);
-            right = Math.max(right, coords[sid].x + CARD_W / 2);
-        });
-        return { left, right, cx: c.x };
-    }
+    const parentConnectorJobs = [];
 
     Object.entries(parentSetToChildren).forEach(([parentKey, childPids]) => {
         const first = persons[childPids[0]];
@@ -1383,117 +1231,92 @@ function render() {
         const parentPids = (first.parents || []).filter(pid => coords[pid]);
         if (!parentPids.length) return;
 
-        let parentCenterX, parentY, spouseLineY;
+        let parentCenterX, spouseLineY;
         if (parentPids.length >= 2) {
             const p1 = coords[parentPids[0]], p2 = coords[parentPids[1]];
             parentCenterX = (p1.x + p2.x) / 2;
-            parentY = p1.y;
             spouseLineY = p1.y;
         } else {
             parentCenterX = coords[parentPids[0]].x;
-            parentY = coords[parentPids[0]].y;
-            spouseLineY = parentY;
+            spouseLineY = coords[parentPids[0]].y;
         }
 
         const childrenCoords = childPids
             .filter(cid => coords[cid])
             .map(cid => {
                 const c = coords[cid];
-                const bl = cardBlockLeftRightAtRow(cid);
                 return {
                     cx: c.x,
                     cy: c.y,
                     topY: c.y - childTopOffset,
-                    blockLeft: bl.left,
-                    blockRight: bl.right,
                 };
             })
             .sort((a, b) => a.cx - b.cx);
         if (!childrenCoords.length) return;
 
-        const minTopY = Math.min(...childrenCoords.map(t => t.topY));
-        /* Ширина вилки — по центрам детей и родителя; НЕ по blockLeft/Right (там супруг,
-         * из‑за этого при одном ребёнке «плечи» горизонтали уходили далеко в стороны). */
-        const childCentersX = childrenCoords.map(t => t.cx);
-        const limbMinX = Math.min(parentCenterX, ...childCentersX);
-        const limbMaxX = Math.max(parentCenterX, ...childCentersX);
-        const minSpanX = limbMinX - 2;
-        const maxSpanX = limbMaxX + 2;
-
-        const bandKey = String(snapRow(childrenCoords[0].cy));
-        if (!connectorJobsByBand[bandKey]) connectorJobsByBand[bandKey] = [];
-        connectorJobsByBand[bandKey].push({
+        parentConnectorJobs.push({
             parentCenterX,
-            parentY,
             spouseLineY,
-            parentPids: [...parentPids],
             childrenCoords,
-            minTopY,
-            minSpanX,
-            maxSpanX,
+            minTopY: Math.min(...childrenCoords.map(t => t.topY)),
         });
-    });
-
-    Object.keys(connectorJobsByBand).forEach(bandKey => {
-        assignParentConnectorLanes(connectorJobsByBand[bandKey]);
     });
 
     const parentLineColor = getComputedStyle(document.documentElement)
         .getPropertyValue('--line-parent').trim() || '#475569';
 
-    Object.keys(connectorJobsByBand).forEach(bandKey => {
-        connectorJobsByBand[bandKey].forEach(job => {
-            const {
-                parentCenterX,
-                spouseLineY,
-                horizLineY,
-                childrenCoords,
-            } = job;
+    parentConnectorJobs.forEach(job => {
+        const { parentCenterX, spouseLineY, childrenCoords, minTopY } = job;
+        const lineY = (spouseLineY + minTopY) / 2;
+        const px = parentCenterX + offsetX;
+        const sy = spouseLineY + offsetY;
+        const ly = lineY + offsetY;
 
-            console.log(`[DEBUG] Parent lines band=${bandKey} horizLineY=${horizLineY.toFixed(1)} span=[${job.minSpanX.toFixed(0)},${job.maxSpanX.toFixed(0)}]`);
-
-            const midVertLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            midVertLine.setAttribute("x1", (parentCenterX + offsetX));
-            midVertLine.setAttribute("y1", (spouseLineY + offsetY));
-            midVertLine.setAttribute("x2", (parentCenterX + offsetX));
-            midVertLine.setAttribute("y2", (horizLineY + offsetY));
-            midVertLine.setAttribute("stroke", parentLineColor);
-            midVertLine.setAttribute("stroke-width", 2);
-            midVertLine.setAttribute("stroke-linecap", "round");
-            svg.appendChild(midVertLine);
-
-            const minX = Math.min(parentCenterX, ...childrenCoords.map(t => t.cx));
-            const maxX = Math.max(parentCenterX, ...childrenCoords.map(t => t.cx));
-
-            const hy = horizLineY + offsetY;
-            /* Почти нулевая горизонталь не нужна; слишком большой порог давал разрыв при микросдвиге cx */
-            const drawHoriz = maxX - minX > 1e-3;
-
-            if (drawHoriz) {
-                const horizLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                horizLine.setAttribute("x1", (minX + offsetX));
-                horizLine.setAttribute("y1", hy);
-                horizLine.setAttribute("x2", (maxX + offsetX));
-                horizLine.setAttribute("y2", hy);
-                horizLine.setAttribute("stroke", parentLineColor);
-                horizLine.setAttribute("stroke-width", 2);
-                horizLine.setAttribute("stroke-linecap", "round");
-                svg.appendChild(horizLine);
+        if (childrenCoords.length === 1) {
+            const { cx, topY } = childrenCoords[0];
+            const cxOff = cx + offsetX;
+            const topOff = topY + offsetY;
+            if (Math.abs(cx - parentCenterX) < 4) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", px);
+                line.setAttribute("y1", sy);
+                line.setAttribute("x2", px);
+                line.setAttribute("y2", topOff);
+                line.setAttribute("stroke", parentLineColor);
+                line.setAttribute("stroke-width", 2);
+                line.setAttribute("stroke-linecap", "round");
+                svg.appendChild(line);
+            } else {
+                const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+                poly.setAttribute("points", `${px},${sy} ${px},${ly} ${cxOff},${ly} ${cxOff},${topOff}`);
+                poly.setAttribute("fill", "none");
+                poly.setAttribute("stroke", parentLineColor);
+                poly.setAttribute("stroke-width", 2);
+                poly.setAttribute("stroke-linecap", "round");
+                poly.setAttribute("stroke-linejoin", "round");
+                svg.appendChild(poly);
             }
+            return;
+        }
 
-            childrenCoords.forEach(({ cx, topY }) => {
-                const childLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                const yTop = topY + offsetY;
-                childLine.setAttribute("x1", (cx + offsetX));
-                childLine.setAttribute("y1", hy);
-                childLine.setAttribute("x2", (cx + offsetX));
-                childLine.setAttribute("y2", yTop);
-                childLine.setAttribute("stroke", parentLineColor);
-                childLine.setAttribute("stroke-width", 2);
-                childLine.setAttribute("stroke-linecap", "round");
-                svg.appendChild(childLine);
-            });
+        const points = [[px, sy], [px, ly]];
+        childrenCoords.forEach(({ cx, topY }) => {
+            const cxOff = cx + offsetX;
+            const topOff = topY + offsetY;
+            points.push([cxOff, ly], [cxOff, topOff], [cxOff, ly]);
         });
+
+        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        poly.setAttribute(
+            "points",
+            points.map(([x, y]) => `${x},${y}`).join(" ")
+        );
+        poly.setAttribute("fill", "none");
+        poly.setAttribute("stroke", parentLineColor);
+        poly.setAttribute("stroke-width", 2);
+        poly.setAttribute("stroke-linecap", "round");
+        poly.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(poly);
     });
 
     updateStatusBar();
