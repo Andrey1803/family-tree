@@ -66,17 +66,21 @@ function collectVisiblePersons(centerId, persons, marriages) {
     // === 4. Добавляем супругов кровных родственников (рекурсивно) ===
     const marriageMap = new Map();  // pid -> [spouse_ids]
 
+    function addMarriagePair(p1, p2) {
+        const a = String(p1);
+        const b = String(p2);
+        if (!marriageMap.has(a)) marriageMap.set(a, []);
+        if (!marriageMap.has(b)) marriageMap.set(b, []);
+        if (!marriageMap.get(a).includes(b)) marriageMap.get(a).push(b);
+        if (!marriageMap.get(b).includes(a)) marriageMap.get(b).push(a);
+    }
+
     if (Array.isArray(marriages)) {
         marriages.forEach(marriage => {
             if (Array.isArray(marriage) && marriage.length >= 2) {
-                const p1 = String(marriage[0]);
-                const p2 = String(marriage[1]);
-
-                if (!marriageMap.has(p1)) marriageMap.set(p1, []);
-                if (!marriageMap.has(p2)) marriageMap.set(p2, []);
-
-                marriageMap.get(p1).push(p2);
-                marriageMap.get(p2).push(p1);
+                addMarriagePair(marriage[0], marriage[1]);
+            } else if (marriage && marriage.persons && marriage.persons.length >= 2) {
+                addMarriagePair(marriage.persons[0], marriage.persons[1]);
             }
         });
     }
